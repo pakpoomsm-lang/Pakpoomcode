@@ -57,7 +57,8 @@ START_TRANSACTION = "ZPP0059"
 # here if the pull says it couldn't find the exported file.
 HOME = Path(os.path.expanduser("~"))
 EXPORT_DIRS = [
-    Path(r"C:\TEMP"),                        # SAP export target seen in practice
+    Path(r"J:\7.541_HEI\Database follow\ZPP0059"),  # shared drive (primary)
+    Path(r"C:\TEMP"),                        # SAP default save dir (fallback)
     ROOT,                                   # this "Daily follow" folder
     HOME / "Documents" / "SAP" / "SAP GUI",  # SAP GUI default working dir
     HOME / "Downloads",
