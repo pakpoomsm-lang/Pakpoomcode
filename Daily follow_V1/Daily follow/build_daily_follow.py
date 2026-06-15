@@ -2221,7 +2221,11 @@ def render_html(rows):
         recompute(true);
         const nMat = Object.keys(DATA.progressMat).length, nLot = Object.keys(DATA.progressLot).length;
         const fname = res.file ? ` from ${{res.file}}` : '';
-        els.importStatus.textContent = `ZPP0059 updated${{fname}} (${{nMat.toLocaleString()}} mat / ${{nLot.toLocaleString()}} lot)`;
+        const st = res.stats || {{}};
+        const dbInfo = st.new_rows !== undefined
+          ? ` [DB +${{st.new_rows}} new / ${{st.skipped_rows}} dup / ${{(st.total_rows||0).toLocaleString()}} total]`
+          : '';
+        els.importStatus.textContent = `ZPP0059 updated${{fname}}${{dbInfo}} (${{nMat.toLocaleString()}} mat / ${{nLot.toLocaleString()}} lot)`;
       }} catch (error) {{
         console.error(error);
         els.importStatus.textContent = `ZPP0059 failed: ${{error.message}}`;
