@@ -54,6 +54,11 @@ DATE_TO_OFFSET_DAYS   = 0    # S_WKDT-HIGH = today
 # Set to "" to run the recorded VBS exactly as-is.
 START_TRANSACTION = "ZPP0059"
 
+# SAP opens the exported file in Excel automatically. When True, the workbook
+# is closed again right after we have read it (only that file is closed; any
+# other Excel windows you have open are left alone).
+CLOSE_EXCEL_AFTER = True
+
 # Folders watched for the file SAP exports (searched in order, newest file wins).
 HOME = Path(os.path.expanduser("~"))
 EXPORT_DIRS = [
@@ -364,6 +369,49 @@ while ((Get-Date) -lt $deadline) {
         return None
 
 
+def _close_excel(filename: str) -> None:
+    """Close the workbook SAP auto-opened after the export, without saving.
+    Only the matching file is closed; other open Excel windows are untouched.
+    Excel itself is quit only if no workbooks remain."""
+    if not CLOSE_EXCEL_AFTER:
+        return
+    wscript = shutil.which("wscript")
+    if not wscript:
+        return
+    safe_name = filename.replace('"', '')
+    vbs = f'''
+On Error Resume Next
+Dim target : target = "{safe_name}"
+Dim i, xl, wb, closed
+closed = False
+For i = 1 To 30
+    Set xl = GetObject(, "Excel.Application")
+    If Not (xl Is Nothing) Then
+        For Each wb In xl.Workbooks
+            If LCase(wb.Name) = LCase(target) Then
+                wb.Close False
+                closed = True
+            End If
+        Next
+        If closed Then
+            If xl.Workbooks.Count = 0 Then xl.Quit
+            Exit For
+        End If
+    End If
+    WScript.Sleep 500
+Next
+'''
+    tmp = ROOT / "_close_excel.vbs"
+    try:
+        tmp.write_text(vbs, encoding="utf-8")
+        subprocess.Popen(
+            [wscript, "//nologo", str(tmp)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
 def _newest_export(since: float) -> Path | None:
     best, best_mtime = None, since - 2
     for d in EXPORT_DIRS:
@@ -433,6 +481,9 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
         raise RuntimeError(
             "Ran the script but found no exported file. "
             "Add your SAP export folder to EXPORT_DIRS in serve_daily_follow.py.")
+
+    # SAP auto-opens the export in Excel — close that workbook again.
+    _close_excel(export.name)
 
     # Keep a copy as ZPP0059.xlsx (backward compat for build_daily_follow.py).
     shutil.copyfile(export, PROGRESS_FILE)
