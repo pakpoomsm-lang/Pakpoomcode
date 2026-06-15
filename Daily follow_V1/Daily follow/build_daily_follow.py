@@ -531,6 +531,33 @@ def render_html(rows):
       color: var(--ink-soft);
     }}
     .dash-close:hover {{ background: #fff1f2; border-color: #e8939b; color: #d62f40; }}
+    .db-panel {{ width: min(1280px, 98vw); }}
+    .db-toolbar {{
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 22px; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    }}
+    .db-toolbar input[type="search"] {{
+      flex: 1 1 240px; height: 32px; padding: 0 12px;
+      border: 1px solid var(--border); border-radius: 8px; font: inherit;
+    }}
+    .db-meta {{ font-size: 12px; color: var(--ink-soft); }}
+    .db-refresh {{
+      height: 32px; padding: 0 14px; border: 1px solid transparent; border-radius: 8px;
+      background: #0a8043; color: #fff; font: 700 11.5px/1 inherit; cursor: pointer;
+    }}
+    .db-refresh:hover {{ background: #0b6e3a; }}
+    .db-table-wrap {{ overflow: auto; flex: 1; padding: 0 0 8px; }}
+    .db-table {{ border-collapse: collapse; font-size: 12px; width: max-content; min-width: 100%; }}
+    .db-table th, .db-table td {{
+      border: 1px solid var(--border); padding: 5px 9px; white-space: nowrap; text-align: left;
+    }}
+    .db-table th {{
+      position: sticky; top: 0; background: #f1f5fb; font-weight: 700;
+      color: var(--ink); z-index: 1;
+    }}
+    .db-table tbody tr:nth-child(even) {{ background: #fafbfd; }}
+    .db-table tbody tr:hover {{ background: #eef4ff; }}
+    .db-empty {{ padding: 40px; text-align: center; color: var(--ink-soft); }}
     .dash-body {{ padding: 20px 22px; overflow: auto; }}
     .dash-stats {{ display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }}
     .dash-stat {{
@@ -1320,6 +1347,7 @@ def render_html(rows):
               <input id="importStock" type="file" accept=".xlsx,.xlsm">
             </label>
             <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
+            <button id="dbViewBtn" class="dash-btn" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
           </div>
         </div>
         <div class="lead-panel">
@@ -1386,6 +1414,20 @@ def render_html(rows):
       <div id="dashBody" class="dash-body"></div>
     </div>
   </div>
+  <div id="dbOverlay" class="dash-overlay" hidden>
+    <div class="dash-panel db-panel">
+      <div class="dash-head">
+        <div class="dash-title">ZPP0059 Database</div>
+        <button id="dbClose" class="dash-close" type="button">&#10005;</button>
+      </div>
+      <div class="db-toolbar">
+        <input id="dbSearch" type="search" placeholder="Search all columns…">
+        <button id="dbRefresh" class="db-refresh" type="button">&#8635; Refresh</button>
+        <span id="dbMeta" class="db-meta"></span>
+      </div>
+      <div id="dbTableWrap" class="db-table-wrap"></div>
+    </div>
+  </div>
   <div id="targetOverlay" class="dash-overlay" hidden>
     <div class="dash-panel target-panel">
       <div class="dash-head">
@@ -1445,7 +1487,11 @@ def render_html(rows):
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
       fillHandle: document.getElementById('fillHandle'),
       dashBtn: document.getElementById('dashBtn'), dashOverlay: document.getElementById('dashOverlay'),
-      dashClose: document.getElementById('dashClose'), dashBody: document.getElementById('dashBody')
+      dashClose: document.getElementById('dashClose'), dashBody: document.getElementById('dashBody'),
+      dbViewBtn: document.getElementById('dbViewBtn'), dbOverlay: document.getElementById('dbOverlay'),
+      dbClose: document.getElementById('dbClose'), dbSearch: document.getElementById('dbSearch'),
+      dbRefresh: document.getElementById('dbRefresh'), dbMeta: document.getElementById('dbMeta'),
+      dbTableWrap: document.getElementById('dbTableWrap')
     }};
     let hideSkip = false;
     let hideHairPin = localStorage.getItem('dailyFollowHideHair') === '1';
@@ -1798,6 +1844,8 @@ def render_html(rows):
           undo();
         }} else if (e.key === 'Escape' && !els.dashOverlay.hidden) {{
           closeDashboard();
+        }} else if (e.key === 'Escape' && !els.dbOverlay.hidden) {{
+          els.dbOverlay.hidden = true;
         }} else if (e.key === 'Escape' && !els.targetOverlay.hidden) {{
           closeTargetEditor();
         }}
@@ -1824,6 +1872,11 @@ def render_html(rows):
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
       els.dashBtn.addEventListener('click', openDashboard);
+      els.dbViewBtn.addEventListener('click', openDatabase);
+      els.dbClose.addEventListener('click', () => {{ els.dbOverlay.hidden = true; }});
+      els.dbOverlay.addEventListener('click', (e) => {{ if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; }});
+      els.dbRefresh.addEventListener('click', () => loadDatabase(els.dbSearch.value.trim()));
+      els.dbSearch.addEventListener('keydown', (e) => {{ if (e.key === 'Enter') loadDatabase(els.dbSearch.value.trim()); }});
       els.dashClose.addEventListener('click', closeDashboard);
       els.dashOverlay.addEventListener('click', (e) => {{ if (e.target === els.dashOverlay) closeDashboard(); }});
       els.editTargetBtn.addEventListener('click', openTargetEditor);
@@ -2831,6 +2884,63 @@ def render_html(rows):
     }}
     function openDashboard() {{ renderDashboardBody(); els.dashOverlay.hidden = false; }}
     function closeDashboard() {{ els.dashOverlay.hidden = true; }}
+    function openDatabase() {{
+      if (location.protocol === 'file:') {{
+        alert('View Database needs the local server.\nDouble-click Start_Daily_Follow.bat and open the page it gives you.');
+        return;
+      }}
+      els.dbOverlay.hidden = false;
+      loadDatabase(els.dbSearch.value.trim());
+    }}
+    async function loadDatabase(q) {{
+      els.dbMeta.textContent = 'Loading…';
+      els.dbTableWrap.replaceChildren();
+      try {{
+        const url = 'api/db-data?limit=1000&q=' + encodeURIComponent(q || '');
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || ('HTTP ' + resp.status));
+        if (!data.rows.length) {{
+          const e = document.createElement('div');
+          e.className = 'db-empty';
+          e.textContent = q ? `No rows match "${{q}}".` : 'Database is empty. Press ZPP0059 to pull data from SAP.';
+          els.dbTableWrap.appendChild(e);
+          els.dbMeta.textContent = `0 of ${{(data.total||0).toLocaleString()}} rows`;
+          return;
+        }}
+        const table = document.createElement('table');
+        table.className = 'db-table';
+        const thead = document.createElement('thead');
+        const htr = document.createElement('tr');
+        data.columns.forEach(c => {{
+          const th = document.createElement('th'); th.textContent = c; htr.appendChild(th);
+        }});
+        thead.appendChild(htr); table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        for (const row of data.rows) {{
+          const tr = document.createElement('tr');
+          for (const cell of row) {{
+            const td = document.createElement('td');
+            td.textContent = cell === null ? '' : cell;
+            tr.appendChild(td);
+          }}
+          tbody.appendChild(tr);
+        }}
+        table.appendChild(tbody);
+        els.dbTableWrap.appendChild(table);
+        const shown = data.shown.toLocaleString();
+        const total = (data.total||0).toLocaleString();
+        els.dbMeta.textContent = `Showing ${{shown}} of ${{total}} rows`
+          + (data.shown < data.total ? ` (newest first, max ${{data.limit}})` : '');
+      }} catch (error) {{
+        console.error(error);
+        els.dbMeta.textContent = '';
+        const e = document.createElement('div');
+        e.className = 'db-empty';
+        e.textContent = 'Failed to load database: ' + error.message;
+        els.dbTableWrap.appendChild(e);
+      }}
+    }}
     function targetLines() {{
       const {{ lines }} = computeLineSummary();
       const names = lines.map(l => l.line).filter(n => n && n !== '-');

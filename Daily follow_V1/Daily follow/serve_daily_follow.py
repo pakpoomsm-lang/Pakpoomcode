@@ -107,12 +107,12 @@ def _row_hash(values) -> str:
 def db_init(conn: sqlite3.Connection, headers: list[str]) -> list[str]:
     """Ensure the table exists and has all required columns. Returns safe col names."""
     safe = [_col_name(h) for h in headers]
-    cols_ddl = ", ".join(f'"{c}" TEXT' for c in safe)
-    conn.execute(f"""
+    # Base table always has the two internal columns; data columns are added
+    # below via ALTER (handles both new tables and empty-headers calls cleanly).
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS zpp0059_raw (
             _row_hash TEXT PRIMARY KEY,
-            _inserted_at TEXT DEFAULT (datetime('now','localtime')),
-            {cols_ddl}
+            _inserted_at TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
     # Add any columns that appeared in a newer export but not in the original table.
@@ -243,6 +243,57 @@ def db_stats(conn: sqlite3.Connection) -> dict:
         "SELECT MAX(_inserted_at) FROM zpp0059_raw"
     ).fetchone()[0]
     return {"total_rows": total, "newest_inserted_at": newest}
+
+
+# Columns shown (in order) by the "View Database" viewer.
+VIEWER_COLS = [
+    "Production Line", "Production Month", "Sequence", "Order", "Activity",
+    "Material", "Material Description", "Operation Short Text",
+    "Posted Quantity", "Assembly Order", "Working day", "Short Time Stamp",
+    "Receive Date", "Receive Time", "Stock Type", "Process",
+]
+
+
+def db_query(conn: sqlite3.Connection, q: str = "", limit: int = 500,
+             offset: int = 0) -> dict:
+    """Return rows from the DB for the viewer, optionally filtered by a text
+    search across the visible columns."""
+    existing = {r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
+    cols = [c for c in VIEWER_COLS if _col_name(c) in existing]
+    if not cols:  # fall back to whatever columns exist (minus internal)
+        cols = [c for c in existing if not c.startswith("_")][:16]
+        safe = cols
+        headers = cols
+    else:
+        safe = [_col_name(c) for c in cols]
+        headers = cols
+    col_sql = ", ".join(f'"{s}"' for s in safe)
+
+    where, params = "", []
+    if q:
+        like = f"%{q}%"
+        clauses = [f'"{s}" LIKE ?' for s in safe]
+        where = "WHERE " + " OR ".join(clauses)
+        params = [like] * len(safe)
+
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM zpp0059_raw {where}", params
+    ).fetchone()[0]
+
+    order_col = _col_name("Short Time Stamp")
+    order_sql = f'ORDER BY "{order_col}" DESC' if order_col in existing else ""
+    rows = conn.execute(
+        f'SELECT {col_sql} FROM zpp0059_raw {where} {order_sql} LIMIT ? OFFSET ?',
+        params + [limit, offset],
+    ).fetchall()
+    return {
+        "columns": headers,
+        "rows": [list(r) for r in rows],
+        "total": total,
+        "shown": len(rows),
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -533,7 +584,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, json.dumps({"ok": False, "error": "not found"}))
 
     def do_GET(self):
-        path = self.path.split("?", 1)[0].lstrip("/")
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        path = parsed.path.lstrip("/")
+        query = parse_qs(parsed.query)
         if path in ("", "index.html"):
             path = OUTPUT_FILE.name
         if path == "api/db-stats":
@@ -543,6 +597,19 @@ class Handler(BaseHTTPRequestHandler):
                 s = db_stats(conn)
                 conn.close()
                 self._send(200, json.dumps(s))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/db-data":
+            try:
+                conn = _get_db()
+                db_init(conn, [])
+                q = (query.get("q", [""])[0] or "").strip()
+                limit = min(int(query.get("limit", ["500"])[0]), 5000)
+                offset = max(int(query.get("offset", ["0"])[0]), 0)
+                data = db_query(conn, q, limit, offset)
+                conn.close()
+                self._send(200, json.dumps(data))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return
