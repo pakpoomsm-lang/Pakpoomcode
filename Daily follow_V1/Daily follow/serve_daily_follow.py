@@ -309,23 +309,18 @@ def _start_security_handler() -> subprocess.Popen | None:
         return None
 
     # VBScript handler: loops until killed by the parent process.
-    # Tab order in the dialog is normally: Allow → Deny → Help → checkbox.
-    # We use Shift+Tab to jump straight to the checkbox, Space to tick it,
-    # then Enter to press the focused (Allow) button.
+    # Uses the "Allow" button accelerator (Alt+A) — far more reliable than
+    # Tab navigation. On Error Resume Next stops any transient SendKeys glitch
+    # from raising a Windows Script Host error dialog.
     vbs = r"""
+On Error Resume Next
 Dim oShell : Set oShell = WScript.CreateObject("WScript.Shell")
 Dim t : t = Timer
 Do While Timer - t < 150
     If oShell.AppActivate("SAP GUI Security") Then
-        WScript.Sleep 250
-        oShell.SendKeys "+{TAB}"   ' Shift+Tab  ->  checkbox
-        WScript.Sleep 100
-        oShell.SendKeys " "        ' Space      ->  tick checkbox
-        WScript.Sleep 100
-        oShell.SendKeys "{TAB}"    ' Tab        ->  back to Allow
-        WScript.Sleep 100
-        oShell.SendKeys "{RETURN}" ' Enter      ->  click Allow
-        WScript.Sleep 500
+        WScript.Sleep 200
+        oShell.SendKeys "%a"   ' Alt+A = Allow
+        WScript.Sleep 400
     End If
     WScript.Sleep 150
 Loop
