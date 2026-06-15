@@ -731,6 +731,29 @@ def render_html(rows):
     .import-btn:active {{ transform: translateY(1px); }}
     .import-btn::before {{ content: "\\2191"; font-size: 13px; }}
     .import-btn input {{ display: none; }}
+    .sap-btn {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 32px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 0 16px;
+      background: #0a8043;
+      color: #fff;
+      font: 700 11.5px/1 inherit;
+      letter-spacing: .3px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(10, 128, 67, .25);
+      white-space: nowrap;
+      transition: background .15s, box-shadow .15s, transform .05s;
+    }}
+    .sap-btn::before {{ content: "\\21BB"; font-size: 14px; }}
+    .sap-btn:hover {{ background: #0b6e3a; box-shadow: 0 4px 10px rgba(10, 128, 67, .3); }}
+    .sap-btn:active {{ transform: translateY(1px); }}
+    .sap-btn[disabled] {{ opacity: .6; cursor: progress; }}
+    .sap-btn.busy::before {{ animation: sapSpin .8s linear infinite; }}
+    @keyframes sapSpin {{ to {{ transform: rotate(360deg); }} }}
     .clear-btn {{
       display: inline-flex;
       align-items: center;
@@ -1296,6 +1319,7 @@ def render_html(rows):
             <label class="import-btn">Update Stock
               <input id="importStock" type="file" accept=".xlsx,.xlsm">
             </label>
+            <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
           </div>
         </div>
         <div class="lead-panel">
@@ -1408,7 +1432,7 @@ def render_html(rows):
       body: document.getElementById('bodyRows'), colgroup: document.getElementById('colGroup'),
       wrap: document.querySelector('.table-wrap'),
       header: document.getElementById('headerRow'), importFile: document.getElementById('importFile'),
-      importStock: document.getElementById('importStock'),
+      importStock: document.getElementById('importStock'), zpp0059Btn: document.getElementById('zpp0059Btn'),
       importStatus: document.getElementById('importStatus'), clearData: document.getElementById('clearDataBtn'),
       clearProgress: document.getElementById('clearProgressBtn'),
       simBadge: document.getElementById('simBadge'), simSub: document.getElementById('simSub'),
@@ -1796,6 +1820,7 @@ def render_html(rows):
       }});
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
+      els.zpp0059Btn.addEventListener('click', runZpp0059);
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
       els.dashBtn.addEventListener('click', openDashboard);
@@ -2170,6 +2195,39 @@ def render_html(rows):
         els.importStatus.textContent = `Stock update failed: ${{error.message}}`;
       }} finally {{
         event.target.value = '';
+      }}
+    }}
+    async function runZpp0059() {{
+      // Ask the local companion server (serve_daily_follow.py) to drive SAP via
+      // Script_0059.vbs, then apply the freshly-exported ZPP0059 progress.
+      if (location.protocol === 'file:') {{
+        els.importStatus.textContent = 'ZPP0059 needs the local server. Double-click Start_Daily_Follow.bat, then open the page it gives you.';
+        return;
+      }}
+      const btn = els.zpp0059Btn;
+      btn.disabled = true;
+      btn.classList.add('busy');
+      els.importStatus.textContent = 'ZPP0059: pulling data from SAP… (do not touch the SAP window)';
+      try {{
+        const resp = await fetch('api/run-zpp0059', {{ method: 'POST' }});
+        const res = await resp.json().catch(() => ({{}}));
+        if (!resp.ok || !res.ok) throw new Error(res.error || ('HTTP ' + resp.status));
+        DATA.progressMat = res.mat || {{}};
+        DATA.progressLot = res.lot || {{}};
+        applyProgressToRows();
+        progressCleared = false;
+        localStorage.removeItem('dailyFollowProgCleared');
+        leadDirty = true;
+        recompute(true);
+        const nMat = Object.keys(DATA.progressMat).length, nLot = Object.keys(DATA.progressLot).length;
+        const fname = res.file ? ` from ${{res.file}}` : '';
+        els.importStatus.textContent = `ZPP0059 updated${{fname}} (${{nMat.toLocaleString()}} mat / ${{nLot.toLocaleString()}} lot)`;
+      }} catch (error) {{
+        console.error(error);
+        els.importStatus.textContent = `ZPP0059 failed: ${{error.message}}`;
+      }} finally {{
+        btn.disabled = false;
+        btn.classList.remove('busy');
       }}
     }}
     function clearData() {{
