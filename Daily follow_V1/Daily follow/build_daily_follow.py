@@ -2985,7 +2985,14 @@ def render_html(rows):
       renderLeadStrip();
       openTargetEditor();
     }}
-    setup();
+    try {{
+      setup();
+    }} catch (err) {{
+      document.body.insertAdjacentHTML('afterbegin',
+        `<div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#c00;color:#fff;padding:12px 16px;font:14px monospace;white-space:pre-wrap">
+&#9888; JS Error during startup — กรุณาแจ้ง error นี้:<br>${{err.stack || err}}</div>`);
+      console.error('setup() failed:', err);
+    }}
   </script>
 </body>
 </html>
