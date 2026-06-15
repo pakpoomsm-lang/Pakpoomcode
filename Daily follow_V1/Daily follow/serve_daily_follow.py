@@ -317,7 +317,10 @@ $Condition          = [System.Windows.Automation.PropertyCondition]
 $InvokePattern      = [System.Windows.Automation.InvokePattern]::Pattern
 $TogglePattern      = [System.Windows.Automation.TogglePattern]::Pattern
 
-$deadline = (Get-Date).AddSeconds(120)
+# Keep handling popups for the whole run; SAP raises several in sequence
+# (scripting attach, create file, modify directory, ...). The parent process
+# kills this handler once cscript returns, so we just loop until then.
+$deadline = (Get-Date).AddSeconds(150)
 while ((Get-Date) -lt $deadline) {
     $root = $AutomationElement::RootElement
     $wins = $root.FindAll(
@@ -326,32 +329,34 @@ while ((Get-Date) -lt $deadline) {
     foreach ($w in $wins) {
         $title = $w.Current.Name
         if ($title -notmatch "SAP GUI Security") { continue }
-        # Tick "Remember My Decision" checkbox
-        $chk = $w.FindFirst(
+        # Tick every "Remember My Decision" checkbox in the dialog.
+        $chks = $w.FindAll(
             [System.Windows.Automation.TreeScope]::Descendants,
             (New-Object $Condition(
                 $AutomationElement::ControlTypeProperty, $ControlType::CheckBox)))
-        if ($chk) {
-            $tp = $chk.GetCurrentPattern($TogglePattern)
-            if ($tp.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) {
-                $tp.Toggle()
-                Start-Sleep -Milliseconds 200
-            }
+        foreach ($chk in $chks) {
+            try {
+                $tp = $chk.GetCurrentPattern($TogglePattern)
+                if ($tp.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) {
+                    $tp.Toggle()
+                }
+            } catch {}
         }
-        # Click "Allow" button
+        Start-Sleep -Milliseconds 150
+        # Click "Allow".
         $btns = $w.FindAll(
             [System.Windows.Automation.TreeScope]::Descendants,
             (New-Object $Condition(
                 $AutomationElement::ControlTypeProperty, $ControlType::Button)))
         foreach ($btn in $btns) {
             if ($btn.Current.Name -match "Allow|Zulassen|อนุญาต") {
-                $btn.GetCurrentPattern($InvokePattern).Invoke()
+                try { $btn.GetCurrentPattern($InvokePattern).Invoke() } catch {}
                 break
             }
         }
-        exit 0
+        Start-Sleep -Milliseconds 400
     }
-    Start-Sleep -Milliseconds 300
+    Start-Sleep -Milliseconds 250
 }
 """
     try:
