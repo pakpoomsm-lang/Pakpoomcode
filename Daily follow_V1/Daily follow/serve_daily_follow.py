@@ -340,9 +340,6 @@ Loop
         )
     except Exception:
         return None
-        )
-    except Exception:
-        return None
 
 
 def _newest_export(since: float) -> Path | None:
