@@ -301,68 +301,45 @@ def _prepare_script() -> Path:
 
 
 def _start_security_handler() -> subprocess.Popen | None:
-    """Launch a background PowerShell that watches for the SAP GUI Security
-    popup, ticks 'Remember My Decision', then clicks Allow — so the user
-    never has to touch it manually.  Returns the Popen handle (or None on
-    non-Windows / if powershell not found)."""
-    ps = shutil.which("powershell") or shutil.which("pwsh")
-    if not ps:
+    """Launch a background WScript that watches for every 'SAP GUI Security'
+    popup, ticks 'Remember My Decision', and clicks Allow automatically.
+    Uses AppActivate + SendKeys — fast and reliable on any Windows version."""
+    wscript = shutil.which("wscript")
+    if not wscript:
         return None
-    script = r"""
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-$AutomationElement  = [System.Windows.Automation.AutomationElement]
-$ControlType        = [System.Windows.Automation.ControlType]
-$Condition          = [System.Windows.Automation.PropertyCondition]
-$InvokePattern      = [System.Windows.Automation.InvokePattern]::Pattern
-$TogglePattern      = [System.Windows.Automation.TogglePattern]::Pattern
 
-# Keep handling popups for the whole run; SAP raises several in sequence
-# (scripting attach, create file, modify directory, ...). The parent process
-# kills this handler once cscript returns, so we just loop until then.
-$deadline = (Get-Date).AddSeconds(150)
-while ((Get-Date) -lt $deadline) {
-    $root = $AutomationElement::RootElement
-    $wins = $root.FindAll(
-        [System.Windows.Automation.TreeScope]::Children,
-        [System.Windows.Automation.Condition]::TrueCondition)
-    foreach ($w in $wins) {
-        $title = $w.Current.Name
-        if ($title -notmatch "SAP GUI Security") { continue }
-        # Tick every "Remember My Decision" checkbox in the dialog.
-        $chks = $w.FindAll(
-            [System.Windows.Automation.TreeScope]::Descendants,
-            (New-Object $Condition(
-                $AutomationElement::ControlTypeProperty, $ControlType::CheckBox)))
-        foreach ($chk in $chks) {
-            try {
-                $tp = $chk.GetCurrentPattern($TogglePattern)
-                if ($tp.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) {
-                    $tp.Toggle()
-                }
-            } catch {}
-        }
-        Start-Sleep -Milliseconds 150
-        # Click "Allow".
-        $btns = $w.FindAll(
-            [System.Windows.Automation.TreeScope]::Descendants,
-            (New-Object $Condition(
-                $AutomationElement::ControlTypeProperty, $ControlType::Button)))
-        foreach ($btn in $btns) {
-            if ($btn.Current.Name -match "Allow|Zulassen|อนุญาต") {
-                try { $btn.GetCurrentPattern($InvokePattern).Invoke() } catch {}
-                break
-            }
-        }
-        Start-Sleep -Milliseconds 400
-    }
-    Start-Sleep -Milliseconds 250
-}
+    # VBScript handler: loops until killed by the parent process.
+    # Tab order in the dialog is normally: Allow → Deny → Help → checkbox.
+    # We use Shift+Tab to jump straight to the checkbox, Space to tick it,
+    # then Enter to press the focused (Allow) button.
+    vbs = r"""
+Dim oShell : Set oShell = WScript.CreateObject("WScript.Shell")
+Dim t : t = Timer
+Do While Timer - t < 150
+    If oShell.AppActivate("SAP GUI Security") Then
+        WScript.Sleep 250
+        oShell.SendKeys "+{TAB}"   ' Shift+Tab  ->  checkbox
+        WScript.Sleep 100
+        oShell.SendKeys " "        ' Space      ->  tick checkbox
+        WScript.Sleep 100
+        oShell.SendKeys "{TAB}"    ' Tab        ->  back to Allow
+        WScript.Sleep 100
+        oShell.SendKeys "{RETURN}" ' Enter      ->  click Allow
+        WScript.Sleep 500
+    End If
+    WScript.Sleep 150
+Loop
 """
+    tmp = ROOT / "_sec_handler.vbs"
+    tmp.write_text(vbs, encoding="utf-8")
     try:
+        # wscript runs the VBS in the background without a console window.
         return subprocess.Popen(
-            [ps, "-NoProfile", "-NonInteractive", "-Command", script],
+            [wscript, "//nologo", str(tmp)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return None
         )
     except Exception:
         return None
@@ -418,6 +395,11 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
             sec_handler.terminate()
         except Exception:
             pass
+    # Clean up temp handler VBS.
+    try:
+        (ROOT / "_sec_handler.vbs").unlink(missing_ok=True)
+    except Exception:
+        pass
     if proc.returncode != 0:
         msg = (proc.stderr or proc.stdout or "").strip()
         raise RuntimeError(f"SAP script error: {msg[:300] or 'unknown'}")
