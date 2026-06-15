@@ -2,4 +2,5 @@ __pycache__/
 *.pyc
 _zpp0059_run.vbs
 _sec_handler.vbs
+_sec_handler.ps1
 zpp0059.db

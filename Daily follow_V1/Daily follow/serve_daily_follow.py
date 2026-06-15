@@ -301,36 +301,63 @@ def _prepare_script() -> Path:
 
 
 def _start_security_handler() -> subprocess.Popen | None:
-    """Launch a background WScript that watches for every 'SAP GUI Security'
-    popup, ticks 'Remember My Decision', and clicks Allow automatically.
-    Uses AppActivate + SendKeys — fast and reliable on any Windows version."""
-    wscript = shutil.which("wscript")
-    if not wscript:
+    """Launch a background PowerShell that watches for every 'SAP GUI Security'
+    popup and clicks its 'Allow' button via UI Automation — focus-independent,
+    so it does not depend on accelerators or tab order. Written to a .ps1 file
+    and run with -File (passing multi-line scripts via -Command is unreliable)."""
+    ps = shutil.which("powershell") or shutil.which("pwsh")
+    if not ps:
         return None
 
-    # VBScript handler: loops until killed by the parent process.
-    # Uses the "Allow" button accelerator (Alt+A) — far more reliable than
-    # Tab navigation. On Error Resume Next stops any transient SendKeys glitch
-    # from raising a Windows Script Host error dialog.
-    vbs = r"""
-On Error Resume Next
-Dim oShell : Set oShell = WScript.CreateObject("WScript.Shell")
-Dim t : t = Timer
-Do While Timer - t < 150
-    If oShell.AppActivate("SAP GUI Security") Then
-        WScript.Sleep 200
-        oShell.SendKeys "%a"   ' Alt+A = Allow
-        WScript.Sleep 400
-    End If
-    WScript.Sleep 150
-Loop
+    script = r"""
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$AE = [System.Windows.Automation.AutomationElement]
+$CT = [System.Windows.Automation.ControlType]
+$Desc = [System.Windows.Automation.TreeScope]::Descendants
+$Child = [System.Windows.Automation.TreeScope]::Children
+$TrueCond = [System.Windows.Automation.Condition]::TrueCondition
+$Toggle = [System.Windows.Automation.TogglePattern]::Pattern
+$Invoke = [System.Windows.Automation.InvokePattern]::Pattern
+$On = [System.Windows.Automation.ToggleState]::On
+
+$deadline = (Get-Date).AddSeconds(160)
+while ((Get-Date) -lt $deadline) {
+    $root = $AE::RootElement
+    $win = $null
+    foreach ($w in $root.FindAll($Child, $TrueCond)) {
+        if ($w.Current.Name -like '*SAP GUI Security*') { $win = $w; break }
+    }
+    if ($win -ne $null) {
+        # Tick "Remember My Decision" so it stops asking next time.
+        $cbCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, $CT::CheckBox)
+        $cb = $win.FindFirst($Desc, $cbCond)
+        if ($cb -ne $null) {
+            try {
+                $tp = $cb.GetCurrentPattern($Toggle)
+                if ($tp.Current.ToggleState -ne $On) { $tp.Toggle() }
+            } catch {}
+        }
+        # Click the Allow button by name (ignore any '&' accelerator marker).
+        $btnCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, $CT::Button)
+        foreach ($b in $win.FindAll($Desc, $btnCond)) {
+            $name = ($b.Current.Name) -replace '&',''
+            if ($name -match '^(Allow|Zulassen|Permitir)') {
+                try { $b.GetCurrentPattern($Invoke).Invoke() } catch {}
+                break
+            }
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    Start-Sleep -Milliseconds 200
+}
 """
-    tmp = ROOT / "_sec_handler.vbs"
-    tmp.write_text(vbs, encoding="utf-8")
+    tmp = ROOT / "_sec_handler.ps1"
+    tmp.write_text(script, encoding="utf-8")
     try:
-        # wscript runs the VBS in the background without a console window.
         return subprocess.Popen(
-            [wscript, "//nologo", str(tmp)],
+            [ps, "-NoProfile", "-ExecutionPolicy", "Bypass",
+             "-WindowStyle", "Hidden", "-File", str(tmp)],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     except Exception:
@@ -387,9 +414,9 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
             sec_handler.terminate()
         except Exception:
             pass
-    # Clean up temp handler VBS.
+    # Clean up temp handler script.
     try:
-        (ROOT / "_sec_handler.vbs").unlink(missing_ok=True)
+        (ROOT / "_sec_handler.ps1").unlink(missing_ok=True)
     except Exception:
         pass
     if proc.returncode != 0:
