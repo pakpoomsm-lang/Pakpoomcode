@@ -47,6 +47,11 @@ DYNAMIC_DATES = True
 DATE_FROM_OFFSET_DAYS = -3   # S_WKDT-LOW  = today - 3 days
 DATE_TO_OFFSET_DAYS = 0      # S_WKDT-HIGH = today
 
+# Navigate to this transaction first, so the script works no matter what
+# screen SAP is on (the recorded script assumes you are already in ZPP0059).
+# Set to "" to skip and run the script exactly as recorded.
+START_TRANSACTION = "ZPP0059"
+
 # Folders to watch for the file SAP exports. The newest spreadsheet created
 # while the script runs is taken as the result. Add your SAP export folder
 # here if the pull says it couldn't find the exported file.
@@ -75,20 +80,34 @@ def _read_vbs_text():
 
 
 def _prepare_script():
-    """Return the path of the .vbs to execute (a temp copy with rolling dates,
-    or the original if DYNAMIC_DATES is off / substitution fails)."""
-    if not DYNAMIC_DATES:
+    """Return the path of the .vbs to execute. A temp copy is written with the
+    rolling date window and a leading "start transaction" step, so the script
+    runs regardless of which SAP screen is currently open. Falls back to the
+    original file if nothing needs changing or anything goes wrong."""
+    if not DYNAMIC_DATES and not START_TRANSACTION:
         return VBS_FILE
     try:
         text = _read_vbs_text()
-        low = (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
-        high = (date.today() + timedelta(days=DATE_TO_OFFSET_DAYS)).strftime("%d.%m.%Y")
-        text, n_low = re.subn(
-            r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{low}\g<2>", text)
-        text, n_high = re.subn(
-            r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{high}\g<2>", text)
-        if not (n_low and n_high):
-            return VBS_FILE  # pattern not found -> run original untouched
+
+        # 1) roll the work-date window to today (best effort).
+        if DYNAMIC_DATES:
+            low = (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
+            high = (date.today() + timedelta(days=DATE_TO_OFFSET_DAYS)).strftime("%d.%m.%Y")
+            text = re.sub(r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{low}\g<2>", text)
+            text = re.sub(r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{high}\g<2>", text)
+
+        # 2) make sure we are inside the transaction before touching its fields.
+        if START_TRANSACTION and "/tbar[0]/okcd" not in text:
+            nav = (
+                f'session.findById("wnd[0]/tbar[0]/okcd").text = "/n{START_TRANSACTION}"\r\n'
+                f'session.findById("wnd[0]").sendVKey 0\r\n'
+            )
+            m = re.search(r'^\s*session\.findById\("wnd\[0\]"\)\.resizeWorkingPane', text, re.M)
+            if not m:
+                m = re.search(r'^\s*session\.findById\("wnd\[0\]', text, re.M)
+            if m:
+                text = text[:m.start()] + nav + text[m.start():]
+
         tmp = ROOT / "_zpp0059_run.vbs"
         tmp.write_text(text, encoding="utf-8")
         return tmp
