@@ -1844,7 +1844,7 @@ def render_html(rows):
           undo();
         }} else if (e.key === 'Escape' && !els.dashOverlay.hidden) {{
           closeDashboard();
-        }} else if (e.key === 'Escape' && !els.dbOverlay.hidden) {{
+        }} else if (e.key === 'Escape' && els.dbOverlay && !els.dbOverlay.hidden) {{
           els.dbOverlay.hidden = true;
         }} else if (e.key === 'Escape' && !els.targetOverlay.hidden) {{
           closeTargetEditor();
@@ -1868,15 +1868,15 @@ def render_html(rows):
       }});
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
-      els.zpp0059Btn.addEventListener('click', runZpp0059);
+      if (els.zpp0059Btn) els.zpp0059Btn.addEventListener('click', runZpp0059);
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
       els.dashBtn.addEventListener('click', openDashboard);
-      els.dbViewBtn.addEventListener('click', openDatabase);
-      els.dbClose.addEventListener('click', () => {{ els.dbOverlay.hidden = true; }});
-      els.dbOverlay.addEventListener('click', (e) => {{ if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; }});
-      els.dbRefresh.addEventListener('click', () => loadDatabase(els.dbSearch.value.trim()));
-      els.dbSearch.addEventListener('keydown', (e) => {{ if (e.key === 'Enter') loadDatabase(els.dbSearch.value.trim()); }});
+      if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
+      if (els.dbClose) els.dbClose.addEventListener('click', () => {{ els.dbOverlay.hidden = true; }});
+      if (els.dbOverlay) els.dbOverlay.addEventListener('click', (e) => {{ if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; }});
+      if (els.dbRefresh) els.dbRefresh.addEventListener('click', () => loadDatabase(els.dbSearch.value.trim()));
+      if (els.dbSearch) els.dbSearch.addEventListener('keydown', (e) => {{ if (e.key === 'Enter') loadDatabase(els.dbSearch.value.trim()); }});
       els.dashClose.addEventListener('click', closeDashboard);
       els.dashOverlay.addEventListener('click', (e) => {{ if (e.target === els.dashOverlay) closeDashboard(); }});
       els.editTargetBtn.addEventListener('click', openTargetEditor);

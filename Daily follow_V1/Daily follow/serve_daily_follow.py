@@ -644,9 +644,8 @@ def main():
             print(f"  → {inserted} rows loaded.")
         conn.close()
 
-    if not OUTPUT_FILE.exists():
-        print("Building daily_follow.html …")
-        bdf.main()
+    print("Building daily_follow.html …")
+    bdf.main()
 
     url = f"http://{HOST}:{PORT}/{OUTPUT_FILE.name}"
     server = ThreadingHTTPServer((HOST, PORT), Handler)
