@@ -65,7 +65,9 @@ EXPORT_DIRS = [
     HOME / "Documents",
     HOME / "Desktop",
 ]
-EXPORT_EXTS = (".xlsx", ".xls", ".xlsm", ".mhtml")
+# Target directory for SAP to save the export file into.
+# Must match one of the EXPORT_DIRS entries above.
+SAP_EXPORT_DIR = str(Path(r"J:\7.541_HEI\Database follow\ZPP0059"))
 
 # Business key columns — a row is considered duplicate when ALL of these match.
 # If any column is missing from the export, falls back to SHA-256 of the whole row.
@@ -252,15 +254,17 @@ def _read_vbs_text() -> str:
 
 
 def _prepare_script() -> Path:
-    if not DYNAMIC_DATES and not START_TRANSACTION:
-        return VBS_FILE
     try:
         text = _read_vbs_text()
+
+        # 1) Roll the work-date window.
         if DYNAMIC_DATES:
             low  = (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
             high = (date.today() + timedelta(days=DATE_TO_OFFSET_DAYS)).strftime("%d.%m.%Y")
             text = re.sub(r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")',  rf"\g<1>{low}\g<2>",  text)
             text = re.sub(r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{high}\g<2>", text)
+
+        # 2) Navigate to the transaction before touching its selection fields.
         if START_TRANSACTION and "/tbar[0]/okcd" not in text:
             nav = (f'session.findById("wnd[0]/tbar[0]/okcd").text = "/n{START_TRANSACTION}"\r\n'
                    f'session.findById("wnd[0]").sendVKey 0\r\n')
@@ -269,11 +273,94 @@ def _prepare_script() -> Path:
                 m = re.search(r'^\s*session\.findById\("wnd\[0\]', text, re.M)
             if m:
                 text = text[:m.start()] + nav + text[m.start():]
+
+        # 3) Set export directory + filename in the SAP "Save File" dialog.
+        #    SAP uses wnd[1]/usr/ctxtDY_PATH and ctxtDY_FILENAME for the local file dialog.
+        #    We inject these lines just before the final wnd[1] btn[0] (Generate) press.
+        export_dir  = SAP_EXPORT_DIR.replace("\\", "\\\\")
+        save_inject = (
+            f'On Error Resume Next\r\n'
+            f'session.findById("wnd[1]/usr/ctxtDY_PATH").text = "{export_dir}"\r\n'
+            f'session.findById("wnd[2]/usr/ctxtDY_PATH").text = "{export_dir}"\r\n'
+            f'On Error GoTo 0\r\n'
+        )
+        # Find the last wnd[1]/tbar[0]/btn[0] press (the Generate button).
+        gen_pat = re.compile(
+            r'^(\s*session\.findById\("wnd\[1\]/tbar\[0\]/btn\[0\]"\)\.press)', re.M)
+        last = None
+        for m in gen_pat.finditer(text):
+            last = m
+        if last:
+            text = text[:last.start()] + save_inject + text[last.start():]
+
         tmp = ROOT / "_zpp0059_run.vbs"
         tmp.write_text(text, encoding="utf-8")
         return tmp
     except Exception:
         return VBS_FILE
+
+
+def _start_security_handler() -> subprocess.Popen | None:
+    """Launch a background PowerShell that watches for the SAP GUI Security
+    popup, ticks 'Remember My Decision', then clicks Allow — so the user
+    never has to touch it manually.  Returns the Popen handle (or None on
+    non-Windows / if powershell not found)."""
+    ps = shutil.which("powershell") or shutil.which("pwsh")
+    if not ps:
+        return None
+    script = r"""
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$AutomationElement  = [System.Windows.Automation.AutomationElement]
+$ControlType        = [System.Windows.Automation.ControlType]
+$Condition          = [System.Windows.Automation.PropertyCondition]
+$InvokePattern      = [System.Windows.Automation.InvokePattern]::Pattern
+$TogglePattern      = [System.Windows.Automation.TogglePattern]::Pattern
+
+$deadline = (Get-Date).AddSeconds(120)
+while ((Get-Date) -lt $deadline) {
+    $root = $AutomationElement::RootElement
+    $wins = $root.FindAll(
+        [System.Windows.Automation.TreeScope]::Children,
+        [System.Windows.Automation.Condition]::TrueCondition)
+    foreach ($w in $wins) {
+        $title = $w.Current.Name
+        if ($title -notmatch "SAP GUI Security") { continue }
+        # Tick "Remember My Decision" checkbox
+        $chk = $w.FindFirst(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            (New-Object $Condition(
+                $AutomationElement::ControlTypeProperty, $ControlType::CheckBox)))
+        if ($chk) {
+            $tp = $chk.GetCurrentPattern($TogglePattern)
+            if ($tp.Current.ToggleState -ne [System.Windows.Automation.ToggleState]::On) {
+                $tp.Toggle()
+                Start-Sleep -Milliseconds 200
+            }
+        }
+        # Click "Allow" button
+        $btns = $w.FindAll(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            (New-Object $Condition(
+                $AutomationElement::ControlTypeProperty, $ControlType::Button)))
+        foreach ($btn in $btns) {
+            if ($btn.Current.Name -match "Allow|Zulassen|อนุญาต") {
+                $btn.GetCurrentPattern($InvokePattern).Invoke()
+                break
+            }
+        }
+        exit 0
+    }
+    Start-Sleep -Milliseconds 300
+}
+"""
+    try:
+        return subprocess.Popen(
+            [ps, "-NoProfile", "-NonInteractive", "-Command", script],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return None
 
 
 def _newest_export(since: float) -> Path | None:
@@ -314,11 +401,18 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
         raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
 
     script = _prepare_script()
+    # Start background handler BEFORE cscript so it's ready to catch the popup.
+    sec_handler = _start_security_handler()
     started = time.time()
     proc = subprocess.run(
         [cscript, "//nologo", str(script)],
         capture_output=True, text=True, timeout=RUN_TIMEOUT,
     )
+    if sec_handler:
+        try:
+            sec_handler.terminate()
+        except Exception:
+            pass
     if proc.returncode != 0:
         msg = (proc.stderr or proc.stdout or "").strip()
         raise RuntimeError(f"SAP script error: {msg[:300] or 'unknown'}")
