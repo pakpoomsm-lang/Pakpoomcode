@@ -35,9 +35,81 @@ import build_daily_follow as bdf
 HOST = "127.0.0.1"
 PORT = 8059
 ROOT = bdf.ROOT
-VBS_FILE = ROOT.parent / "Script_0059.vbs"
 OUTPUT_FILE = bdf.OUTPUT_FILE
 PROGRESS_FILE = bdf.PROGRESS_FILE          # ZPP0059.xlsx — still kept for fallback
+
+# ---------------------------------------------------------------------------
+# SAP GUI recordings, embedded inline (no external .vbs files needed).
+# The selection-screen field values are taken verbatim from the recordings;
+# the date window in ZPP0059 is rolled automatically before each run.
+# ---------------------------------------------------------------------------
+SAP_SCRIPT_0059 = r'''If Not IsObject(application) Then
+   Set SapGuiAuto  = GetObject("SAPGUISERVER")
+   Set application = SapGuiAuto.GetScriptingEngine
+End If
+If Not IsObject(connection) Then
+   Set connection = application.Children(0)
+End If
+If Not IsObject(session) Then
+   Set session    = connection.Children(0)
+End If
+If IsObject(WScript) Then
+   WScript.ConnectObject session,     "on"
+   WScript.ConnectObject application, "on"
+End If
+session.findById("wnd[0]").resizeWorkingPane 153,29,false
+session.findById("wnd[0]").sendVKey 0
+session.findById("wnd[0]/usr/ctxtS_SHOP-LOW").text = "542"
+session.findById("wnd[0]/usr/ctxtS_ORDTY-LOW").text = "zp40"
+session.findById("wnd[0]/usr/ctxtS_WKDT-LOW").text = "12.06.2026"
+session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").text = "15.06.2026"
+session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").setFocus
+session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").caretPosition = 10
+session.findById("wnd[0]").sendVKey 8
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").setCurrentCell 2,"ZTIMESTAMP"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").selectedRows = "2"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").contextMenu
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").selectContextMenuItem "&XXL"
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_GUI_CUL_EXPORT_AS:0512/cmbGS_EXPORT-DESTINATION").setFocus
+session.findById("wnd[1]/tbar[0]/btn[20]").press
+session.findById("wnd[1]/tbar[0]/btn[0]").press
+'''
+
+SAP_SCRIPT_0022 = r'''If Not IsObject(application) Then
+   Set SapGuiAuto  = GetObject("SAPGUISERVER")
+   Set application = SapGuiAuto.GetScriptingEngine
+End If
+If Not IsObject(connection) Then
+   Set connection = application.Children(0)
+End If
+If Not IsObject(session) Then
+   Set session    = connection.Children(0)
+End If
+If IsObject(WScript) Then
+   WScript.ConnectObject session,     "on"
+   WScript.ConnectObject application, "on"
+End If
+session.findById("wnd[0]").resizeWorkingPane 194,25,false
+session.findById("wnd[0]").sendVKey 0
+session.findById("wnd[0]/usr/ctxtS_WERKS-LOW").text = "1001"
+session.findById("wnd[0]/usr/radR_PROC_3").setFocus
+session.findById("wnd[0]/usr/radR_PROC_3").select
+session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").text = "542"
+session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").setFocus
+session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").caretPosition = 3
+session.findById("wnd[0]").sendVKey 8
+session.findById("wnd[0]").sendVKey 33
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").setCurrentCell 10,"TEXT"
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").firstVisibleRow = 3
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").selectedRows = "10"
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").clickCurrentCell
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").setCurrentCell 5,"PSMNG"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectedRows = "5"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").contextMenu
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectContextMenuItem "&XXL"
+session.findById("wnd[1]/tbar[0]/btn[20]").press
+session.findById("wnd[1]/tbar[0]/btn[0]").press
+'''
 
 # SQLite database path (same folder as the scripts).
 DB_FILE = ROOT / "zpp0059.db"
@@ -63,7 +135,6 @@ START_TRANSACTION = "ZPP0059"
 # Same concept as ZPP0059, but pulls the order export that rebuilds the table.
 # The recorded script already fills its own selection fields (plant 1001,
 # line 542, radio R_PROC_3), so it runs as-is — no date window to roll.
-VBS_FILE_0022          = ROOT.parent / "Script_0022.vbs"
 START_TRANSACTION_0022 = "ZPP0022"
 PROGRESS_0022_FILE     = ROOT / "ZPP0022.xlsx"   # latest export, served to the page
 ZPP0022_TABLE          = "zpp0022_raw"
@@ -311,23 +382,13 @@ def db_query(conn: sqlite3.Connection, q: str = "", limit: int = 500,
 # ---------------------------------------------------------------------------
 # SAP + export helpers
 # ---------------------------------------------------------------------------
-def _read_vbs_text(vbs_file: Path = VBS_FILE) -> str:
-    raw = vbs_file.read_bytes()
-    for enc in ("utf-16", "utf-16-le", "utf-8-sig", "utf-8", "latin-1"):
-        try:
-            return raw.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return raw.decode("latin-1", "ignore")
-
-
-def _prepare_script(vbs_file: Path = VBS_FILE,
+def _prepare_script(script_text: str = SAP_SCRIPT_0059,
                     transaction: str = START_TRANSACTION,
                     roll_dates: bool = DYNAMIC_DATES,
                     export_dir_win: str = SAP_EXPORT_DIR,
                     tmp_name: str = "_zpp0059_run.vbs") -> Path:
     try:
-        text = _read_vbs_text(vbs_file)
+        text = script_text
 
         # 1) Roll the work-date window (only for scripts that have S_WKDT fields).
         if roll_dates:
@@ -369,7 +430,10 @@ def _prepare_script(vbs_file: Path = VBS_FILE,
         tmp.write_text(text, encoding="utf-8")
         return tmp
     except Exception:
-        return vbs_file
+        # Fall back to the unmodified recording.
+        tmp = ROOT / tmp_name
+        tmp.write_text(script_text, encoding="utf-8")
+        return tmp
 
 
 def _start_security_handler() -> subprocess.Popen | None:
@@ -585,7 +649,7 @@ def _friendly_sap_error(raw: str) -> str:
     return f"SAP script error: {raw[:300] or 'unknown'}"
 
 
-def _drive_sap_export(vbs_file: Path = VBS_FILE,
+def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
                      transaction: str = START_TRANSACTION,
                      roll_dates: bool = DYNAMIC_DATES,
                      export_dir_win: str = SAP_EXPORT_DIR,
@@ -593,7 +657,7 @@ def _drive_sap_export(vbs_file: Path = VBS_FILE,
     """Drive SAP once and return the file it just exported.
     Raises RuntimeError on a (often transient) failure; TimeoutExpired on timeout."""
     cscript = shutil.which("cscript")
-    script = _prepare_script(vbs_file, transaction, roll_dates, export_dir_win, tmp_name)
+    script = _prepare_script(script_text, transaction, roll_dates, export_dir_win, tmp_name)
     # Start background handler BEFORE cscript so it's ready to catch the popup.
     sec_handler = _start_security_handler()
     started = time.time()
@@ -631,8 +695,6 @@ def _drive_sap_export(vbs_file: Path = VBS_FILE,
 
 def run_zpp0059() -> tuple[dict, dict, str, dict]:
     """Drive SAP → upsert into DB → aggregate. Returns (mat, lot, filename, stats)."""
-    if not VBS_FILE.exists():
-        raise RuntimeError(f"Script not found: {VBS_FILE.name}")
     cscript = shutil.which("cscript")
     if not cscript:
         raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
@@ -683,11 +745,10 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
 
 
 def run_zpp0022() -> tuple[str, dict]:
-    """Drive SAP via Script_0022.vbs → save the order export → store raw rows in
-    SQLite. The page then loads ZPP0022.xlsx and rebuilds the table from it
-    (same pipeline as the manual 'Update Progress' import). Returns (filename, stats)."""
-    if not VBS_FILE_0022.exists():
-        raise RuntimeError(f"Script not found: {VBS_FILE_0022.name}")
+    """Drive SAP with the embedded ZPP0022 recording → save the order export →
+    store raw rows in SQLite. The page then loads ZPP0022.xlsx and rebuilds the
+    table from it (same pipeline as the manual 'Update Progress' import).
+    Returns (filename, stats)."""
     cscript = shutil.which("cscript")
     if not cscript:
         raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
@@ -700,7 +761,7 @@ def run_zpp0022() -> tuple[str, dict]:
     for attempt in range(1, RUN_ATTEMPTS + 1):
         try:
             export = _drive_sap_export(
-                vbs_file=VBS_FILE_0022,
+                script_text=SAP_SCRIPT_0022,
                 transaction=START_TRANSACTION_0022,
                 roll_dates=False,   # the 0022 script has no S_WKDT date window
                 export_dir_win=SAP_EXPORT_DIR_0022,
