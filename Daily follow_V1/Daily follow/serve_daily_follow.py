@@ -1,0 +1,977 @@
+"""Local companion server for daily_follow.html.
+
+POST /api/run-zpp0059  — drives SAP (ZPP0059), upserts rows into SQLite,
+                         returns aggregated progress to the page.
+GET  /api/db-stats     — returns row count and newest timestamp from the DB.
+GET  /*                — serves static files from the Daily follow folder.
+
+Requires Python 3.8+ (sqlite3 is in the standard library).
+Run on the Windows machine that has SAP GUI open and logged in.
+Double-click Start_Daily_Follow.bat or: python serve_daily_follow.py
+"""
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import time
+import webbrowser
+from collections import defaultdict
+from datetime import date, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import openpyxl
+
+import build_daily_follow as bdf
+
+# ---------------------------------------------------------------------------
+# Configuration  (edit these to match your machine)
+# ---------------------------------------------------------------------------
+HOST = "127.0.0.1"
+PORT = 8059
+ROOT = bdf.ROOT
+OUTPUT_FILE = bdf.OUTPUT_FILE
+PROGRESS_FILE = bdf.PROGRESS_FILE          # ZPP0059.xlsx — still kept for fallback
+
+# ---------------------------------------------------------------------------
+# SAP GUI recordings, embedded inline (no external .vbs files needed).
+# The selection-screen field values are taken verbatim from the recordings;
+# the date window in ZPP0059 is rolled automatically before each run.
+# ---------------------------------------------------------------------------
+SAP_SCRIPT_0059 = r'''If Not IsObject(application) Then
+   Set SapGuiAuto  = GetObject("SAPGUISERVER")
+   Set application = SapGuiAuto.GetScriptingEngine
+End If
+If Not IsObject(connection) Then
+   Set connection = application.Children(0)
+End If
+If Not IsObject(session) Then
+   Set session    = connection.Children(0)
+End If
+If IsObject(WScript) Then
+   WScript.ConnectObject session,     "on"
+   WScript.ConnectObject application, "on"
+End If
+session.findById("wnd[0]").resizeWorkingPane 153,29,false
+session.findById("wnd[0]").sendVKey 0
+session.findById("wnd[0]/usr/ctxtS_SHOP-LOW").text = "542"
+session.findById("wnd[0]/usr/ctxtS_ORDTY-LOW").text = "zp40"
+session.findById("wnd[0]/usr/ctxtS_WKDT-LOW").text = "12.06.2026"
+session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").text = "15.06.2026"
+session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").setFocus
+session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").caretPosition = 10
+session.findById("wnd[0]").sendVKey 8
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").setCurrentCell 2,"ZTIMESTAMP"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").selectedRows = "2"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").contextMenu
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell").selectContextMenuItem "&XXL"
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_GUI_CUL_EXPORT_AS:0512/cmbGS_EXPORT-DESTINATION").setFocus
+session.findById("wnd[1]/tbar[0]/btn[20]").press
+session.findById("wnd[1]/tbar[0]/btn[0]").press
+'''
+
+SAP_SCRIPT_0022 = r'''If Not IsObject(application) Then
+   Set SapGuiAuto  = GetObject("SAPGUISERVER")
+   Set application = SapGuiAuto.GetScriptingEngine
+End If
+If Not IsObject(connection) Then
+   Set connection = application.Children(0)
+End If
+If Not IsObject(session) Then
+   Set session    = connection.Children(0)
+End If
+If IsObject(WScript) Then
+   WScript.ConnectObject session,     "on"
+   WScript.ConnectObject application, "on"
+End If
+session.findById("wnd[0]").resizeWorkingPane 194,25,false
+session.findById("wnd[0]").sendVKey 0
+session.findById("wnd[0]/usr/ctxtS_WERKS-LOW").text = "1001"
+session.findById("wnd[0]/usr/radR_PROC_3").setFocus
+session.findById("wnd[0]/usr/radR_PROC_3").select
+session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").text = "542"
+session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").setFocus
+session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").caretPosition = 3
+session.findById("wnd[0]").sendVKey 8
+session.findById("wnd[0]").sendVKey 33
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").setCurrentCell 10,"TEXT"
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").firstVisibleRow = 3
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").selectedRows = "10"
+session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").clickCurrentCell
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").setCurrentCell 5,"PSMNG"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectedRows = "5"
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").contextMenu
+session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectContextMenuItem "&XXL"
+session.findById("wnd[1]/tbar[0]/btn[20]").press
+session.findById("wnd[1]/tbar[0]/btn[0]").press
+'''
+
+# SQLite database path (same folder as the scripts).
+DB_FILE = ROOT / "zpp0059.db"
+
+# Persisted page state (imported rows + progress overlay) so the table survives
+# a browser refresh. Written by POST /api/save-state, read by GET /api/state.
+STATE_FILE = ROOT / "daily_follow_state.json"
+
+# How long to wait for SAP to finish exporting (seconds).
+RUN_TIMEOUT = 180
+
+# How many times to drive SAP before giving up. A second try clears most
+# transient hiccups (a stray popup, SAP momentarily busy) because the script
+# re-navigates to /nZPP0059 from scratch each run. Timeouts are never retried.
+RUN_ATTEMPTS = 2
+
+# Rolling date window injected into the VBS before each run.
+DYNAMIC_DATES = True
+DATE_FROM_OFFSET_DAYS = -7   # S_WKDT-LOW  = today - 7 days
+DATE_TO_OFFSET_DAYS   = 0    # S_WKDT-HIGH = today
+
+# Navigate to ZPP0059 before touching its selection screen fields.
+# Set to "" to run the recorded VBS exactly as-is.
+START_TRANSACTION = "ZPP0059"
+
+# --- ZPP0022 (order master / "Update Progress" source) -----------------------
+# Same concept as ZPP0059, but pulls the order export that rebuilds the table.
+# The recorded script already fills its own selection fields (plant 1001,
+# line 542, radio R_PROC_3), so it runs as-is — no date window to roll.
+START_TRANSACTION_0022 = "ZPP0022"
+PROGRESS_0022_FILE     = ROOT / "ZPP0022.xlsx"   # latest export, served to the page
+ZPP0022_TABLE          = "zpp0022_raw"
+SAP_EXPORT_DIR_0022    = str(Path(r"J:\7.541_HEI\Database follow\ZPP0022"))
+
+
+# SAP opens the exported file in Excel automatically. When True, the workbook
+# is closed again right after we have read it (only that file is closed; any
+# other Excel windows you have open are left alone).
+CLOSE_EXCEL_AFTER = True
+
+# Folders watched for the file SAP exports (searched in order, newest file wins).
+HOME = Path(os.path.expanduser("~"))
+EXPORT_DIRS = [
+    Path(r"J:\7.541_HEI\Database follow\ZPP0059"),  # shared drive (primary)
+    Path(r"J:\7.541_HEI\Database follow\ZPP0022"),  # ZPP0022 order export
+    Path(r"C:\TEMP"),                               # SAP default save dir
+    ROOT,
+    HOME / "Documents" / "SAP" / "SAP GUI",
+    HOME / "Downloads",
+    HOME / "Documents",
+    HOME / "Desktop",
+]
+# Target directory for SAP to save the export file into.
+# Must match one of the EXPORT_DIRS entries above.
+SAP_EXPORT_DIR = str(Path(r"J:\7.541_HEI\Database follow\ZPP0059"))
+
+# Business key columns — a row is considered duplicate when ALL of these match.
+# If any column is missing from the export, falls back to SHA-256 of the whole row.
+UNIQUE_KEY_COLS = ["Order", "Activity", "Short Time Stamp", "Tag ID"]
+
+# Columns used to aggregate progress (must match bdf.load_progress logic).
+PROGRESS_COLS = [
+    "Production Line", "Production Month", "Sequence",
+    "Material", "Assembly Order", "Operation Short Text", "Posted Quantity",
+]
+
+# File extensions accepted when scanning EXPORT_DIRS for SAP's export file.
+EXPORT_EXTS = {".xlsx", ".xlsm", ".xls"}
+
+
+# ---------------------------------------------------------------------------
+# SQLite helpers
+# ---------------------------------------------------------------------------
+def _get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(str(DB_FILE), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _col_name(raw: str) -> str:
+    """Sanitise a header string to a safe SQL column name."""
+    return re.sub(r"[^\w]", "_", raw.strip()).strip("_")
+
+
+def _row_hash(values) -> str:
+    blob = "|".join("" if v is None else str(v) for v in values)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def db_init(conn: sqlite3.Connection, headers: list[str],
+            table: str = "zpp0059_raw") -> list[str]:
+    """Ensure the table exists and has all required columns. Returns safe col names."""
+    safe = [_col_name(h) for h in headers]
+    # Base table always has the two internal columns; data columns are added
+    # below via ALTER (handles both new tables and empty-headers calls cleanly).
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table} (
+            _row_hash TEXT PRIMARY KEY,
+            _inserted_at TEXT DEFAULT (datetime('now','localtime'))
+        )
+    """)
+    # Add any columns that appeared in a newer export but not in the original table.
+    existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+    for c in safe:
+        if c not in existing:
+            conn.execute(f'ALTER TABLE {table} ADD COLUMN "{c}" TEXT')
+    conn.commit()
+    return safe
+
+
+def db_upsert(conn: sqlite3.Connection, headers: list[str], rows,
+              table: str = "zpp0059_raw") -> tuple[int, int]:
+    """Insert rows that don't already exist. Returns (inserted, skipped)."""
+    safe_headers = db_init(conn, headers, table)
+    h_to_safe = {h: s for h, s in zip(headers, safe_headers)}
+
+    # Determine which columns to use for the business key.
+    key_cols = [c for c in UNIQUE_KEY_COLS if c in headers]
+    use_hash = len(key_cols) < 2  # fallback: SHA-256 of entire row
+
+    inserted = skipped = 0
+    placeholders = ", ".join("?" for _ in safe_headers)
+    col_list = ", ".join(f'"{c}"' for c in safe_headers)
+    sql = (f'INSERT OR IGNORE INTO {table} (_row_hash, {col_list}) '
+           f'VALUES (?, {placeholders})')
+
+    batch = []
+    for row in rows:
+        values = [str(v).strip() if v is not None else "" for v in row]
+        if use_hash:
+            key = _row_hash(values)
+        else:
+            key_vals = [values[headers.index(c)] for c in key_cols]
+            key = hashlib.sha256("|".join(key_vals).encode()).hexdigest()
+        batch.append((key, *values))
+        if len(batch) >= 500:
+            cur = conn.executemany(sql, batch)
+            inserted += cur.rowcount
+            skipped += len(batch) - cur.rowcount
+            batch.clear()
+
+    if batch:
+        cur = conn.executemany(sql, batch)
+        inserted += cur.rowcount
+        skipped += len(batch) - cur.rowcount
+    conn.commit()
+    return inserted, skipped
+
+
+def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
+    """Re-aggregate the full DB into (progressMat, progressLot) for the page."""
+    # Map header -> safe col name.
+    col_map = {r[1]: r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
+
+    def c(name):
+        return _col_name(name)
+
+    # Check all needed columns exist.
+    needed = [c(x) for x in PROGRESS_COLS]
+    missing = [n for n in needed if n not in col_map]
+    if missing:
+        return {}, {}
+
+    op_field = {"Insert": "fp", "Brazing": "auto", "Cutting": "cutting"}
+    hp_op = "H/P bender"
+
+    def clean(v):
+        if v is None:
+            return ""
+        v = str(v).strip()
+        try:
+            f = float(v)
+            return int(f) if f.is_integer() else round(f, 3)
+        except ValueError:
+            return v
+
+    by_mat: dict = defaultdict(lambda: defaultdict(float))
+    by_lot: dict = defaultdict(float)
+
+    sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", '
+           f'"{c("Sequence")}", "{c("Material")}", "{c("Assembly Order")}", '
+           f'"{c("Operation Short Text")}", "{c("Posted Quantity")}" '
+           f'FROM zpp0059_raw WHERE "{c("Production Line")}" != ""')
+
+    for row in conn.execute(sql):
+        line, month_raw, seq_raw, mat, ao, op, qty_raw = row
+        if not line:
+            continue
+        try:
+            qty = float(qty_raw) if qty_raw else 0.0
+        except ValueError:
+            qty = 0.0
+        head = f"{line}|{bdf.month_display(month_raw)}|{bdf.seq_key(seq_raw)}"
+        if op == hp_op:
+            by_lot[f"{head}|{ao}"] += qty
+        elif op in op_field:
+            by_mat[f"{head}|{mat}"][op_field[op]] += qty
+
+    def rnd(v):
+        return int(v) if float(v).is_integer() else round(v, 3)
+
+    mat_out = {k: {f: rnd(q) for f, q in fields.items()} for k, fields in by_mat.items()}
+    lot_out = {k: rnd(q) for k, q in by_lot.items()}
+    return mat_out, lot_out
+
+
+def db_stats(conn: sqlite3.Connection, table: str = "zpp0059_raw") -> dict:
+    total = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    newest = conn.execute(
+        f"SELECT MAX(_inserted_at) FROM {table}"
+    ).fetchone()[0]
+    return {"total_rows": total, "newest_inserted_at": newest}
+
+
+# Columns shown (in order) by the "View Database" viewer.
+VIEWER_COLS = [
+    "Production Line", "Production Month", "Sequence", "Order", "Activity",
+    "Material", "Material Description", "Operation Short Text",
+    "Posted Quantity", "Assembly Order", "Working day", "Short Time Stamp",
+    "Receive Date", "Receive Time", "Stock Type", "Process",
+]
+
+
+def db_query(conn: sqlite3.Connection, q: str = "", limit: int = 500,
+             offset: int = 0, filters: dict | None = None) -> dict:
+    """Return rows from the DB for the viewer.
+
+    `q` is a free-text search OR-ed across all visible columns.
+    `filters` maps a visible-column index -> substring; each is AND-ed
+    (and AND-ed with `q`) so the viewer can narrow one column at a time."""
+    existing = {r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
+    cols = [c for c in VIEWER_COLS if _col_name(c) in existing]
+    if not cols:  # fall back to whatever columns exist (minus internal)
+        cols = [c for c in existing if not c.startswith("_")][:16]
+        safe = cols
+        headers = cols
+    else:
+        safe = [_col_name(c) for c in cols]
+        headers = cols
+    col_sql = ", ".join(f'"{s}"' for s in safe)
+
+    where_parts, params = [], []
+    if q:
+        like = f"%{q}%"
+        where_parts.append("(" + " OR ".join(f'"{s}" LIKE ?' for s in safe) + ")")
+        params += [like] * len(safe)
+    if filters:
+        for i, val in filters.items():
+            if 0 <= i < len(safe) and val:
+                where_parts.append(f'"{safe[i]}" LIKE ?')
+                params.append(f"%{val}%")
+    where = "WHERE " + " AND ".join(where_parts) if where_parts else ""
+
+    total = conn.execute(
+        f"SELECT COUNT(*) FROM zpp0059_raw {where}", params
+    ).fetchone()[0]
+
+    order_col = _col_name("Short Time Stamp")
+    order_sql = f'ORDER BY "{order_col}" DESC' if order_col in existing else ""
+    rows = conn.execute(
+        f'SELECT {col_sql} FROM zpp0059_raw {where} {order_sql} LIMIT ? OFFSET ?',
+        params + [limit, offset],
+    ).fetchall()
+    return {
+        "columns": headers,
+        "rows": [list(r) for r in rows],
+        "total": total,
+        "shown": len(rows),
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+# ---------------------------------------------------------------------------
+# SAP + export helpers
+# ---------------------------------------------------------------------------
+def _prepare_script(script_text: str = SAP_SCRIPT_0059,
+                    transaction: str = START_TRANSACTION,
+                    roll_dates: bool = DYNAMIC_DATES,
+                    export_dir_win: str = SAP_EXPORT_DIR,
+                    tmp_name: str = "_zpp0059_run.vbs") -> Path:
+    try:
+        text = script_text
+
+        # 1) Roll the work-date window (only for scripts that have S_WKDT fields).
+        if roll_dates:
+            low  = (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
+            high = (date.today() + timedelta(days=DATE_TO_OFFSET_DAYS)).strftime("%d.%m.%Y")
+            text = re.sub(r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")',  rf"\g<1>{low}\g<2>",  text)
+            text = re.sub(r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{high}\g<2>", text)
+
+        # 2) Navigate to the transaction before touching its selection fields.
+        if transaction and "/tbar[0]/okcd" not in text:
+            nav = (f'session.findById("wnd[0]/tbar[0]/okcd").text = "/n{transaction}"\r\n'
+                   f'session.findById("wnd[0]").sendVKey 0\r\n')
+            m = re.search(r'^\s*session\.findById\("wnd\[0\]"\)\.resizeWorkingPane', text, re.M)
+            if not m:
+                m = re.search(r'^\s*session\.findById\("wnd\[0\]', text, re.M)
+            if m:
+                text = text[:m.start()] + nav + text[m.start():]
+
+        # 3) Set export directory + filename in the SAP "Save File" dialog.
+        #    SAP uses wnd[1]/usr/ctxtDY_PATH and ctxtDY_FILENAME for the local file dialog.
+        #    We inject these lines just before the final wnd[1] btn[0] (Generate) press.
+        export_dir  = export_dir_win.replace("\\", "\\\\")
+        save_inject = (
+            f'On Error Resume Next\r\n'
+            f'session.findById("wnd[1]/usr/ctxtDY_PATH").text = "{export_dir}"\r\n'
+            f'session.findById("wnd[2]/usr/ctxtDY_PATH").text = "{export_dir}"\r\n'
+            f'On Error GoTo 0\r\n'
+        )
+        # Find the last wnd[1]/tbar[0]/btn[0] press (the Generate button).
+        gen_pat = re.compile(
+            r'^(\s*session\.findById\("wnd\[1\]/tbar\[0\]/btn\[0\]"\)\.press)', re.M)
+        last = None
+        for m in gen_pat.finditer(text):
+            last = m
+        if last:
+            text = text[:last.start()] + save_inject + text[last.start():]
+
+        tmp = ROOT / tmp_name
+        tmp.write_text(text, encoding="utf-8")
+        return tmp
+    except Exception:
+        # Fall back to the unmodified recording.
+        tmp = ROOT / tmp_name
+        tmp.write_text(script_text, encoding="utf-8")
+        return tmp
+
+
+def _start_security_handler() -> subprocess.Popen | None:
+    """Launch a background PowerShell that watches for every 'SAP GUI Security'
+    popup and clicks its 'Allow' button via UI Automation — focus-independent,
+    so it does not depend on accelerators or tab order. Written to a .ps1 file
+    and run with -File (passing multi-line scripts via -Command is unreliable)."""
+    ps = shutil.which("powershell") or shutil.which("pwsh")
+    if not ps:
+        return None
+
+    script = r"""
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+$AE = [System.Windows.Automation.AutomationElement]
+$CT = [System.Windows.Automation.ControlType]
+$Desc = [System.Windows.Automation.TreeScope]::Descendants
+$Child = [System.Windows.Automation.TreeScope]::Children
+$TrueCond = [System.Windows.Automation.Condition]::TrueCondition
+$Toggle = [System.Windows.Automation.TogglePattern]::Pattern
+$Invoke = [System.Windows.Automation.InvokePattern]::Pattern
+$On = [System.Windows.Automation.ToggleState]::On
+
+$deadline = (Get-Date).AddSeconds(160)
+while ((Get-Date) -lt $deadline) {
+    $root = $AE::RootElement
+    $win = $null
+    foreach ($w in $root.FindAll($Child, $TrueCond)) {
+        if ($w.Current.Name -like '*SAP GUI Security*') { $win = $w; break }
+    }
+    if ($win -ne $null) {
+        # Tick "Remember My Decision" so it stops asking next time.
+        $cbCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, $CT::CheckBox)
+        $cb = $win.FindFirst($Desc, $cbCond)
+        if ($cb -ne $null) {
+            try {
+                $tp = $cb.GetCurrentPattern($Toggle)
+                if ($tp.Current.ToggleState -ne $On) { $tp.Toggle() }
+            } catch {}
+        }
+        # Click the Allow button by name (ignore any '&' accelerator marker).
+        $btnCond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, $CT::Button)
+        foreach ($b in $win.FindAll($Desc, $btnCond)) {
+            $name = ($b.Current.Name) -replace '&',''
+            if ($name -match '^(Allow|Zulassen|Permitir)') {
+                try { $b.GetCurrentPattern($Invoke).Invoke() } catch {}
+                break
+            }
+        }
+        Start-Sleep -Milliseconds 300
+    }
+    Start-Sleep -Milliseconds 200
+}
+"""
+    tmp = ROOT / "_sec_handler.ps1"
+    tmp.write_text(script, encoding="utf-8")
+    try:
+        return subprocess.Popen(
+            [ps, "-NoProfile", "-ExecutionPolicy", "Bypass",
+             "-WindowStyle", "Hidden", "-File", str(tmp)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return None
+
+
+def _close_excel(filename: str) -> None:
+    """Close the workbook SAP auto-opened after the export, without saving.
+    Only the matching file is closed; other open Excel windows are untouched.
+    Excel itself is quit only if no workbooks remain."""
+    if not CLOSE_EXCEL_AFTER:
+        return
+    wscript = shutil.which("wscript")
+    if not wscript:
+        return
+    safe_name = filename.replace('"', '')
+    vbs = f'''
+On Error Resume Next
+Dim target : target = "{safe_name}"
+Dim i, xl, wb, closed
+closed = False
+For i = 1 To 30
+    Set xl = GetObject(, "Excel.Application")
+    If Not (xl Is Nothing) Then
+        For Each wb In xl.Workbooks
+            If LCase(wb.Name) = LCase(target) Then
+                wb.Close False
+                closed = True
+            End If
+        Next
+        If closed Then
+            If xl.Workbooks.Count = 0 Then xl.Quit
+            Exit For
+        End If
+    End If
+    WScript.Sleep 500
+Next
+'''
+    tmp = ROOT / "_close_excel.vbs"
+    try:
+        tmp.write_text(vbs, encoding="utf-8")
+        subprocess.Popen(
+            [wscript, "//nologo", str(tmp)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def _newest_export(since: float) -> Path | None:
+    best, best_mtime = None, since - 2
+    for d in EXPORT_DIRS:
+        try:
+            if not d.is_dir():
+                continue
+            for f in d.iterdir():
+                if f.suffix.lower() not in EXPORT_EXTS:
+                    continue
+                if f.resolve() in (PROGRESS_FILE.resolve(), PROGRESS_0022_FILE.resolve()):
+                    continue
+                m = f.stat().st_mtime
+                if m >= best_mtime:
+                    best, best_mtime = f, m
+        except OSError:
+            continue
+    return best
+
+
+def _read_xlsx(path: Path) -> tuple[list[str], list]:
+    wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
+    ws = wb.active
+    it = ws.iter_rows(values_only=True)
+    headers = [str(v).strip() if v is not None else f"col{i}" for i, v in enumerate(next(it))]
+    rows = list(it)
+    wb.close()
+    return headers, rows
+
+
+class SapNotReady(RuntimeError):
+    """SAP GUI is not open / scripting off / not logged in — cannot export yet."""
+
+
+# Short reason code (from the probe) -> message shown to the user.
+_SAP_NOT_READY_MSG = {
+    "NO_SAPGUI": "ไม่พบ SAP GUI — กรุณาเปิด SAP Logon แล้ว login ก่อนกดปุ่มนี้ "
+                 "(SAP GUI is not open. Open SAP Logon and log in first.)",
+    "NO_ENGINE": "SAP GUI Scripting ยังไม่ได้เปิดใช้งาน — เปิด scripting แล้ว login ก่อน "
+                 "(SAP GUI Scripting is disabled. Enable it and log in first.)",
+    "NO_CONNECTION": "ยังไม่ได้ login เข้า SAP — กรุณา login ก่อนกดปุ่มนี้ "
+                     "(Not logged in to SAP. Please log in first.)",
+    "NO_SESSION": "ยังไม่ได้ login เข้า SAP — กรุณา login ก่อนกดปุ่มนี้ "
+                  "(Not logged in to SAP. Please log in first.)",
+    "NOT_LOGGED_IN": "ยังไม่ได้ login เข้า SAP — กรุณา login ให้เรียบร้อยก่อนกดปุ่มนี้ "
+                     "(Not logged in to SAP. Please log in first.)",
+}
+
+
+def _sap_session_ready() -> tuple[bool, str]:
+    """Probe for a logged-in SAP GUI session. Returns (ready, reason_code).
+    reason_code is 'OK' when ready, otherwise one of the keys in _SAP_NOT_READY_MSG."""
+    cscript = shutil.which("cscript")
+    if not cscript:
+        return False, "NO_SAPGUI"
+    probe = (
+        'On Error Resume Next\r\n'
+        'Dim g, app, conn, sess\r\n'
+        'Set g = GetObject("SAPGUI")\r\n'
+        'If g Is Nothing Then Err.Clear : Set g = GetObject("SAPGUISERVER")\r\n'
+        'If g Is Nothing Then WScript.Echo "NO_SAPGUI" : WScript.Quit 0\r\n'
+        'Set app = g.GetScriptingEngine\r\n'
+        'If app Is Nothing Then WScript.Echo "NO_ENGINE" : WScript.Quit 0\r\n'
+        'If app.Children.Count = 0 Then WScript.Echo "NO_CONNECTION" : WScript.Quit 0\r\n'
+        'Set conn = app.Children(0)\r\n'
+        'If conn.Children.Count = 0 Then WScript.Echo "NO_SESSION" : WScript.Quit 0\r\n'
+        'Set sess = conn.Children(0)\r\n'
+        'If sess.Info.User = "" Then WScript.Echo "NOT_LOGGED_IN" : WScript.Quit 0\r\n'
+        'WScript.Echo "OK:" & sess.Info.User\r\n'
+    )
+    tmp = ROOT / "_sap_probe.vbs"
+    try:
+        tmp.write_text(probe, encoding="utf-8")
+        proc = subprocess.run(
+            [cscript, "//nologo", str(tmp)],
+            capture_output=True, text=True, timeout=20,
+        )
+        out = (proc.stdout or "").strip()
+    except Exception:
+        return False, "NO_SAPGUI"
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            pass
+    return (out.startswith("OK:"), out if out.startswith("OK:") else (out or "NO_SAPGUI"))
+
+
+# Fragments seen in SAP scripting COM errors -> a hint the user can act on.
+_SAP_ERROR_HINTS = [
+    ("could not be found", "SAP อาจไม่ได้อยู่ที่หน้าจอ ZPP0059 หรือมี popup ค้างอยู่ "
+                           "— ปิด popup แล้วกลับไปหน้า ZPP0059 (SAP not on the ZPP0059 "
+                           "screen, or a dialog is open.)"),
+    ("enable scripting", "เปิด SAP GUI Scripting ก่อนใช้งาน (Enable SAP GUI Scripting.)"),
+    ("scripting is disabled", "เปิด SAP GUI Scripting ก่อนใช้งาน (Enable SAP GUI Scripting.)"),
+    ("is busy", "SAP กำลังทำงานอื่นอยู่ — รอสักครู่แล้วลองใหม่ (SAP is busy, try again.)"),
+]
+
+
+def _friendly_sap_error(raw: str) -> str:
+    low = raw.lower()
+    for frag, hint in _SAP_ERROR_HINTS:
+        if frag in low:
+            return f"{hint} [รายละเอียด: {raw[:200]}]"
+    return f"SAP script error: {raw[:300] or 'unknown'}"
+
+
+def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
+                     transaction: str = START_TRANSACTION,
+                     roll_dates: bool = DYNAMIC_DATES,
+                     export_dir_win: str = SAP_EXPORT_DIR,
+                     tmp_name: str = "_zpp0059_run.vbs") -> Path:
+    """Drive SAP once and return the file it just exported.
+    Raises RuntimeError on a (often transient) failure; TimeoutExpired on timeout."""
+    cscript = shutil.which("cscript")
+    script = _prepare_script(script_text, transaction, roll_dates, export_dir_win, tmp_name)
+    # Start background handler BEFORE cscript so it's ready to catch the popup.
+    sec_handler = _start_security_handler()
+    started = time.time()
+    try:
+        proc = subprocess.run(
+            [cscript, "//nologo", str(script)],
+            capture_output=True, text=True, timeout=RUN_TIMEOUT,
+        )
+    finally:
+        if sec_handler:
+            try:
+                sec_handler.terminate()
+            except Exception:
+                pass
+        try:
+            (ROOT / "_sec_handler.ps1").unlink(missing_ok=True)
+        except Exception:
+            pass
+    if proc.returncode != 0:
+        msg = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(_friendly_sap_error(msg))
+
+    export = None
+    for _ in range(20):
+        export = _newest_export(started)
+        if export:
+            break
+        time.sleep(0.5)
+    if not export:
+        raise RuntimeError(
+            "Ran the script but found no exported file. "
+            "Add your SAP export folder to EXPORT_DIRS in serve_daily_follow.py.")
+    return export
+
+
+def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, str, dict]:
+    """Drive SAP → upsert into DB → aggregate. Returns (mat, lot, filename, stats).
+    date_from / date_to override the rolling window when supplied (format DD.MM.YYYY).
+    """
+    cscript = shutil.which("cscript")
+    if not cscript:
+        raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
+
+    ready, code = _sap_session_ready()
+    if not ready:
+        raise SapNotReady(_SAP_NOT_READY_MSG.get(code, _SAP_NOT_READY_MSG["NOT_LOGGED_IN"]))
+
+    # Retry transient GUI hiccups. Never retry a timeout (would double the wait),
+    # and bail out early if the SAP session dropped between attempts.
+    # Build the SAP script with the requested date window.
+    # Explicit dates from the caller win; otherwise use the rolling offset.
+    if date_from or date_to:
+        d_low  = date_from or (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
+        d_high = date_to   or date.today().strftime("%d.%m.%Y")
+        patched = re.sub(r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")',  rf"\g<1>{d_low}\g<2>",  SAP_SCRIPT_0059)
+        patched = re.sub(r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{d_high}\g<2>", patched)
+        script_text = patched
+        use_roll = False
+    else:
+        script_text = SAP_SCRIPT_0059
+        use_roll = DYNAMIC_DATES
+
+    export = None
+    for attempt in range(1, RUN_ATTEMPTS + 1):
+        try:
+            export = _drive_sap_export(script_text=script_text, roll_dates=use_roll)
+            break
+        except subprocess.TimeoutExpired:
+            raise
+        except RuntimeError as exc:
+            if attempt >= RUN_ATTEMPTS:
+                raise
+            print(f"[SAP] attempt {attempt} failed: {exc} — retrying…")
+            time.sleep(3)
+            ok, _ = _sap_session_ready()
+            if not ok:
+                raise SapNotReady(_SAP_NOT_READY_MSG["NOT_LOGGED_IN"])
+
+    # SAP auto-opens the export in Excel — close that workbook again.
+    _close_excel(export.name)
+
+    # Keep a copy as ZPP0059.xlsx (backward compat for build_daily_follow.py).
+    shutil.copyfile(export, PROGRESS_FILE)
+
+    # Read the export and upsert into SQLite.
+    headers, rows = _read_xlsx(export)
+    conn = _get_db()
+    inserted, skipped = db_upsert(conn, headers, rows)
+    print(f"[DB] {inserted} new rows inserted, {skipped} duplicates skipped "
+          f"(total export: {len(rows)})")
+
+    # Aggregate from the full DB (not just this export).
+    mat, lot = db_aggregate(conn)
+    stats = db_stats(conn)
+    stats["last_export"] = export.name
+    stats["new_rows"] = inserted
+    stats["skipped_rows"] = skipped
+    conn.close()
+    return mat, lot, export.name, stats
+
+
+def run_zpp0022() -> tuple[str, dict]:
+    """Drive SAP with the embedded ZPP0022 recording → save the order export →
+    store raw rows in SQLite. The page then loads ZPP0022.xlsx and rebuilds the
+    table from it (same pipeline as the manual 'Update Progress' import).
+    Returns (filename, stats)."""
+    cscript = shutil.which("cscript")
+    if not cscript:
+        raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
+
+    ready, code = _sap_session_ready()
+    if not ready:
+        raise SapNotReady(_SAP_NOT_READY_MSG.get(code, _SAP_NOT_READY_MSG["NOT_LOGGED_IN"]))
+
+    export = None
+    for attempt in range(1, RUN_ATTEMPTS + 1):
+        try:
+            export = _drive_sap_export(
+                script_text=SAP_SCRIPT_0022,
+                transaction=START_TRANSACTION_0022,
+                roll_dates=False,   # the 0022 script has no S_WKDT date window
+                export_dir_win=SAP_EXPORT_DIR_0022,
+                tmp_name="_zpp0022_run.vbs",
+            )
+            break
+        except subprocess.TimeoutExpired:
+            raise
+        except RuntimeError as exc:
+            if attempt >= RUN_ATTEMPTS:
+                raise
+            print(f"[SAP] ZPP0022 attempt {attempt} failed: {exc} — retrying…")
+            time.sleep(3)
+            ok, _ = _sap_session_ready()
+            if not ok:
+                raise SapNotReady(_SAP_NOT_READY_MSG["NOT_LOGGED_IN"])
+
+    # SAP auto-opens the export in Excel — close that workbook again.
+    _close_excel(export.name)
+
+    # Keep the latest export as ZPP0022.xlsx so the page can fetch + parse it.
+    shutil.copyfile(export, PROGRESS_0022_FILE)
+
+    # Accumulate the raw rows in their own SQLite table (dedup, never wipe).
+    headers, rows = _read_xlsx(export)
+    conn = _get_db()
+    inserted, skipped = db_upsert(conn, headers, rows, table=ZPP0022_TABLE)
+    print(f"[DB:0022] {inserted} new rows inserted, {skipped} duplicates skipped "
+          f"(total export: {len(rows)})")
+    stats = db_stats(conn, table=ZPP0022_TABLE)
+    stats["last_export"] = export.name
+    stats["new_rows"] = inserted
+    stats["skipped_rows"] = skipped
+    conn.close()
+    return export.name, stats
+
+
+# ---------------------------------------------------------------------------
+# HTTP server
+# ---------------------------------------------------------------------------
+class Handler(BaseHTTPRequestHandler):
+    def _send(self, code, body, ctype="application/json"):
+        data = body if isinstance(body, bytes) else body.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        route = self.path.rstrip("/")
+        if route == "/api/run-zpp0059":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length)) if length else {}
+                mat, lot, fname, stats = run_zpp0059(
+                    date_from=body.get("date_from", ""),
+                    date_to=body.get("date_to", ""),
+                )
+                self._send(200, json.dumps(
+                    {"ok": True, "mat": mat, "lot": lot, "file": fname, "stats": stats}
+                ))
+            except SapNotReady as exc:
+                self._send(409, json.dumps(
+                    {"ok": False, "error": str(exc), "code": "SAP_NOT_READY"}
+                ))
+            except subprocess.TimeoutExpired:
+                self._send(504, json.dumps({"ok": False, "error": "SAP timed out."}))
+            except Exception as exc:
+                self._send(500, json.dumps({"ok": False, "error": str(exc)}))
+        elif route == "/api/save-state":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                raw = self.rfile.read(length) if length else b"{}"
+                # Validate it is JSON before persisting; reject garbage.
+                json.loads(raw.decode("utf-8"))
+                STATE_FILE.write_bytes(raw)
+                self._send(200, json.dumps({"ok": True}))
+            except Exception as exc:
+                self._send(500, json.dumps({"ok": False, "error": str(exc)}))
+        elif route == "/api/run-zpp0022":
+            try:
+                fname, stats = run_zpp0022()
+                self._send(200, json.dumps(
+                    {"ok": True, "file": PROGRESS_0022_FILE.name, "export": fname, "stats": stats}
+                ))
+            except SapNotReady as exc:
+                self._send(409, json.dumps(
+                    {"ok": False, "error": str(exc), "code": "SAP_NOT_READY"}
+                ))
+            except subprocess.TimeoutExpired:
+                self._send(504, json.dumps({"ok": False, "error": "SAP timed out."}))
+            except Exception as exc:
+                self._send(500, json.dumps({"ok": False, "error": str(exc)}))
+        else:
+            self._send(404, json.dumps({"ok": False, "error": "not found"}))
+
+    def do_GET(self):
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        path = parsed.path.lstrip("/")
+        query = parse_qs(parsed.query)
+        if path in ("", "index.html"):
+            path = OUTPUT_FILE.name
+        if path == "api/state":
+            try:
+                if STATE_FILE.is_file():
+                    self._send(200, STATE_FILE.read_bytes())
+                else:
+                    self._send(200, json.dumps({}))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/db-stats":
+            try:
+                conn = _get_db()
+                db_init(conn, [])   # ensure table exists
+                s = db_stats(conn)
+                conn.close()
+                self._send(200, json.dumps(s))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/db-data":
+            try:
+                conn = _get_db()
+                db_init(conn, [])
+                q = (query.get("q", [""])[0] or "").strip()
+                limit = min(int(query.get("limit", ["500"])[0]), 5000)
+                offset = max(int(query.get("offset", ["0"])[0]), 0)
+                filters = {}
+                for k, vals in query.items():
+                    m = re.fullmatch(r"f(\d+)", k)
+                    if m and vals and vals[0].strip():
+                        filters[int(m.group(1))] = vals[0].strip()
+                data = db_query(conn, q, limit, offset, filters)
+                conn.close()
+                self._send(200, json.dumps(data))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        target = (ROOT / path).resolve()
+        if ROOT.resolve() not in target.parents and target != ROOT.resolve():
+            return self._send(403, "forbidden", "text/plain")
+        if not target.is_file():
+            return self._send(404, "not found", "text/plain")
+        ctype = "text/html; charset=utf-8" if target.suffix == ".html" else "application/octet-stream"
+        self._send(200, target.read_bytes(), ctype)
+
+    def log_message(self, *args):
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+def main():
+    # Pre-populate DB from the existing ZPP0059.xlsx if the DB is new.
+    if PROGRESS_FILE.exists():
+        conn = _get_db()
+        total = 0
+        try:
+            total = conn.execute("SELECT COUNT(*) FROM zpp0059_raw").fetchone()[0]
+        except sqlite3.OperationalError:
+            pass
+        if total == 0:
+            print("Pre-loading existing ZPP0059.xlsx into the database …")
+            headers, rows = _read_xlsx(PROGRESS_FILE)
+            inserted, _ = db_upsert(conn, headers, rows)
+            print(f"  → {inserted} rows loaded.")
+        conn.close()
+
+    print("Building daily_follow.html …")
+    bdf.main()
+
+    url = f"http://{HOST}:{PORT}/{OUTPUT_FILE.name}"
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    print(f"Daily Follow server: {url}")
+    print(f"SQLite database:     {DB_FILE}")
+    print("Press Ctrl+C to stop.")
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopped.")
+        server.shutdown()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
