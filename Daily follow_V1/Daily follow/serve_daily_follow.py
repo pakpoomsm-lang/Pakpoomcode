@@ -59,6 +59,17 @@ DATE_TO_OFFSET_DAYS   = 0    # S_WKDT-HIGH = today
 # Set to "" to run the recorded VBS exactly as-is.
 START_TRANSACTION = "ZPP0059"
 
+# --- ZPP0022 (order master / "Update Progress" source) -----------------------
+# Same concept as ZPP0059, but pulls the order export that rebuilds the table.
+# The recorded script already fills its own selection fields (plant 1001,
+# line 542, radio R_PROC_3), so it runs as-is — no date window to roll.
+VBS_FILE_0022          = ROOT.parent / "Script_0022.vbs"
+START_TRANSACTION_0022 = "ZPP0022"
+PROGRESS_0022_FILE     = ROOT / "ZPP0022.xlsx"   # latest export, served to the page
+ZPP0022_TABLE          = "zpp0022_raw"
+SAP_EXPORT_DIR_0022    = str(Path(r"J:\7.541_HEI\Database follow\ZPP0022"))
+
+
 # SAP opens the exported file in Excel automatically. When True, the workbook
 # is closed again right after we have read it (only that file is closed; any
 # other Excel windows you have open are left alone).
@@ -68,6 +79,7 @@ CLOSE_EXCEL_AFTER = True
 HOME = Path(os.path.expanduser("~"))
 EXPORT_DIRS = [
     Path(r"J:\7.541_HEI\Database follow\ZPP0059"),  # shared drive (primary)
+    Path(r"J:\7.541_HEI\Database follow\ZPP0022"),  # ZPP0022 order export
     Path(r"C:\TEMP"),                               # SAP default save dir
     ROOT,
     HOME / "Documents" / "SAP" / "SAP GUI",
@@ -112,29 +124,31 @@ def _row_hash(values) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def db_init(conn: sqlite3.Connection, headers: list[str]) -> list[str]:
+def db_init(conn: sqlite3.Connection, headers: list[str],
+            table: str = "zpp0059_raw") -> list[str]:
     """Ensure the table exists and has all required columns. Returns safe col names."""
     safe = [_col_name(h) for h in headers]
     # Base table always has the two internal columns; data columns are added
     # below via ALTER (handles both new tables and empty-headers calls cleanly).
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS zpp0059_raw (
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table} (
             _row_hash TEXT PRIMARY KEY,
             _inserted_at TEXT DEFAULT (datetime('now','localtime'))
         )
     """)
     # Add any columns that appeared in a newer export but not in the original table.
-    existing = {r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
+    existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
     for c in safe:
         if c not in existing:
-            conn.execute(f'ALTER TABLE zpp0059_raw ADD COLUMN "{c}" TEXT')
+            conn.execute(f'ALTER TABLE {table} ADD COLUMN "{c}" TEXT')
     conn.commit()
     return safe
 
 
-def db_upsert(conn: sqlite3.Connection, headers: list[str], rows) -> tuple[int, int]:
+def db_upsert(conn: sqlite3.Connection, headers: list[str], rows,
+              table: str = "zpp0059_raw") -> tuple[int, int]:
     """Insert rows that don't already exist. Returns (inserted, skipped)."""
-    safe_headers = db_init(conn, headers)
+    safe_headers = db_init(conn, headers, table)
     h_to_safe = {h: s for h, s in zip(headers, safe_headers)}
 
     # Determine which columns to use for the business key.
@@ -144,7 +158,7 @@ def db_upsert(conn: sqlite3.Connection, headers: list[str], rows) -> tuple[int, 
     inserted = skipped = 0
     placeholders = ", ".join("?" for _ in safe_headers)
     col_list = ", ".join(f'"{c}"' for c in safe_headers)
-    sql = (f'INSERT OR IGNORE INTO zpp0059_raw (_row_hash, {col_list}) '
+    sql = (f'INSERT OR IGNORE INTO {table} (_row_hash, {col_list}) '
            f'VALUES (?, {placeholders})')
 
     batch = []
@@ -227,10 +241,10 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
     return mat_out, lot_out
 
 
-def db_stats(conn: sqlite3.Connection) -> dict:
-    total = conn.execute("SELECT COUNT(*) FROM zpp0059_raw").fetchone()[0]
+def db_stats(conn: sqlite3.Connection, table: str = "zpp0059_raw") -> dict:
+    total = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
     newest = conn.execute(
-        "SELECT MAX(_inserted_at) FROM zpp0059_raw"
+        f"SELECT MAX(_inserted_at) FROM {table}"
     ).fetchone()[0]
     return {"total_rows": total, "newest_inserted_at": newest}
 
@@ -297,8 +311,8 @@ def db_query(conn: sqlite3.Connection, q: str = "", limit: int = 500,
 # ---------------------------------------------------------------------------
 # SAP + export helpers
 # ---------------------------------------------------------------------------
-def _read_vbs_text() -> str:
-    raw = VBS_FILE.read_bytes()
+def _read_vbs_text(vbs_file: Path = VBS_FILE) -> str:
+    raw = vbs_file.read_bytes()
     for enc in ("utf-16", "utf-16-le", "utf-8-sig", "utf-8", "latin-1"):
         try:
             return raw.decode(enc)
@@ -307,20 +321,24 @@ def _read_vbs_text() -> str:
     return raw.decode("latin-1", "ignore")
 
 
-def _prepare_script() -> Path:
+def _prepare_script(vbs_file: Path = VBS_FILE,
+                    transaction: str = START_TRANSACTION,
+                    roll_dates: bool = DYNAMIC_DATES,
+                    export_dir_win: str = SAP_EXPORT_DIR,
+                    tmp_name: str = "_zpp0059_run.vbs") -> Path:
     try:
-        text = _read_vbs_text()
+        text = _read_vbs_text(vbs_file)
 
-        # 1) Roll the work-date window.
-        if DYNAMIC_DATES:
+        # 1) Roll the work-date window (only for scripts that have S_WKDT fields).
+        if roll_dates:
             low  = (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
             high = (date.today() + timedelta(days=DATE_TO_OFFSET_DAYS)).strftime("%d.%m.%Y")
             text = re.sub(r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")',  rf"\g<1>{low}\g<2>",  text)
             text = re.sub(r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{high}\g<2>", text)
 
         # 2) Navigate to the transaction before touching its selection fields.
-        if START_TRANSACTION and "/tbar[0]/okcd" not in text:
-            nav = (f'session.findById("wnd[0]/tbar[0]/okcd").text = "/n{START_TRANSACTION}"\r\n'
+        if transaction and "/tbar[0]/okcd" not in text:
+            nav = (f'session.findById("wnd[0]/tbar[0]/okcd").text = "/n{transaction}"\r\n'
                    f'session.findById("wnd[0]").sendVKey 0\r\n')
             m = re.search(r'^\s*session\.findById\("wnd\[0\]"\)\.resizeWorkingPane', text, re.M)
             if not m:
@@ -331,7 +349,7 @@ def _prepare_script() -> Path:
         # 3) Set export directory + filename in the SAP "Save File" dialog.
         #    SAP uses wnd[1]/usr/ctxtDY_PATH and ctxtDY_FILENAME for the local file dialog.
         #    We inject these lines just before the final wnd[1] btn[0] (Generate) press.
-        export_dir  = SAP_EXPORT_DIR.replace("\\", "\\\\")
+        export_dir  = export_dir_win.replace("\\", "\\\\")
         save_inject = (
             f'On Error Resume Next\r\n'
             f'session.findById("wnd[1]/usr/ctxtDY_PATH").text = "{export_dir}"\r\n'
@@ -347,11 +365,11 @@ def _prepare_script() -> Path:
         if last:
             text = text[:last.start()] + save_inject + text[last.start():]
 
-        tmp = ROOT / "_zpp0059_run.vbs"
+        tmp = ROOT / tmp_name
         tmp.write_text(text, encoding="utf-8")
         return tmp
     except Exception:
-        return VBS_FILE
+        return vbs_file
 
 
 def _start_security_handler() -> subprocess.Popen | None:
@@ -470,7 +488,7 @@ def _newest_export(since: float) -> Path | None:
             for f in d.iterdir():
                 if f.suffix.lower() not in EXPORT_EXTS:
                     continue
-                if f.resolve() == PROGRESS_FILE.resolve():
+                if f.resolve() in (PROGRESS_FILE.resolve(), PROGRESS_0022_FILE.resolve()):
                     continue
                 m = f.stat().st_mtime
                 if m >= best_mtime:
@@ -567,11 +585,15 @@ def _friendly_sap_error(raw: str) -> str:
     return f"SAP script error: {raw[:300] or 'unknown'}"
 
 
-def _drive_sap_export() -> Path:
+def _drive_sap_export(vbs_file: Path = VBS_FILE,
+                     transaction: str = START_TRANSACTION,
+                     roll_dates: bool = DYNAMIC_DATES,
+                     export_dir_win: str = SAP_EXPORT_DIR,
+                     tmp_name: str = "_zpp0059_run.vbs") -> Path:
     """Drive SAP once and return the file it just exported.
     Raises RuntimeError on a (often transient) failure; TimeoutExpired on timeout."""
     cscript = shutil.which("cscript")
-    script = _prepare_script()
+    script = _prepare_script(vbs_file, transaction, roll_dates, export_dir_win, tmp_name)
     # Start background handler BEFORE cscript so it's ready to catch the popup.
     sec_handler = _start_security_handler()
     started = time.time()
@@ -660,6 +682,62 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
     return mat, lot, export.name, stats
 
 
+def run_zpp0022() -> tuple[str, dict]:
+    """Drive SAP via Script_0022.vbs → save the order export → store raw rows in
+    SQLite. The page then loads ZPP0022.xlsx and rebuilds the table from it
+    (same pipeline as the manual 'Update Progress' import). Returns (filename, stats)."""
+    if not VBS_FILE_0022.exists():
+        raise RuntimeError(f"Script not found: {VBS_FILE_0022.name}")
+    cscript = shutil.which("cscript")
+    if not cscript:
+        raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
+
+    ready, code = _sap_session_ready()
+    if not ready:
+        raise SapNotReady(_SAP_NOT_READY_MSG.get(code, _SAP_NOT_READY_MSG["NOT_LOGGED_IN"]))
+
+    export = None
+    for attempt in range(1, RUN_ATTEMPTS + 1):
+        try:
+            export = _drive_sap_export(
+                vbs_file=VBS_FILE_0022,
+                transaction=START_TRANSACTION_0022,
+                roll_dates=False,   # the 0022 script has no S_WKDT date window
+                export_dir_win=SAP_EXPORT_DIR_0022,
+                tmp_name="_zpp0022_run.vbs",
+            )
+            break
+        except subprocess.TimeoutExpired:
+            raise
+        except RuntimeError as exc:
+            if attempt >= RUN_ATTEMPTS:
+                raise
+            print(f"[SAP] ZPP0022 attempt {attempt} failed: {exc} — retrying…")
+            time.sleep(3)
+            ok, _ = _sap_session_ready()
+            if not ok:
+                raise SapNotReady(_SAP_NOT_READY_MSG["NOT_LOGGED_IN"])
+
+    # SAP auto-opens the export in Excel — close that workbook again.
+    _close_excel(export.name)
+
+    # Keep the latest export as ZPP0022.xlsx so the page can fetch + parse it.
+    shutil.copyfile(export, PROGRESS_0022_FILE)
+
+    # Accumulate the raw rows in their own SQLite table (dedup, never wipe).
+    headers, rows = _read_xlsx(export)
+    conn = _get_db()
+    inserted, skipped = db_upsert(conn, headers, rows, table=ZPP0022_TABLE)
+    print(f"[DB:0022] {inserted} new rows inserted, {skipped} duplicates skipped "
+          f"(total export: {len(rows)})")
+    stats = db_stats(conn, table=ZPP0022_TABLE)
+    stats["last_export"] = export.name
+    stats["new_rows"] = inserted
+    stats["skipped_rows"] = skipped
+    conn.close()
+    return export.name, stats
+
+
 # ---------------------------------------------------------------------------
 # HTTP server
 # ---------------------------------------------------------------------------
@@ -674,11 +752,26 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
-        if self.path.rstrip("/") == "/api/run-zpp0059":
+        route = self.path.rstrip("/")
+        if route == "/api/run-zpp0059":
             try:
                 mat, lot, fname, stats = run_zpp0059()
                 self._send(200, json.dumps(
                     {"ok": True, "mat": mat, "lot": lot, "file": fname, "stats": stats}
+                ))
+            except SapNotReady as exc:
+                self._send(409, json.dumps(
+                    {"ok": False, "error": str(exc), "code": "SAP_NOT_READY"}
+                ))
+            except subprocess.TimeoutExpired:
+                self._send(504, json.dumps({"ok": False, "error": "SAP timed out."}))
+            except Exception as exc:
+                self._send(500, json.dumps({"ok": False, "error": str(exc)}))
+        elif route == "/api/run-zpp0022":
+            try:
+                fname, stats = run_zpp0022()
+                self._send(200, json.dumps(
+                    {"ok": True, "file": PROGRESS_0022_FILE.name, "export": fname, "stats": stats}
                 ))
             except SapNotReady as exc:
                 self._send(409, json.dumps(

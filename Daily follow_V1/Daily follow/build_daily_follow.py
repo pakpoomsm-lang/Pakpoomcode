@@ -866,6 +866,8 @@ def render_html(rows):
     .sap-btn:active {{ transform: translateY(1px); }}
     .sap-btn[disabled] {{ opacity: .6; cursor: progress; }}
     .sap-btn.busy::before {{ animation: sapSpin .8s linear infinite; }}
+    .sap-btn-0022 {{ background: #1b5fb3; box-shadow: 0 2px 6px rgba(27, 95, 179, .25); }}
+    .sap-btn-0022:hover {{ background: #164e95; box-shadow: 0 4px 10px rgba(27, 95, 179, .3); }}
     @keyframes sapSpin {{ to {{ transform: rotate(360deg); }} }}
     .clear-btn {{
       display: inline-flex;
@@ -1480,6 +1482,7 @@ def render_html(rows):
                 <button id="dbViewBtn" class="dm-item" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
               </div>
             </div>
+            <button id="zpp0022Btn" class="sap-btn sap-btn-0022" type="button" title="Pull the order list straight from SAP (runs transaction ZPP0022, then rebuilds the table automatically)">ZPP0022</button>
             <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
           </div>
         </div>
@@ -1611,6 +1614,7 @@ def render_html(rows):
       dataMgmtBtn: document.getElementById('dataMgmtBtn'), dataMgmtMenu: document.getElementById('dataMgmtMenu'),
       defaultDisplayBtn: document.getElementById('defaultDisplayBtn'),
       zpp0059Btn: document.getElementById('zpp0059Btn'),
+      zpp0022Btn: document.getElementById('zpp0022Btn'),
       importStatus: document.getElementById('importStatus'), clearData: document.getElementById('clearDataBtn'),
       clearProgress: document.getElementById('clearProgressBtn'),
       simBadge: document.getElementById('simBadge'), simSub: document.getElementById('simSub'),
@@ -2187,6 +2191,7 @@ def render_html(rows):
         render();
       }});
       if (els.zpp0059Btn) els.zpp0059Btn.addEventListener('click', runZpp0059);
+      if (els.zpp0022Btn) els.zpp0022Btn.addEventListener('click', runZpp0022);
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
       if (els.leadStrip) els.leadStrip.addEventListener('click', openDashboard);
@@ -2627,6 +2632,53 @@ def render_html(rows):
         els.importStatus.textContent = `Routing update failed: ${{error.message}}`;
       }} finally {{
         event.target.value = '';
+      }}
+    }}
+    async function runZpp0022() {{
+      // Ask the local companion server to drive SAP via Script_0022.vbs, then
+      // load the freshly-exported order list and rebuild the table from it
+      // (same pipeline as the manual "Update Progress" import).
+      if (location.protocol === 'file:') {{
+        els.importStatus.textContent = 'ZPP0022 needs the local server. Double-click Start_Daily_Follow.bat, then open the page it gives you.';
+        return;
+      }}
+      const btn = els.zpp0022Btn;
+      btn.disabled = true;
+      btn.classList.add('busy');
+      els.importStatus.textContent = 'ZPP0022: pulling order list from SAP… (do not touch the SAP window)';
+      try {{
+        const resp = await fetch('api/run-zpp0022', {{ method: 'POST' }});
+        const res = await resp.json().catch(() => ({{}}));
+        if (!resp.ok || !res.ok) {{
+          if (res.code === 'SAP_NOT_READY') alert(res.error);
+          throw new Error(res.error || ('HTTP ' + resp.status));
+        }}
+        const fileResp = await fetch((res.file || 'ZPP0022.xlsx') + '?t=' + Date.now());
+        if (!fileResp.ok) throw new Error('Pulled from SAP but could not read the exported file.');
+        currentRows = await rowsFromXlsx(await fileResp.blob());
+        indexRows(currentRows);
+        saveSelected();
+        needSort = true;
+        leadDirty = true;
+        progressCleared = false;
+        localStorage.removeItem('dailyFollowProgCleared');
+        els.line.value = 'ALL';
+        els.month.value = 'ALL';
+        els.status.value = 'ALL';
+        els.search.value = '';
+        refreshFilters();
+        recompute(true);
+        const st = res.stats || {{}};
+        const dbInfo = st.new_rows !== undefined
+          ? ` [DB +${{st.new_rows}} new / ${{st.skipped_rows}} dup / ${{(st.total_rows||0).toLocaleString()}} total]`
+          : '';
+        els.importStatus.textContent = `ZPP0022 updated (${{currentRows.length.toLocaleString()}} rows)${{dbInfo}}`;
+      }} catch (error) {{
+        console.error(error);
+        els.importStatus.textContent = `ZPP0022 failed: ${{error.message}}`;
+      }} finally {{
+        btn.disabled = false;
+        btn.classList.remove('busy');
       }}
     }}
     async function runZpp0059() {{
