@@ -18,7 +18,7 @@ session.findById("wnd[0]").resizeWorkingPane 153,29,false
 session.findById("wnd[0]").sendVKey 0
 session.findById("wnd[0]/usr/ctxtS_SHOP-LOW").text = "542"
 session.findById("wnd[0]/usr/ctxtS_ORDTY-LOW").text = "zp40"
-session.findById("wnd[0]/usr/ctxtS_WKDT-LOW").text = "11.06.2026"
+session.findById("wnd[0]/usr/ctxtS_WKDT-LOW").text = "18.06.2026"
 session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").text = "18.06.2026"
 session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").setFocus
 session.findById("wnd[0]/usr/ctxtS_WKDT-HIGH").caretPosition = 10
