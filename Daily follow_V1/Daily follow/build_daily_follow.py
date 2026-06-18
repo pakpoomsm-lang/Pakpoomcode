@@ -1339,15 +1339,36 @@ def render_html(rows):
             </label>
           </div>
           <div class="action-bar">
-            <button id="hideHairBtn" class="toggle-btn" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
-            <label class="import-btn">Update Progress
-              <input id="importFile" type="file" accept=".xlsx,.xlsm">
-            </label>
-            <label class="import-btn">Update Stock
-              <input id="importStock" type="file" accept=".xlsx,.xlsm">
-            </label>
+            <div class="dm-wrap">
+              <button id="visCtrlBtn" class="dm-toggle vis-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Show / hide rows">Visible control</button>
+              <div id="visCtrlMenu" class="dm-menu" hidden>
+                <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
+                <div class="dm-sep"></div>
+                <div class="dm-label">Hidden DLV records</div>
+                <div id="dlvHiddenInfo" class="dlv-hidden-info">None hidden yet. Click the &#10005; on a DLV row to hide it.</div>
+                <div id="dlvHiddenList" class="dlv-hidden-list"></div>
+                <button id="showDlvBtn" class="dm-item dm-reset" type="button" title="Show all DLV records you have hidden" hidden>Show all hidden DLV</button>
+              </div>
+            </div>
+            <div class="dm-wrap">
+              <button id="dataMgmtBtn" class="dm-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Update data sources and display settings">Data Management</button>
+              <div id="dataMgmtMenu" class="dm-menu" hidden>
+                <label class="dm-item">Update Progress
+                  <input id="importFile" type="file" accept=".xlsx,.xlsm">
+                </label>
+                <label class="dm-item">Update Stock
+                  <input id="importStock" type="file" accept=".xlsx,.xlsm">
+                </label>
+                <label class="dm-item">Update Routing
+                  <input id="importRouting" type="file" accept=".xlsx,.xlsm">
+                </label>
+                <div class="dm-sep"></div>
+                <button id="defaultDisplayBtn" class="dm-item dm-reset" type="button" title="Reset all column widths back to fit-the-screen">Default display</button>
+                <div class="dm-sep"></div>
+                <button id="dbViewBtn" class="dm-item" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
+              </div>
+            </div>
             <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
-            <button id="dbViewBtn" class="dash-btn" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
           </div>
         </div>
         <div class="lead-panel">
