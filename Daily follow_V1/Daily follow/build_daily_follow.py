@@ -2012,22 +2012,26 @@ def render_html(rows):
         const td = e.target && e.target.closest ? e.target.closest('td') : null;
         if (!td) return;
         const field = td.dataset.field;
-        if (field === 'exp') {{
-          // Double-click EXP (Expander, no SAP source) = fill it with the Assy order qty.
+        // Double-click any editable work cell = fill with Assy Order qty.
+        const dblFillFields = new Set(['hp','fp','exp','auto','cutting','fg','stockFg','subcooler']);
+        if (dblFillFields.has(field)) {{
           const tr = td.closest('tr');
           const row = tr && tr.__row;
           if (!row) return;
           const v = row.assyOrder;
           if (v === '' || v === null || v === undefined) return;
           e.preventDefault();
-          // Flush focus first: blur fires the focused cell's focusout NOW (while
-          // it is still connected) so no stale focusout can overwrite saved after
-          // we mutate and re-render below.
           if (document.activeElement && document.activeElement !== document.body
               && typeof document.activeElement.blur === 'function') {{
             document.activeElement.blur();
           }}
-          applyChanges([{{ key: keyOf(row, 'exp'), value: String(v) }}]);
+          const changes = [{{ key: keyOf(row, field), value: String(v) }}];
+          // fg double-click also fills Assy and Subcooler
+          if (field === 'fg') {{
+            changes.push({{ key: keyOf(row, 'stockFg'), value: String(v) }});
+            changes.push({{ key: keyOf(row, 'subcooler'), value: String(v) }});
+          }}
+          applyChanges(changes);
           renderWindow(true);
           renderLeadStrip();
           return;
@@ -2121,13 +2125,19 @@ def render_html(rows):
         const field = td.dataset.field;
         if (!row || !field) return;
         const text = td.textContent.trim();
-        applyChanges([{{ key: keyOf(row, field), value: text }}]);
+        const changes = [{{ key: keyOf(row, field), value: text }}];
+        // Typing a value into FG auto-mirrors it to Assy (stockFg) and Subcooler.
+        if (field === 'fg' && text !== '') {{
+          changes.push({{ key: keyOf(row, 'stockFg'), value: text }});
+          changes.push({{ key: keyOf(row, 'subcooler'), value: text }});
+        }}
+        applyChanges(changes);
         td.classList.toggle('blank', !text);
         const ao = row.assyOrder;
         td.classList.toggle('red', field !== 'leadRemark' && text !== '' && ao !== '' && ao !== null && ao !== undefined && Number(text) !== Number(ao));
         // An edit to stockFg/subcooler changes the whole seq group's leadtime,
         // so re-render the visible window rather than just this row's cell.
-        if (field === 'stockFg' || field === 'subcooler') {{ renderWindow(true); renderLeadStrip(); }}
+        if (field === 'fg' || field === 'stockFg' || field === 'subcooler') {{ renderWindow(true); renderLeadStrip(); }}
       }});
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
