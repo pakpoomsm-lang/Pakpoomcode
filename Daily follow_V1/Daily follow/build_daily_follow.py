@@ -767,6 +767,67 @@ def render_html(rows):
     .import-btn:active {{ transform: translateY(1px); }}
     .import-btn::before {{ content: "\\2191"; font-size: 13px; }}
     .import-btn input {{ display: none; }}
+    .dm-wrap {{ position: relative; display: inline-flex; }}
+    .dm-toggle {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 38px;
+      min-width: 170px;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 0 16px;
+      background: var(--primary);
+      color: #fff;
+      font: 700 11.5px/1 inherit;
+      letter-spacing: .3px;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(47, 86, 196, .25);
+      white-space: nowrap;
+      transition: background .15s, box-shadow .15s, transform .05s;
+    }}
+    .dm-toggle::before {{ content: "\\2699"; font-size: 14px; }}
+    .dm-toggle::after {{ content: "\\25BE"; font-size: 11px; opacity: .85; }}
+    .dm-toggle:hover {{ background: var(--primary-dark); box-shadow: 0 4px 10px rgba(47, 86, 196, .3); }}
+    .dm-toggle:active {{ transform: translateY(1px); }}
+    .dm-menu {{
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 30;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .18);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 210px;
+    }}
+    .dm-menu[hidden] {{ display: none; }}
+    .dm-item {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 36px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--ink);
+      font: 700 12px/1 inherit;
+      cursor: pointer;
+      text-align: left;
+      white-space: nowrap;
+      width: 100%;
+    }}
+    .dm-item::before {{ content: "\\2191"; font-size: 12px; color: var(--primary); }}
+    .dm-item.dm-reset::before {{ content: "\\21BA"; }}
+    .dm-item:hover {{ background: #eef2f7; }}
+    .dm-item input {{ display: none; }}
+    .dm-sep {{ height: 1px; background: var(--border); margin: 3px 4px; }}
     .sap-btn {{
       display: inline-flex;
       align-items: center;
@@ -1381,15 +1442,22 @@ def render_html(rows):
           </div>
           <div class="action-bar">
             <button id="hideHairBtn" class="toggle-btn" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
-            <label class="import-btn">Update Progress
-              <input id="importFile" type="file" accept=".xlsx,.xlsm">
-            </label>
-            <label class="import-btn">Update Stock
-              <input id="importStock" type="file" accept=".xlsx,.xlsm">
-            </label>
-            <label class="import-btn">Update Routing
-              <input id="importRouting" type="file" accept=".xlsx,.xlsm">
-            </label>
+            <div class="dm-wrap">
+              <button id="dataMgmtBtn" class="dm-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Update data sources and display settings">Data Management</button>
+              <div id="dataMgmtMenu" class="dm-menu" hidden>
+                <label class="dm-item">Update Progress
+                  <input id="importFile" type="file" accept=".xlsx,.xlsm">
+                </label>
+                <label class="dm-item">Update Stock
+                  <input id="importStock" type="file" accept=".xlsx,.xlsm">
+                </label>
+                <label class="dm-item">Update Routing
+                  <input id="importRouting" type="file" accept=".xlsx,.xlsm">
+                </label>
+                <div class="dm-sep"></div>
+                <button id="defaultDisplayBtn" class="dm-item dm-reset" type="button" title="Reset all column widths back to fit-the-screen">Default display</button>
+              </div>
+            </div>
             <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
             <button id="dbViewBtn" class="dash-btn" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
           </div>
@@ -1519,6 +1587,8 @@ def render_html(rows):
       wrap: document.querySelector('.table-wrap'),
       header: document.getElementById('headerRow'), importFile: document.getElementById('importFile'),
       importStock: document.getElementById('importStock'), importRouting: document.getElementById('importRouting'),
+      dataMgmtBtn: document.getElementById('dataMgmtBtn'), dataMgmtMenu: document.getElementById('dataMgmtMenu'),
+      defaultDisplayBtn: document.getElementById('defaultDisplayBtn'),
       zpp0059Btn: document.getElementById('zpp0059Btn'),
       importStatus: document.getElementById('importStatus'), clearData: document.getElementById('clearDataBtn'),
       clearProgress: document.getElementById('clearProgressBtn'),
@@ -1941,6 +2011,26 @@ def render_html(rows):
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
       els.importRouting.addEventListener('change', importRoutingData);
+      if (els.dataMgmtBtn) els.dataMgmtBtn.addEventListener('click', (e) => {{
+        e.stopPropagation();
+        const open = els.dataMgmtMenu.hidden;
+        els.dataMgmtMenu.hidden = !open;
+        els.dataMgmtBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }});
+      if (els.dataMgmtMenu) els.dataMgmtMenu.addEventListener('click', (e) => {{
+        // Keep menu open while picking files; close only on the reset action.
+        if (e.target.closest('#defaultDisplayBtn')) closeDataMenu();
+      }});
+      document.addEventListener('click', (e) => {{
+        if (els.dataMgmtMenu && !els.dataMgmtMenu.hidden &&
+            !e.target.closest('.dm-wrap')) closeDataMenu();
+      }});
+      if (els.defaultDisplayBtn) els.defaultDisplayBtn.addEventListener('click', () => {{
+        colWidths = {{}};
+        saveColWidths();
+        if (els.wrap) els.wrap.scrollLeft = 0;
+        render();
+      }});
       if (els.zpp0059Btn) els.zpp0059Btn.addEventListener('click', runZpp0059);
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
@@ -2499,6 +2589,10 @@ def render_html(rows):
         addColResizer(th, field);
         els.header.appendChild(th);
       }});
+    }}
+    function closeDataMenu() {{
+      if (els.dataMgmtMenu) els.dataMgmtMenu.hidden = true;
+      if (els.dataMgmtBtn) els.dataMgmtBtn.setAttribute('aria-expanded', 'false');
     }}
     function addColResizer(th, field) {{
       const grip = document.createElement('span');
