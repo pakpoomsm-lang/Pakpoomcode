@@ -825,9 +825,22 @@ def render_html(rows):
     }}
     .dm-item::before {{ content: "\\2191"; font-size: 12px; color: var(--primary); }}
     .dm-item.dm-reset::before {{ content: "\\21BA"; }}
+    .dm-item.dm-check::before {{ content: "\\2610"; font-size: 15px; color: var(--ink); }}
+    .dm-item.dm-check.on::before {{ content: "\\2611"; color: var(--primary); }}
     .dm-item:hover {{ background: #eef2f7; }}
     .dm-item input {{ display: none; }}
     .dm-sep {{ height: 1px; background: var(--border); margin: 3px 4px; }}
+    .dm-toggle.vis-toggle::before {{ content: "\\1F441\\FE0E"; }}
+    .dm-label {{ font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }}
+    .dlv-line-list {{ display: flex; flex-direction: column; gap: 1px; max-height: 240px; overflow: auto; }}
+    .dlv-line-item {{
+      display: flex; align-items: center; gap: 8px;
+      height: 30px; padding: 0 12px; border-radius: 6px;
+      cursor: pointer; font: 600 12px/1 inherit; color: var(--ink);
+    }}
+    .dlv-line-item:hover {{ background: #eef2f7; }}
+    .dlv-line-item input {{ width: 15px; height: 15px; margin: 0; cursor: pointer; }}
+    .dlv-line-item .dlv-count {{ margin-left: auto; font-weight: 700; color: var(--muted); font-size: 11px; }}
     .sap-btn {{
       display: inline-flex;
       align-items: center;
@@ -1441,7 +1454,15 @@ def render_html(rows):
             </label>
           </div>
           <div class="action-bar">
-            <button id="hideHairBtn" class="toggle-btn" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
+            <div class="dm-wrap">
+              <button id="visCtrlBtn" class="dm-toggle vis-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Show / hide rows">Visible control</button>
+              <div id="visCtrlMenu" class="dm-menu" hidden>
+                <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
+                <div class="dm-sep"></div>
+                <div class="dm-label">Hide DLV by line</div>
+                <div id="dlvLineList" class="dlv-line-list"></div>
+              </div>
+            </div>
             <div class="dm-wrap">
               <button id="dataMgmtBtn" class="dm-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Update data sources and display settings">Data Management</button>
               <div id="dataMgmtMenu" class="dm-menu" hidden>
@@ -1600,6 +1621,8 @@ def render_html(rows):
       targetSave: document.getElementById('targetSave'),
       workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
+      visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
+      dlvLineList: document.getElementById('dlvLineList'),
       fillHandle: document.getElementById('fillHandle'),
       dashOverlay: document.getElementById('dashOverlay'),
       dashClose: document.getElementById('dashClose'), dashBody: document.getElementById('dashBody'),
@@ -1610,6 +1633,10 @@ def render_html(rows):
     }};
     let hideSkip = false;
     let hideHairPin = localStorage.getItem('dailyFollowHideHair') === '1';
+    let hideDlvLines = new Set();
+    try {{ hideDlvLines = new Set(JSON.parse(localStorage.getItem('dailyFollowHideDlvLines') || '[]')); }} catch (e) {{ hideDlvLines = new Set(); }}
+    function saveHideDlvLines() {{ localStorage.setItem('dailyFollowHideDlvLines', JSON.stringify([...hideDlvLines])); }}
+    function isDlv(row) {{ return String(row.status || '').trim().toUpperCase() === 'DLV'; }}
     let okSet = new Set(JSON.parse(localStorage.getItem('dailyFollowOk') || '[]'));
     let hidden = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenCols') || '[]'));
     let colWidths = {{}};
@@ -1815,6 +1842,62 @@ def render_html(rows):
       fillSelect(els.line, [...new Set(currentRows.map(r => r.line).filter(Boolean))].sort(), els.line.value || DATA.defaultLine || 'ALL');
       fillSelect(els.month, [...new Set(currentRows.map(r => r.month).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'th', {{numeric:true}})), els.month.value || 'ALL');
       fillSelect(els.status, [...new Set(currentRows.map(r => r.status).filter(Boolean))].sort(), els.status.value || 'ALL');
+      renderDlvLineList();
+    }}
+    function renderDlvLineList() {{
+      if (!els.dlvLineList) return;
+      // Count DLV records per line so the user knows what each toggle hides.
+      const counts = new Map();
+      for (const r of currentRows) {{
+        if (!isDlv(r) || !r.line) continue;
+        counts.set(r.line, (counts.get(r.line) || 0) + 1);
+      }}
+      const lines = [...counts.keys()].sort((a,b) => a.localeCompare(b, 'th', {{numeric:true}}));
+      // Drop any saved selections for lines no longer present.
+      for (const l of [...hideDlvLines]) if (!counts.has(l)) hideDlvLines.delete(l);
+      els.dlvLineList.replaceChildren();
+      if (!lines.length) {{
+        const empty = document.createElement('div');
+        empty.className = 'dm-label';
+        empty.textContent = 'No DLV records';
+        els.dlvLineList.appendChild(empty);
+        return;
+      }}
+      // "All lines" master toggle.
+      const allOn = lines.every(l => hideDlvLines.has(l));
+      els.dlvLineList.appendChild(makeDlvItem('__ALL__', 'All lines', '', allOn, () => {{
+        if (allOn) hideDlvLines.clear();
+        else for (const l of lines) hideDlvLines.add(l);
+        saveHideDlvLines();
+        renderDlvLineList();
+        recompute(true);
+      }}));
+      for (const line of lines) {{
+        els.dlvLineList.appendChild(makeDlvItem(line, 'Line ' + line, counts.get(line), hideDlvLines.has(line), () => {{
+          if (hideDlvLines.has(line)) hideDlvLines.delete(line);
+          else hideDlvLines.add(line);
+          saveHideDlvLines();
+          renderDlvLineList();
+          recompute(true);
+        }}));
+      }}
+    }}
+    function makeDlvItem(key, label, count, checked, onToggle) {{
+      const item = document.createElement('label');
+      item.className = 'dlv-line-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = checked;
+      cb.addEventListener('change', onToggle);
+      item.appendChild(cb);
+      item.appendChild(document.createTextNode(label));
+      if (count !== '') {{
+        const c = document.createElement('span');
+        c.className = 'dlv-count';
+        c.textContent = count;
+        item.appendChild(c);
+      }}
+      return item;
     }}
     function setup() {{
       indexRows(currentRows);
@@ -1824,7 +1907,22 @@ def render_html(rows):
       els.line.value = DATA.defaultLine || 'ALL';
       els.month.value = 'ALL';
       els.hideHairBtn.classList.toggle('active', hideHairPin);
+      els.hideHairBtn.classList.toggle('on', hideHairPin);
       els.hideHairBtn.setAttribute('aria-pressed', hideHairPin ? 'true' : 'false');
+      renderDlvLineList();
+      if (els.visCtrlBtn) els.visCtrlBtn.addEventListener('click', (e) => {{
+        e.stopPropagation();
+        const open = els.visCtrlMenu.hidden;
+        els.visCtrlMenu.hidden = !open;
+        els.visCtrlBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }});
+      if (els.visCtrlMenu) els.visCtrlMenu.addEventListener('click', (e) => e.stopPropagation());
+      document.addEventListener('click', () => {{
+        if (els.visCtrlMenu && !els.visCtrlMenu.hidden) {{
+          els.visCtrlMenu.hidden = true;
+          els.visCtrlBtn.setAttribute('aria-expanded', 'false');
+        }}
+      }});
       els.line.addEventListener('change', () => recompute(true));
       els.month.addEventListener('change', () => recompute(true));
       els.status.addEventListener('change', () => recompute(true));
@@ -1836,6 +1934,7 @@ def render_html(rows):
         hideHairPin = !hideHairPin;
         localStorage.setItem('dailyFollowHideHair', hideHairPin ? '1' : '0');
         els.hideHairBtn.classList.toggle('active', hideHairPin);
+        els.hideHairBtn.classList.toggle('on', hideHairPin);
         els.hideHairBtn.setAttribute('aria-pressed', hideHairPin ? 'true' : 'false');
         recompute(true);
       }});
@@ -2067,6 +2166,7 @@ def render_html(rows):
       if (els.status.value !== 'ALL' && row.status !== els.status.value) return false;
       if (hideSkip && row.attribute1 && row.attribute1 !== 'FG') return false;
       if (hideHairPin && isHairPin(row)) return false;
+      if (hideDlvLines.size && isDlv(row) && hideDlvLines.has(row.line)) return false;
       if (q && !(row._hay || '').includes(q)) return false;
       return true;
     }}
@@ -2642,7 +2742,7 @@ def render_html(rows):
       if (needSort) {{ sortedAll = sortRows(currentRows.slice()); needSort = false; }}
       const q = els.search.value.trim().toLowerCase();
       const filtering = q || els.line.value !== 'ALL' || els.month.value !== 'ALL'
-        || els.status.value !== 'ALL' || hideSkip || hideHairPin;
+        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideDlvLines.size > 0;
       filtered = filtering ? sortedAll.filter(r => passes(r, q)) : sortedAll;
       if (resetScroll && els.wrap) els.wrap.scrollTop = 0;
       render();
