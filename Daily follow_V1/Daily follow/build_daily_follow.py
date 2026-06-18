@@ -1677,6 +1677,7 @@ def render_html(rows):
     let fillScrollTimer = 0;
     let lastMouse = {{ x: 0, y: 0 }};
     let lastChkIdx = null;
+    let cellDragOrigin = null; // {td, idx, ci} — mousedown on editable, not yet fill-dragging
     let pendingChkModifier = false;
     let targets = loadTargets();
     function loadTargets() {{
@@ -2083,13 +2084,49 @@ def render_html(rows):
         document.body.classList.add('fill-dragging');
         fillScrollTimer = setInterval(fillAutoScroll, 60);
       }});
+      // Drag from inside any editable cell body → start fill-range select when
+      // the pointer crosses into a different cell (same column only if same-row,
+      // any direction otherwise).  A pure click (no cross-cell move) is ignored
+      // so the cell still focuses and edits normally.
+      els.body.addEventListener('mousedown', (e) => {{
+        const td = e.target && e.target.closest ? e.target.closest('td') : null;
+        if (!td || !td.classList.contains('editable')) return;
+        const tr = td.closest('tr');
+        if (!tr || tr.dataset.idx === undefined) return;
+        cellDragOrigin = {{ td, idx: Number(tr.dataset.idx), ci: Number(td.dataset.ci) }};
+      }});
       document.addEventListener('mousemove', (e) => {{
-        if (!fillDragging) return;
         lastMouse.x = e.clientX; lastMouse.y = e.clientY;
+        // Promote cellDragOrigin → fillDragging once cursor enters a different cell.
+        if (cellDragOrigin && !fillDragging) {{
+          const el = document.elementFromPoint(e.clientX, e.clientY);
+          const overTd = el && el.closest && el.closest('td');
+          if (overTd && overTd !== cellDragOrigin.td) {{
+            // Commit any in-progress text in the source cell before hijacking focus.
+            if (document.activeElement && document.activeElement !== document.body
+                && typeof document.activeElement.blur === 'function') {{
+              document.activeElement.blur();
+            }}
+            // Ensure fillSource is set to the drag origin cell.
+            const overTr = overTd.closest('tr');
+            if (!overTr || overTr.dataset.idx === undefined) {{ cellDragOrigin = null; return; }}
+            fillSource = {{ td: cellDragOrigin.td, field: cellDragOrigin.td.dataset.field,
+                            idx: cellDragOrigin.idx, ci: cellDragOrigin.ci }};
+            cancelPendingSel();
+            fillDragging = true;
+            fillSource.value = cellDragOrigin.td.textContent.trim();
+            fillRange = [cellDragOrigin.idx, cellDragOrigin.idx, cellDragOrigin.ci, cellDragOrigin.ci];
+            document.body.classList.add('fill-dragging');
+            fillScrollTimer = setInterval(fillAutoScroll, 60);
+            cellDragOrigin = null;
+          }}
+        }}
+        if (!fillDragging) return;
         updateFillTargetFromPoint();
         highlightFillRange();
       }});
       document.addEventListener('mouseup', () => {{
+        cellDragOrigin = null;
         if (!fillDragging) return;
         fillDragging = false;
         document.body.classList.remove('fill-dragging');
