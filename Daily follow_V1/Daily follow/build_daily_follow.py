@@ -874,6 +874,7 @@ def render_html(rows):
       position: fixed; inset: 0; background: rgba(0,0,0,.45);
       display: flex; align-items: center; justify-content: center; z-index: 9000;
     }}
+    .zpp-date-overlay[hidden] {{ display: none; }}
     .zpp-date-dialog {{
       background: var(--bg-header, #1a1f2e); border: 1px solid var(--border, #2d3551);
       border-radius: 10px; padding: 22px 28px; min-width: 340px;
