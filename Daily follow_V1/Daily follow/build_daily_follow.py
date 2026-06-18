@@ -395,11 +395,12 @@ def render_html(rows):
     .app {{
       height: 100vh;
       height: 100dvh;
-      display: grid;
-      grid-template-rows: auto 1fr;
+      display: flex;
+      flex-direction: column;
       overflow: hidden;
     }}
     .top {{
+      flex: 0 0 auto;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       box-shadow: var(--shadow-sm);
@@ -1163,9 +1164,9 @@ def render_html(rows):
       text-decoration: underline;
     }}
     .table-wrap {{
+      flex: 1 1 auto;
       overflow: auto;
       min-height: 0;
-      height: 100%;
       background: var(--surface);
     }}
     table {{
