@@ -2042,11 +2042,7 @@ def render_html(rows):
       }});
       els.body.addEventListener('keydown', (e) => {{
         if (e.isComposing) return;
-        if (pendingSel) {{
-          if (e.key === 'Enter') {{ e.preventDefault(); commitPendingFillAssy(); return; }}
-          if (e.key === 'Delete') {{ e.preventDefault(); clearPendingSel(); return; }}
-          if (e.key === 'Escape') {{ e.preventDefault(); cancelPendingSel(); return; }}
-        }}
+        if (pendingSel) return; // handled by the document-level keydown listener
         if (e.key !== 'Enter') return;
         const td = e.target;
         if (!td || !td.classList || !td.classList.contains('editable')) return;
@@ -2119,6 +2115,14 @@ def render_html(rows):
         }}
       }});
       document.addEventListener('keydown', (e) => {{
+        // A drag-selected range is active: Enter fills Assy Order, Delete clears,
+        // Escape cancels. Handled at document level because the drag blurs the
+        // cell, so focus is no longer inside the table body.
+        if (pendingSel && !e.isComposing) {{
+          if (e.key === 'Enter') {{ e.preventDefault(); commitPendingFillAssy(); return; }}
+          if (e.key === 'Delete' || e.key === 'Backspace') {{ e.preventDefault(); clearPendingSel(); return; }}
+          if (e.key === 'Escape') {{ e.preventDefault(); cancelPendingSel(); return; }}
+        }}
         if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {{
           e.preventDefault();
           undo();
