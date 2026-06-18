@@ -383,6 +383,7 @@ def render_html(rows):
       --green: #00b050;
     }}
     * {{ box-sizing: border-box; }}
+    html, body {{ height: 100%; overflow: hidden; }}
     body {{
       margin: 0;
       background: var(--bg);
@@ -393,8 +394,10 @@ def render_html(rows):
     }}
     .app {{
       height: 100vh;
+      height: 100dvh;
       display: grid;
       grid-template-rows: auto 1fr;
+      overflow: hidden;
     }}
     .top {{
       background: var(--surface);
@@ -1312,6 +1315,8 @@ def render_html(rows):
     .small {{ font-size: 11px; }}
     @media print {{
       .top {{ display: none; }}
+      html, body {{ height: auto; overflow: visible; }}
+      .app {{ height: auto; overflow: visible; }}
       .table-wrap {{ height: auto; overflow: visible; }}
       body {{ background: #fff; }}
       table {{ min-width: 0; font-size: 9px; }}
