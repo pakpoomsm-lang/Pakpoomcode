@@ -1378,16 +1378,7 @@ def render_html(rows):
       vertical-align: middle;
     }}
     #fillHandle {{
-      position: fixed;
-      width: 10px;
-      height: 10px;
-      background: var(--primary);
-      border: 1.5px solid #fff;
-      border-radius: 2px;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, .25);
-      cursor: crosshair;
-      z-index: 50;
-      display: none;
+      display: none !important;
     }}
     body.fill-dragging {{ cursor: crosshair; user-select: none; }}
     body.fill-dragging td.editable {{ cursor: crosshair; }}
@@ -2008,7 +1999,7 @@ def render_html(rows):
         }}
       }});
       els.wrap.addEventListener('scroll', onScroll, {{ passive: true }});
-      window.addEventListener('resize', () => {{ renderWindow(true); positionFillHandle(); }});
+      window.addEventListener('resize', () => {{ renderWindow(true); }});
       els.body.addEventListener('dblclick', (e) => {{
         const td = e.target && e.target.closest ? e.target.closest('td') : null;
         if (!td) return;
@@ -2052,7 +2043,7 @@ def render_html(rows):
       els.body.addEventListener('keydown', (e) => {{
         if (e.isComposing) return;
         if (pendingSel) {{
-          if (e.key === 'Enter') {{ e.preventDefault(); commitPendingFill(); return; }}
+          if (e.key === 'Enter') {{ e.preventDefault(); commitPendingFillAssy(); return; }}
           if (e.key === 'Delete') {{ e.preventDefault(); clearPendingSel(); return; }}
           if (e.key === 'Escape') {{ e.preventDefault(); cancelPendingSel(); return; }}
         }}
@@ -2072,17 +2063,6 @@ def render_html(rows):
         cancelPendingSel();
         const tr = td.closest('tr');
         fillSource = {{ td: td, field: td.dataset.field, idx: Number(tr.dataset.idx), ci: Number(td.dataset.ci) }};
-        positionFillHandle();
-      }});
-      els.fillHandle.addEventListener('mousedown', (e) => {{
-        e.preventDefault();
-        if (!fillSource || !document.body.contains(fillSource.td)) return;
-        cancelPendingSel();
-        fillDragging = true;
-        fillSource.value = fillSource.td.textContent.trim();
-        fillRange = [fillSource.idx, fillSource.idx, fillSource.ci, fillSource.ci];
-        document.body.classList.add('fill-dragging');
-        fillScrollTimer = setInterval(fillAutoScroll, 60);
       }});
       // Drag from inside any editable cell body → start fill-range select when
       // the pointer crosses into a different cell (same column only if same-row,
@@ -2157,7 +2137,6 @@ def render_html(rows):
         // value programmatically). Its textContent is stale — committing it
         // would clobber the value we just stored, so skip.
         if (!td.isConnected) return;
-        if (!fillDragging) els.fillHandle.style.display = 'none';
         const row = td.parentElement && td.parentElement.__row;
         const field = td.dataset.field;
         if (!row || !field) return;
@@ -2989,22 +2968,7 @@ def render_html(rows):
     function onScroll() {{
       if (scrollTicking) return;
       scrollTicking = true;
-      requestAnimationFrame(() => {{ scrollTicking = false; renderWindow(false); positionFillHandle(); }});
-    }}
-    function positionFillHandle() {{
-      const td = fillSource && fillSource.td;
-      if (!td || !document.body.contains(td)) {{ els.fillHandle.style.display = 'none'; return; }}
-      const r = td.getBoundingClientRect();
-      const wrapR = els.wrap.getBoundingClientRect();
-      const headH = els.header.getBoundingClientRect().height || 26;
-      if (r.bottom <= wrapR.top + headH || r.top >= wrapR.bottom
-          || r.right <= wrapR.left || r.left >= wrapR.right) {{
-        els.fillHandle.style.display = 'none';
-        return;
-      }}
-      els.fillHandle.style.display = 'block';
-      els.fillHandle.style.left = (r.right - 5) + 'px';
-      els.fillHandle.style.top = (r.bottom - 5) + 'px';
+      requestAnimationFrame(() => {{ scrollTicking = false; renderWindow(false); }});
     }}
     function updateFillTargetFromPoint() {{
       const el = document.elementFromPoint(lastMouse.x, lastMouse.y);
@@ -3113,6 +3077,24 @@ def render_html(rows):
     function commitPendingFill() {{
       if (!pendingSel) return;
       applyChanges(selChanges(pendingSel.rect, pendingSel.value));
+      pendingSel = null;
+      renderWindow(true);
+      renderLeadStrip();
+    }}
+    function commitPendingFillAssy() {{
+      if (!pendingSel) return;
+      const [r0, r1, c0, c1] = pendingSel.rect;
+      const out = [];
+      for (let i = r0; i <= r1; i++) {{
+        const row = filtered[i];
+        if (!row || isHairPin(row)) continue;
+        const v = String(row.assyOrder ?? '');
+        for (let c = c0; c <= c1; c++) {{
+          const field = activeCols[c] && activeCols[c][0];
+          if (field && editable.has(field)) out.push({{ key: keyOf(row, field), value: v }});
+        }}
+      }}
+      applyChanges(out);
       pendingSel = null;
       renderWindow(true);
       renderLeadStrip();
