@@ -1710,6 +1710,7 @@ def render_html(rows):
       leadGroups = new Map();
       for (const row of currentRows) {{
         if (isHairPin(row)) continue;
+        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
         const k = groupKey(row);
         let g = leadGroups.get(k);
         if (!g) {{ g = {{ stocks: [], scs: [], stockGate: true, scGate: true }}; leadGroups.set(k, g); }}
@@ -1890,18 +1891,21 @@ def render_html(rows):
       }}
       saveHiddenDlv();
       renderDlvHiddenInfo();
+      leadDirty = true;
       recompute(true);
     }}
     function hideDlvRecord(row) {{
       hiddenDlvRecords.add(recordKey(row));
       saveHiddenDlv();
       renderDlvHiddenInfo();
+      leadDirty = true;
       recompute(false);
     }}
     function showAllHiddenDlv() {{
       hiddenDlvRecords.clear();
       saveHiddenDlv();
       renderDlvHiddenInfo();
+      leadDirty = true;
       recompute(true);
     }}
     function setup() {{
@@ -3196,6 +3200,7 @@ def render_html(rows):
       for (const row of sortedAll) {{
         const line = row.line || '-';
         if (/^SRV/i.test(line)) continue;
+        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
         let a = byLine.get(line);
         if (!a) {{ a = {{ line: line, lead: 0, scLead: 0, pcs: 0, orders: 0, from: '', to: '', rows: [] }}; byLine.set(line, a); }}
         if (isHairPin(row)) continue;
