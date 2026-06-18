@@ -1172,8 +1172,7 @@ def render_html(rows):
       border-collapse: separate;
       border-spacing: 0;
       table-layout: fixed;
-      width: max-content;
-      min-width: 100%;
+      width: 100%;
     }}
     tr.spacer td {{
       padding: 0;
@@ -2533,9 +2532,13 @@ def render_html(rows):
     }}
     function renderColgroup(cols) {{
       const frag = document.createDocumentFragment();
+      // Distribute column widths proportionally so the whole table fits the
+      // viewport width — no horizontal scrollbar.
+      const total = cols.reduce((s, col) => s + (col[3] || 80), 0);
       for (const col of cols) {{
         const c = document.createElement('col');
-        if (col[3]) c.style.width = col[3] + 'px';
+        const w = col[3] || 80;
+        c.style.width = (w / total * 100).toFixed(3) + '%';
         frag.appendChild(c);
       }}
       els.colgroup.replaceChildren(frag);
