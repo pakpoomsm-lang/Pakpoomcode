@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd \"C:\\\\Users\\\\USER\\\\Desktop\\\\Daily follow_V1\\\\Daily follow\"; \"{0:N1} MB\" -f \\(\\(Get-Item daily_follow.html\\).Length/1MB\\))",
+      "PowerShell(cd \"C:\\\\Users\\\\USER\\\\Desktop\\\\Daily follow_V1\\\\Daily follow\"; $p = Start-Process python -ArgumentList \"serve_daily_follow.py\" -PassThru -WindowStyle Hidden -RedirectStandardOutput _srv_out.txt -RedirectStandardError _srv_err.txt; Start-Sleep -Seconds 10; \"--- stdout ---\"; Get-Content _srv_out.txt -ErrorAction SilentlyContinue; \"--- stderr ---\"; Get-Content _srv_err.txt -ErrorAction SilentlyContinue; $listening = Test-NetConnection -ComputerName 127.0.0.1 -Port 8059 -WarningAction SilentlyContinue | Select-Object -ExpandProperty TcpTestSucceeded; \"listening: $listening\"; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; Remove-Item _srv_out.txt,_srv_err.txt -ErrorAction SilentlyContinue)",
+      "PowerShell(cd \"C:\\\\Users\\\\USER\\\\Desktop\\\\Daily follow_V1\\\\Daily follow\"; $p = Start-Process python -ArgumentList \"serve_daily_follow.py\" -PassThru -WindowStyle Hidden -RedirectStandardOutput _o.txt -RedirectStandardError _e.txt; Start-Sleep -Seconds 10; \"=== curl GET /api/state ===\"; & curl.exe -s -i http://127.0.0.1:8059/api/state; \"`n=== curl POST /api/save-state ===\"; & curl.exe -s -i -X POST -H \"Content-Type: application/json\" --data '{\\\\\"rows\\\\\":[{\\\\\"line\\\\\":\\\\\"A\\\\\"}],\\\\\"mat\\\\\":{},\\\\\"lot\\\\\":{}}' http://127.0.0.1:8059/api/save-state; \"`n=== server stderr ===\"; Get-Content _e.txt -ErrorAction SilentlyContinue; Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue; if \\(Test-Path daily_follow_state.json\\) { Remove-Item daily_follow_state.json }; Remove-Item _o.txt,_e.txt -ErrorAction SilentlyContinue)",
+      "Bash(netstat -ano)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8059 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"killed $_\" } catch {} }; Start-Sleep -Seconds 1; if \\(Get-NetTCPConnection -LocalPort 8059 -State Listen -ErrorAction SilentlyContinue\\) { \"still listening\" } else { \"port free\" })",
+      "Bash(rm -f \"/c/Users/USER/Desktop/Daily follow_V1/Daily follow/.claude/launch.json\")",
+      "Bash(rmdir \"/c/Users/USER/Desktop/Daily follow_V1/Daily follow/.claude\")",
+      "Bash(mkdir -p \"/c/Users/USER/Desktop/Daily follow_V1/.claude\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(rm -f \".claude/launch.json\")",
+      "Bash(rmdir \".claude\")",
+      "Bash(rm -f \"Daily follow/daily_follow_state.json\" \"Daily follow/_state_test.mjs\")",
+      "Bash(cd \"/c/Users/USER/Desktop/Daily follow_V1\" && ls -la *.xls* \"Daily follow\"/*.xls* 2>/dev/null)",
+      "Bash(python -)"
+    ]
+  }
+}
