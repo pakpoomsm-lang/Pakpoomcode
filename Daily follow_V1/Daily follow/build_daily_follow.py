@@ -1677,7 +1677,7 @@ def render_html(rows):
     let fillScrollTimer = 0;
     let lastMouse = {{ x: 0, y: 0 }};
     let lastChkIdx = null;
-    let cellDragOrigin = null; // {td, idx, ci} — mousedown on editable, not yet fill-dragging
+    let cellDragOrigin = null; // mousedown on editable cell, not yet fill-dragging
     let pendingChkModifier = false;
     let targets = loadTargets();
     function loadTargets() {{
