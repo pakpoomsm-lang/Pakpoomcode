@@ -836,12 +836,14 @@ def render_html(rows):
     .dlv-hidden-info b {{ color: var(--primary); }}
     .badge.dlv-hideable {{ padding-right: 4px; }}
     .dlv-hide-btn {{
-      display: inline-flex; align-items: center; justify-content: center;
+      display: none; align-items: center; justify-content: center;
       width: 15px; height: 15px; margin-left: 4px; vertical-align: middle;
       border-radius: 4px; cursor: pointer; font-size: 11px; line-height: 1;
       color: #fff; background: rgba(19, 138, 85, .55);
     }}
+    tbody tr:hover .dlv-hide-btn {{ display: inline-flex; }}
     .dlv-hide-btn:hover {{ background: var(--late, #c0392b); }}
+    .dlv-hidden-list {{ display: flex; flex-direction: column; gap: 1px; max-height: 200px; overflow: auto; }}
     .sap-btn {{
       display: inline-flex;
       align-items: center;
@@ -1349,9 +1351,12 @@ def render_html(rows):
     tbody tr.row-missing td.lead {{ background: #fdf4dc !important; color: #a9790a; }}
     td.editable {{ cursor: text; }}
     td.blocked {{
-      background: #9aa5b5 !important;
+      background: #eceef2 !important;
       cursor: not-allowed;
     }}
+    tbody tr.dlv-row td {{ background: #eef0f3 !important; }}
+    tbody tr.dlv-row:hover td {{ background: #e4e7ec !important; }}
+    tbody tr.dlv-row td.blocked {{ background: #e2e5ea !important; }}
     td.editable:focus {{
       outline: 2px solid var(--primary);
       outline-offset: -2px;
@@ -1462,6 +1467,7 @@ def render_html(rows):
                 <div class="dm-sep"></div>
                 <div class="dm-label">Hidden DLV records</div>
                 <div id="dlvHiddenInfo" class="dlv-hidden-info">None hidden yet. Click the &#10005; on a DLV row to hide it.</div>
+                <div id="dlvHiddenList" class="dlv-hidden-list"></div>
                 <button id="showDlvBtn" class="dm-item dm-reset" type="button" title="Show all DLV records you have hidden" hidden>Show all hidden DLV</button>
               </div>
             </div>
@@ -1691,12 +1697,16 @@ def render_html(rows):
     let leadDirty = true;
     let progressCleared = localStorage.getItem('dailyFollowProgCleared') === '1';
     const progressFields = new Set(['hp','fp','exp','auto','cutting','fg','stockFg','subcooler']);
+    // Production "work" columns — for delivered (DLV) rows these are all
+    // considered complete, so every one equals the Assy Order quantity.
+    const workFields = new Set(['hp','fp','exp','auto','cutting','fg']);
     function keyOf(row, field) {{
       return `${{row.productionOrder}}|${{row.item}}|${{field}}`;
     }}
     function valueOf(row, field) {{
       const k = keyOf(row, field);
       if (Object.prototype.hasOwnProperty.call(saved, k)) return saved[k];
+      if (isDlv(row) && workFields.has(field)) return row.assyOrder;
       if (progressCleared && progressFields.has(field)) return '';
       return row[field];
     }}
@@ -1852,14 +1862,42 @@ def render_html(rows):
     }}
     function renderDlvHiddenInfo() {{
       const info = document.getElementById('dlvHiddenInfo');
+      const list = document.getElementById('dlvHiddenList');
       const showBtn = document.getElementById('showDlvBtn');
       const n = hiddenDlvRecords.size;
       if (info) {{
         info.innerHTML = n
-          ? `<b>${{n.toLocaleString()}}</b> DLV record${{n === 1 ? '' : 's'}} hidden.`
+          ? `<b>${{n.toLocaleString()}}</b> DLV record${{n === 1 ? '' : 's'}} hidden \\u00B7 show by line:`
           : 'None hidden yet. Click the \\u2715 on a DLV row to hide it.';
       }}
+      if (list) {{
+        // Group hidden record keys by line (key = line|month|seq|...).
+        const byLine = new Map();
+        for (const key of hiddenDlvRecords) {{
+          const line = key.split('|')[0] || '(none)';
+          byLine.set(line, (byLine.get(line) || 0) + 1);
+        }}
+        list.replaceChildren();
+        const lines = [...byLine.keys()].sort((a,b) => a.localeCompare(b, 'th', {{numeric:true}}));
+        for (const line of lines) {{
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'dm-item dm-reset';
+          btn.title = 'Show (un-hide) hidden DLV records of Line ' + line;
+          btn.textContent = `Show Line ${{line}} (${{byLine.get(line)}})`;
+          btn.addEventListener('click', () => showHiddenDlvLine(line));
+          list.appendChild(btn);
+        }}
+      }}
       if (showBtn) showBtn.hidden = n === 0;
+    }}
+    function showHiddenDlvLine(line) {{
+      for (const key of [...hiddenDlvRecords]) {{
+        if ((key.split('|')[0] || '(none)') === line) hiddenDlvRecords.delete(key);
+      }}
+      saveHiddenDlv();
+      renderDlvHiddenInfo();
+      recompute(true);
     }}
     function hideDlvRecord(row) {{
       hiddenDlvRecords.add(recordKey(row));
@@ -2811,6 +2849,7 @@ def render_html(rows):
       const locked = isHairPin(row);
       const leadVal = computeLead(row);
       tr.className = locked ? 'row-locked' : (leadVal === '' ? 'row-missing' : 'row-ready');
+      if (isDlv(row)) tr.classList.add('dlv-row');
       let ci = -1;
       for (const [field, title, klass] of activeCols) {{
         ci++;
