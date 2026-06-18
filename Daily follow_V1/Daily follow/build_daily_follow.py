@@ -832,15 +832,16 @@ def render_html(rows):
     .dm-sep {{ height: 1px; background: var(--border); margin: 3px 4px; }}
     .dm-toggle.vis-toggle::before {{ content: "\\1F441\\FE0E"; }}
     .dm-label {{ font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }}
-    .dlv-line-list {{ display: flex; flex-direction: column; gap: 1px; max-height: 240px; overflow: auto; }}
-    .dlv-line-item {{
-      display: flex; align-items: center; gap: 8px;
-      height: 30px; padding: 0 12px; border-radius: 6px;
-      cursor: pointer; font: 600 12px/1 inherit; color: var(--ink);
+    .dlv-hidden-info {{ font: 600 11.5px/1.4 inherit; color: var(--muted); padding: 2px 12px 6px; max-width: 220px; }}
+    .dlv-hidden-info b {{ color: var(--primary); }}
+    .badge.dlv-hideable {{ padding-right: 4px; }}
+    .dlv-hide-btn {{
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 15px; height: 15px; margin-left: 4px; vertical-align: middle;
+      border-radius: 4px; cursor: pointer; font-size: 11px; line-height: 1;
+      color: #fff; background: rgba(19, 138, 85, .55);
     }}
-    .dlv-line-item:hover {{ background: #eef2f7; }}
-    .dlv-line-item input {{ width: 15px; height: 15px; margin: 0; cursor: pointer; }}
-    .dlv-line-item .dlv-count {{ margin-left: auto; font-weight: 700; color: var(--muted); font-size: 11px; }}
+    .dlv-hide-btn:hover {{ background: var(--late, #c0392b); }}
     .sap-btn {{
       display: inline-flex;
       align-items: center;
@@ -1459,8 +1460,9 @@ def render_html(rows):
               <div id="visCtrlMenu" class="dm-menu" hidden>
                 <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
                 <div class="dm-sep"></div>
-                <div class="dm-label">Hide DLV by line</div>
-                <div id="dlvLineList" class="dlv-line-list"></div>
+                <div class="dm-label">Hidden DLV records</div>
+                <div id="dlvHiddenInfo" class="dlv-hidden-info">None hidden yet. Click the &#10005; on a DLV row to hide it.</div>
+                <button id="showDlvBtn" class="dm-item dm-reset" type="button" title="Show all DLV records you have hidden" hidden>Show all hidden DLV</button>
               </div>
             </div>
             <div class="dm-wrap">
@@ -1633,10 +1635,14 @@ def render_html(rows):
     }};
     let hideSkip = false;
     let hideHairPin = localStorage.getItem('dailyFollowHideHair') === '1';
-    let hideDlvLines = new Set();
-    try {{ hideDlvLines = new Set(JSON.parse(localStorage.getItem('dailyFollowHideDlvLines') || '[]')); }} catch (e) {{ hideDlvLines = new Set(); }}
-    function saveHideDlvLines() {{ localStorage.setItem('dailyFollowHideDlvLines', JSON.stringify([...hideDlvLines])); }}
+    let hiddenDlvRecords = new Set();
+    try {{ hiddenDlvRecords = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenDlv') || '[]')); }} catch (e) {{ hiddenDlvRecords = new Set(); }}
+    function saveHiddenDlv() {{ localStorage.setItem('dailyFollowHiddenDlv', JSON.stringify([...hiddenDlvRecords])); }}
     function isDlv(row) {{ return String(row.status || '').trim().toUpperCase() === 'DLV'; }}
+    // Stable business key so a hidden record stays hidden across data reloads.
+    function recordKey(row) {{
+      return [row.line, row.month, row.seq, row.productionOrder, row.assyOrderNo, row.item].join('|');
+    }}
     let okSet = new Set(JSON.parse(localStorage.getItem('dailyFollowOk') || '[]'));
     let hidden = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenCols') || '[]'));
     let colWidths = {{}};
@@ -1842,62 +1848,30 @@ def render_html(rows):
       fillSelect(els.line, [...new Set(currentRows.map(r => r.line).filter(Boolean))].sort(), els.line.value || DATA.defaultLine || 'ALL');
       fillSelect(els.month, [...new Set(currentRows.map(r => r.month).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'th', {{numeric:true}})), els.month.value || 'ALL');
       fillSelect(els.status, [...new Set(currentRows.map(r => r.status).filter(Boolean))].sort(), els.status.value || 'ALL');
-      renderDlvLineList();
+      renderDlvHiddenInfo();
     }}
-    function renderDlvLineList() {{
-      if (!els.dlvLineList) return;
-      // Count DLV records per line so the user knows what each toggle hides.
-      const counts = new Map();
-      for (const r of currentRows) {{
-        if (!isDlv(r) || !r.line) continue;
-        counts.set(r.line, (counts.get(r.line) || 0) + 1);
+    function renderDlvHiddenInfo() {{
+      const info = document.getElementById('dlvHiddenInfo');
+      const showBtn = document.getElementById('showDlvBtn');
+      const n = hiddenDlvRecords.size;
+      if (info) {{
+        info.innerHTML = n
+          ? `<b>${{n.toLocaleString()}}</b> DLV record${{n === 1 ? '' : 's'}} hidden.`
+          : 'None hidden yet. Click the \\u2715 on a DLV row to hide it.';
       }}
-      const lines = [...counts.keys()].sort((a,b) => a.localeCompare(b, 'th', {{numeric:true}}));
-      // Drop any saved selections for lines no longer present.
-      for (const l of [...hideDlvLines]) if (!counts.has(l)) hideDlvLines.delete(l);
-      els.dlvLineList.replaceChildren();
-      if (!lines.length) {{
-        const empty = document.createElement('div');
-        empty.className = 'dm-label';
-        empty.textContent = 'No DLV records';
-        els.dlvLineList.appendChild(empty);
-        return;
-      }}
-      // "All lines" master toggle.
-      const allOn = lines.every(l => hideDlvLines.has(l));
-      els.dlvLineList.appendChild(makeDlvItem('__ALL__', 'All lines', '', allOn, () => {{
-        if (allOn) hideDlvLines.clear();
-        else for (const l of lines) hideDlvLines.add(l);
-        saveHideDlvLines();
-        renderDlvLineList();
-        recompute(true);
-      }}));
-      for (const line of lines) {{
-        els.dlvLineList.appendChild(makeDlvItem(line, 'Line ' + line, counts.get(line), hideDlvLines.has(line), () => {{
-          if (hideDlvLines.has(line)) hideDlvLines.delete(line);
-          else hideDlvLines.add(line);
-          saveHideDlvLines();
-          renderDlvLineList();
-          recompute(true);
-        }}));
-      }}
+      if (showBtn) showBtn.hidden = n === 0;
     }}
-    function makeDlvItem(key, label, count, checked, onToggle) {{
-      const item = document.createElement('label');
-      item.className = 'dlv-line-item';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = checked;
-      cb.addEventListener('change', onToggle);
-      item.appendChild(cb);
-      item.appendChild(document.createTextNode(label));
-      if (count !== '') {{
-        const c = document.createElement('span');
-        c.className = 'dlv-count';
-        c.textContent = count;
-        item.appendChild(c);
-      }}
-      return item;
+    function hideDlvRecord(row) {{
+      hiddenDlvRecords.add(recordKey(row));
+      saveHiddenDlv();
+      renderDlvHiddenInfo();
+      recompute(false);
+    }}
+    function showAllHiddenDlv() {{
+      hiddenDlvRecords.clear();
+      saveHiddenDlv();
+      renderDlvHiddenInfo();
+      recompute(true);
     }}
     function setup() {{
       indexRows(currentRows);
@@ -1909,7 +1883,9 @@ def render_html(rows):
       els.hideHairBtn.classList.toggle('active', hideHairPin);
       els.hideHairBtn.classList.toggle('on', hideHairPin);
       els.hideHairBtn.setAttribute('aria-pressed', hideHairPin ? 'true' : 'false');
-      renderDlvLineList();
+      renderDlvHiddenInfo();
+      const showDlvBtn = document.getElementById('showDlvBtn');
+      if (showDlvBtn) showDlvBtn.addEventListener('click', showAllHiddenDlv);
       if (els.visCtrlBtn) els.visCtrlBtn.addEventListener('click', (e) => {{
         e.stopPropagation();
         const open = els.visCtrlMenu.hidden;
@@ -1951,6 +1927,13 @@ def render_html(rows):
       }});
       els.body.addEventListener('click', (e) => {{
         const cb = e.target;
+        if (cb && cb.classList && cb.classList.contains('dlv-hide-btn')) {{
+          e.preventDefault();
+          e.stopPropagation();
+          const tr = cb.closest('tr');
+          if (tr && tr.__row) hideDlvRecord(tr.__row);
+          return;
+        }}
         if (cb && cb.classList && cb.classList.contains('rowchk')) {{
           pendingChkModifier = e.shiftKey || e.ctrlKey || e.metaKey;
         }}
@@ -2166,7 +2149,7 @@ def render_html(rows):
       if (els.status.value !== 'ALL' && row.status !== els.status.value) return false;
       if (hideSkip && row.attribute1 && row.attribute1 !== 'FG') return false;
       if (hideHairPin && isHairPin(row)) return false;
-      if (hideDlvLines.size && isDlv(row) && hideDlvLines.has(row.line)) return false;
+      if (hiddenDlvRecords.size && isDlv(row) && hiddenDlvRecords.has(recordKey(row))) return false;
       if (q && !(row._hay || '').includes(q)) return false;
       return true;
     }}
@@ -2742,7 +2725,7 @@ def render_html(rows):
       if (needSort) {{ sortedAll = sortRows(currentRows.slice()); needSort = false; }}
       const q = els.search.value.trim().toLowerCase();
       const filtering = q || els.line.value !== 'ALL' || els.month.value !== 'ALL'
-        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideDlvLines.size > 0;
+        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hiddenDlvRecords.size > 0;
       filtered = filtering ? sortedAll.filter(r => passes(r, q)) : sortedAll;
       if (resetScroll && els.wrap) els.wrap.scrollTop = 0;
       render();
@@ -2859,6 +2842,14 @@ def render_html(rows):
           badge.className = 'badge ' + (s === 'DLV' || s === 'COMPLETE' ? 'ok' : 'info');
           badge.textContent = value;
           td.appendChild(badge);
+          if (s === 'DLV') {{
+            badge.classList.add('dlv-hideable');
+            const x = document.createElement('span');
+            x.className = 'dlv-hide-btn';
+            x.textContent = '\\u2715';
+            x.title = 'Hide this DLV record';
+            badge.appendChild(x);
+          }}
         }} else {{
           td.textContent = fmt(value);
           if (!td.textContent && !cutBlocked) td.classList.add('blank');
