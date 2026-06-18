@@ -280,6 +280,7 @@ def build_rows():
                 "assyOrder": assy_qty,
                 "assyOrderNo": assy_order_no,
                 "status": status,
+                "assyStatus": text(row[26]),
                 "remark": remark,
                 "hp": hp_val,
                 "fp": matp.get("fp", ""),
@@ -1457,6 +1458,8 @@ def render_html(rows):
               <button id="visCtrlBtn" class="dm-toggle vis-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Show / hide rows">Visible control</button>
               <div id="visCtrlMenu" class="dm-menu" hidden>
                 <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
+                <button id="hideCnclBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Assy Status is CNCL">Hide CNCL</button>
+                <button id="hideSkipBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Assy Status is SKIP">Hide Skip</button>
                 <div class="dm-sep"></div>
                 <div class="dm-label">Hidden DLV records</div>
                 <div id="dlvHiddenInfo" class="dlv-hidden-info">None hidden yet. Click the &#10005; on a DLV row to hide it.</div>
@@ -1589,7 +1592,7 @@ def render_html(rows):
       ['item','Item','',112], ['description','Description','',180], ['attribute','Attribute','',112],
       ['productionOrder','Production Order','num',112], ['speed','Speed','num',58], ['prodDate','Prod.Date','date',92],
       ['prodTime','Prod.Time','time',72], ['assyOrder','Assy Order','num',80], ['assyOrderNo','Assy Order No.','num',104],
-      ['status','Status','center',76], ['remark','Remark','',230], ['hp','H/P','num edit',52],
+      ['status','Status','center',76], ['assyStatus','Assy Status','center',86], ['remark','Remark','',230], ['hp','H/P','num edit',52],
       ['fp','FP','num edit',52], ['exp','EXP','num edit',52], ['auto','Auto','num edit',54],
       ['cutting','Cutting','num edit',64], ['fg','FG.','num edit',52], ['unit','UNIT','num',58],
       ['stockFg','Assy','num edit',74], ['subcooler','Subcooler','num edit',84], ['lead','Assy LT (Hrs.)','num lead',96], ['scLead','SC LT (Hrs.)','num lead',90],
@@ -1625,6 +1628,7 @@ def render_html(rows):
       targetSave: document.getElementById('targetSave'),
       workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
+      hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
       dlvLineList: document.getElementById('dlvLineList'),
       fillHandle: document.getElementById('fillHandle'),
@@ -1637,9 +1641,21 @@ def render_html(rows):
     }};
     let hideSkip = false;
     let hideHairPin = localStorage.getItem('dailyFollowHideHair') === '1';
+    let hideCncl = localStorage.getItem('dailyFollowHideCncl') === '1';
+    let hideAssySkip = localStorage.getItem('dailyFollowHideSkip') === '1';
     let hiddenDlvRecords = new Set();
     try {{ hiddenDlvRecords = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenDlv') || '[]')); }} catch (e) {{ hiddenDlvRecords = new Set(); }}
     function saveHiddenDlv() {{ localStorage.setItem('dailyFollowHiddenDlv', JSON.stringify([...hiddenDlvRecords])); }}
+    function syncHideBtn(btn, on) {{
+      if (!btn) return;
+      btn.classList.toggle('active', on);
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }}
+    function isHiddenByAssyStatus(row) {{
+      const s = String(row.assyStatus || '').trim().toUpperCase();
+      return (hideCncl && s === 'CNCL') || (hideAssySkip && s === 'SKIP');
+    }}
     function isDlv(row) {{ return String(row.status || '').trim().toUpperCase() === 'DLV'; }}
     // Stable business key so a hidden record stays hidden across data reloads.
     function recordKey(row) {{
@@ -1715,6 +1731,7 @@ def render_html(rows):
       for (const row of currentRows) {{
         if (isHairPin(row)) continue;
         if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isHiddenByAssyStatus(row)) continue;
         const k = groupKey(row);
         let g = leadGroups.get(k);
         if (!g) {{ g = {{ stocks: [], scs: [], stockGate: true, scGate: true }}; leadGroups.set(k, g); }}
@@ -1922,6 +1939,8 @@ def render_html(rows):
       els.hideHairBtn.classList.toggle('active', hideHairPin);
       els.hideHairBtn.classList.toggle('on', hideHairPin);
       els.hideHairBtn.setAttribute('aria-pressed', hideHairPin ? 'true' : 'false');
+      syncHideBtn(els.hideCnclBtn, hideCncl);
+      syncHideBtn(els.hideSkipBtn, hideAssySkip);
       renderDlvHiddenInfo();
       const showDlvBtn = document.getElementById('showDlvBtn');
       if (showDlvBtn) showDlvBtn.addEventListener('click', showAllHiddenDlv);
@@ -1951,6 +1970,20 @@ def render_html(rows):
         els.hideHairBtn.classList.toggle('active', hideHairPin);
         els.hideHairBtn.classList.toggle('on', hideHairPin);
         els.hideHairBtn.setAttribute('aria-pressed', hideHairPin ? 'true' : 'false');
+        recompute(true);
+      }});
+      if (els.hideCnclBtn) els.hideCnclBtn.addEventListener('click', () => {{
+        hideCncl = !hideCncl;
+        localStorage.setItem('dailyFollowHideCncl', hideCncl ? '1' : '0');
+        syncHideBtn(els.hideCnclBtn, hideCncl);
+        leadDirty = true;
+        recompute(true);
+      }});
+      if (els.hideSkipBtn) els.hideSkipBtn.addEventListener('click', () => {{
+        hideAssySkip = !hideAssySkip;
+        localStorage.setItem('dailyFollowHideSkip', hideAssySkip ? '1' : '0');
+        syncHideBtn(els.hideSkipBtn, hideAssySkip);
+        leadDirty = true;
         recompute(true);
       }});
       els.simClear.addEventListener('click', () => {{
@@ -2227,6 +2260,8 @@ def render_html(rows):
       if (els.status.value !== 'ALL' && row.status !== els.status.value) return false;
       if (hideSkip && row.attribute1 && row.attribute1 !== 'FG') return false;
       if (hideHairPin && isHairPin(row)) return false;
+      if (hideCncl && /^CNCL$/i.test(row.assyStatus || '')) return false;
+      if (hideAssySkip && /^SKIP$/i.test(row.assyStatus || '')) return false;
       if (hiddenDlvRecords.size && isDlv(row) && hiddenDlvRecords.has(recordKey(row))) return false;
       if (q && !(row._hay || '').includes(q)) return false;
       return true;
@@ -2437,6 +2472,7 @@ def render_html(rows):
         assyOrder: assyQty,
         assyOrderNo,
         status,
+        assyStatus: cleanText(values[26]),
         remark: [cleanText(values[23]), cleanText(values[24]), cleanText(values[50])].filter(Boolean).join(' '),
         hp: hpVal === undefined ? '' : hpVal,
         fp: matp.fp ?? '',
@@ -2850,7 +2886,7 @@ def render_html(rows):
       if (needSort) {{ sortedAll = sortRows(currentRows.slice()); needSort = false; }}
       const q = els.search.value.trim().toLowerCase();
       const filtering = q || els.line.value !== 'ALL' || els.month.value !== 'ALL'
-        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hiddenDlvRecords.size > 0;
+        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideCncl || hideAssySkip || hiddenDlvRecords.size > 0;
       filtered = filtering ? sortedAll.filter(r => passes(r, q)) : sortedAll;
       if (resetScroll && els.wrap) els.wrap.scrollTop = 0;
       render();
@@ -3253,6 +3289,7 @@ def render_html(rows):
         const line = row.line || '-';
         if (/^SRV/i.test(line)) continue;
         if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isHiddenByAssyStatus(row)) continue;
         let a = byLine.get(line);
         if (!a) {{ a = {{ line: line, lead: 0, scLead: 0, pcs: 0, orders: 0, from: '', to: '', rows: [] }}; byLine.set(line, a); }}
         if (isHairPin(row)) continue;
