@@ -1391,6 +1391,7 @@ def render_html(rows):
         <div class="hidden-bar empty" id="hiddenBar"></div>
         <div class="subbar-right">
           <span id="importStatus" class="import-status">Loaded: {escape(EXPORT_FILE.name)}</span>
+          <span id="rowCounter" style="margin-left:10px;color:#888;font-size:11px"></span>
           <button id="clearProgressBtn" class="clear-btn" type="button" title="Clear entered values in H/P, FP, EXP, Auto, Cutting, FG, Assy, Subcooler">Clear Progress</button>
           <button id="clearDataBtn" class="clear-btn" type="button" title="Remove all loaded data">Reset</button>
         </div>
@@ -1444,6 +1445,12 @@ def render_html(rows):
   </div>
   <script id="daily-data" type="application/json">{payload}</script>
   <script>
+    window.onerror = (msg, src, line, col, err) => {{
+      const div = document.createElement('div');
+      div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#900;color:#fff;padding:8px 14px;font:12px monospace;white-space:pre-wrap';
+      div.textContent = `JS Error: ${{msg}} (${{src}}:${{line}})`;
+      document.body.prepend(div);
+    }};
     const DATA = JSON.parse(document.getElementById('daily-data').textContent);
     let currentRows = DATA.rows;
     const columns = [
@@ -2414,6 +2421,8 @@ def render_html(rows):
       renderWindow(true);
       updateSimReadout();
       renderLeadStrip();
+      const rc = document.getElementById('rowCounter');
+      if (rc) rc.textContent = `(${{filtered.length.toLocaleString()}} / ${{currentRows.length.toLocaleString()}} rows)`;
     }}
     function renderColgroup(cols) {{
       const frag = document.createDocumentFragment();
