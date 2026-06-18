@@ -1175,6 +1175,8 @@ def render_html(rows):
       table-layout: fixed;
       width: 100%;
     }}
+    table.sized {{ width: max-content; min-width: 100%; }}
+    table.sized th, table.sized td {{ max-width: none; }}
     tr.spacer td {{
       padding: 0;
       border: 0;
@@ -1224,6 +1226,21 @@ def render_html(rows):
     }}
     th:hover .th-hide {{ display: inline-flex; }}
     th .th-hide:hover {{ background: rgba(0, 0, 0, .45); }}
+    th .col-resizer {{
+      position: absolute;
+      top: 0;
+      right: -3px;
+      width: 7px;
+      height: 100%;
+      cursor: col-resize;
+      z-index: 6;
+      user-select: none;
+    }}
+    th .col-resizer:hover, th .col-resizer.active {{
+      background: rgba(255, 255, 255, .55);
+    }}
+    body.col-resizing {{ cursor: col-resize; user-select: none; }}
+    body.col-resizing * {{ cursor: col-resize !important; }}
     th .arrow {{
       display: inline-block;
       width: 0;
@@ -1525,6 +1542,9 @@ def render_html(rows):
     let hideHairPin = localStorage.getItem('dailyFollowHideHair') === '1';
     let okSet = new Set(JSON.parse(localStorage.getItem('dailyFollowOk') || '[]'));
     let hidden = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenCols') || '[]'));
+    let colWidths = {{}};
+    try {{ colWidths = JSON.parse(localStorage.getItem('dailyFollowColWidths') || '{{}}') || {{}}; }} catch (e) {{ colWidths = {{}}; }}
+    function saveColWidths() {{ localStorage.setItem('dailyFollowColWidths', JSON.stringify(colWidths)); }}
     const columnTitle = Object.fromEntries(columns.map(([field, title]) => [field, title]));
     let sortKey = 'prodSort';
     let sortDir = 1;
@@ -2462,6 +2482,7 @@ def render_html(rows):
             updateSimReadout();
           }});
           els.selAll = chk;
+          addColResizer(th, field);
           th.appendChild(chk);
           els.header.appendChild(th);
           return;
@@ -2475,8 +2496,53 @@ def render_html(rows):
         hide.title = 'Hide this column';
         hide.addEventListener('click', (e) => {{ e.stopPropagation(); hideColumn(field); }});
         th.appendChild(hide);
+        addColResizer(th, field);
         els.header.appendChild(th);
       }});
+    }}
+    function addColResizer(th, field) {{
+      const grip = document.createElement('span');
+      grip.className = 'col-resizer';
+      grip.title = 'Drag to resize \\u00B7 double-click to auto-fit';
+      grip.addEventListener('click', (e) => e.stopPropagation());
+      grip.addEventListener('dblclick', (e) => {{
+        e.stopPropagation();
+        delete colWidths[field];
+        saveColWidths();
+        render();
+      }});
+      grip.addEventListener('mousedown', (e) => {{
+        e.preventDefault();
+        e.stopPropagation();
+        // Lock every visible column to its current pixel width so dragging one
+        // resizer only changes that column (Excel-style), not the whole layout.
+        const headers = [...els.header.children];
+        for (const h of headers) {{
+          const f = h.dataset.field;
+          if (f && !colWidths[f]) colWidths[f] = Math.round(h.getBoundingClientRect().width);
+        }}
+        render();
+        grip.classList.add('active');
+        document.body.classList.add('col-resizing');
+        const startX = e.clientX;
+        const startW = colWidths[field] || 80;
+        const onMove = (ev) => {{
+          const w = Math.max(28, startW + (ev.clientX - startX));
+          colWidths[field] = w;
+          const col = els.colgroup.querySelector(`col[data-field="${{field}}"]`);
+          if (col) col.style.width = w + 'px';
+        }};
+        const onUp = () => {{
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          grip.classList.remove('active');
+          document.body.classList.remove('col-resizing');
+          saveColWidths();
+        }};
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      }});
+      th.appendChild(grip);
     }}
     function recompute(resetScroll) {{
       if (needSort) {{ sortedAll = sortRows(currentRows.slice()); needSort = false; }}
@@ -2533,13 +2599,22 @@ def render_html(rows):
     }}
     function renderColgroup(cols) {{
       const frag = document.createDocumentFragment();
-      // Distribute column widths proportionally so the whole table fits the
-      // viewport width — no horizontal scrollbar.
+      // If the user has resized any column, switch to Excel-style fixed pixel
+      // widths (table grows + scrolls horizontally). Otherwise distribute
+      // proportionally so the whole table fits the viewport — no h-scroll.
+      const hasCustom = cols.some(col => colWidths[col[0]]);
       const total = cols.reduce((s, col) => s + (col[3] || 80), 0);
+      const table = els.colgroup.closest('table');
+      if (table) table.classList.toggle('sized', hasCustom);
       for (const col of cols) {{
         const c = document.createElement('col');
-        const w = col[3] || 80;
-        c.style.width = (w / total * 100).toFixed(3) + '%';
+        c.dataset.field = col[0];
+        const base = col[3] || 80;
+        if (hasCustom) {{
+          c.style.width = (colWidths[col[0]] || base) + 'px';
+        }} else {{
+          c.style.width = (base / total * 100).toFixed(3) + '%';
+        }}
         frag.appendChild(c);
       }}
       els.colgroup.replaceChildren(frag);
