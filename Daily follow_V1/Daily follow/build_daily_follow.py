@@ -1485,10 +1485,11 @@ def render_html(rows):
                 </label>
                 <div class="dm-sep"></div>
                 <button id="defaultDisplayBtn" class="dm-item dm-reset" type="button" title="Reset all column widths back to fit-the-screen">Default display</button>
+                <div class="dm-sep"></div>
+                <button id="dbViewBtn" class="dm-item" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
               </div>
             </div>
             <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
-            <button id="dbViewBtn" class="dash-btn" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
           </div>
         </div>
         <div class="lead-panel">

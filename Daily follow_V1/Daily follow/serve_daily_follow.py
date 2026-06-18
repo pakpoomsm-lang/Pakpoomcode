@@ -52,7 +52,7 @@ RUN_ATTEMPTS = 2
 
 # Rolling date window injected into the VBS before each run.
 DYNAMIC_DATES = True
-DATE_FROM_OFFSET_DAYS = -3   # S_WKDT-LOW  = today - 3 days
+DATE_FROM_OFFSET_DAYS = -7   # S_WKDT-LOW  = today - 7 days
 DATE_TO_OFFSET_DAYS   = 0    # S_WKDT-HIGH = today
 
 # Navigate to ZPP0059 before touching its selection screen fields.
