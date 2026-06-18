@@ -870,6 +870,29 @@ def render_html(rows):
     .sap-btn-0022 {{ background: #1b5fb3; box-shadow: 0 2px 6px rgba(27, 95, 179, .25); }}
     .sap-btn-0022:hover {{ background: #164e95; box-shadow: 0 4px 10px rgba(27, 95, 179, .3); }}
     @keyframes sapSpin {{ to {{ transform: rotate(360deg); }} }}
+    .zpp-date-overlay {{
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: flex; align-items: center; justify-content: center; z-index: 9000;
+    }}
+    .zpp-date-dialog {{
+      background: var(--bg-header, #1a1f2e); border: 1px solid var(--border, #2d3551);
+      border-radius: 10px; padding: 22px 28px; min-width: 340px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }}
+    .zpp-date-title {{ font-size: 14px; font-weight: 700; color: var(--fg, #e8ecf4); margin-bottom: 16px; }}
+    .zpp-date-row {{ display: flex; gap: 14px; margin-bottom: 18px; }}
+    .zpp-date-row label {{ display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--fg-muted, #8892a4); flex: 1; }}
+    .zpp-date-row input[type=date] {{
+      background: var(--bg-row, #222840); border: 1px solid var(--border, #2d3551);
+      color: var(--fg, #e8ecf4); border-radius: 5px; padding: 5px 8px; font-size: 13px;
+      color-scheme: dark;
+    }}
+    .zpp-date-actions {{ display: flex; gap: 10px; justify-content: flex-end; }}
+    .zpp-date-btn {{ height: 30px; padding: 0 18px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }}
+    .zpp-cancel {{ background: var(--bg-row, #2a3050); color: var(--fg-muted, #8892a4); }}
+    .zpp-cancel:hover {{ background: #3a4060; }}
+    .zpp-ok {{ background: #0a8043; color: #fff; }}
+    .zpp-ok:hover {{ background: #0b6e3a; }}
     .clear-btn {{
       display: inline-flex;
       align-items: center;
@@ -1489,6 +1512,20 @@ def render_html(rows):
             <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
           </div>
         </div>
+        <!-- ZPP0059 date picker dialog -->
+        <div id="zppDateOverlay" class="zpp-date-overlay" hidden>
+          <div class="zpp-date-dialog">
+            <div class="zpp-date-title">&#x21BB; ZPP0059 — เลือกช่วงวันที่</div>
+            <div class="zpp-date-row">
+              <label>วันที่เริ่มต้น<input id="zppDateFrom" type="date"></label>
+              <label>วันที่สิ้นสุด<input id="zppDateTo" type="date"></label>
+            </div>
+            <div class="zpp-date-actions">
+              <button id="zppDateCancel" class="zpp-date-btn zpp-cancel" type="button">ยกเลิก</button>
+              <button id="zppDateOk" class="zpp-date-btn zpp-ok" type="button">ดึงข้อมูล</button>
+            </div>
+          </div>
+        </div>
         <div class="lead-panel">
           <div class="lead-head">
             <span class="lead-panel-title">Target Assy Leadtime (Hrs.)</span>
@@ -1618,6 +1655,11 @@ def render_html(rows):
       defaultDisplayBtn: document.getElementById('defaultDisplayBtn'),
       zpp0059Btn: document.getElementById('zpp0059Btn'),
       zpp0022Btn: document.getElementById('zpp0022Btn'),
+      zppDateOverlay: document.getElementById('zppDateOverlay'),
+      zppDateFrom: document.getElementById('zppDateFrom'),
+      zppDateTo: document.getElementById('zppDateTo'),
+      zppDateOk: document.getElementById('zppDateOk'),
+      zppDateCancel: document.getElementById('zppDateCancel'),
       importStatus: document.getElementById('importStatus'), clearData: document.getElementById('clearDataBtn'),
       clearProgress: document.getElementById('clearProgressBtn'),
       simBadge: document.getElementById('simBadge'), simSub: document.getElementById('simSub'),
@@ -2225,6 +2267,16 @@ def render_html(rows):
       }});
       if (els.zpp0059Btn) els.zpp0059Btn.addEventListener('click', runZpp0059);
       if (els.zpp0022Btn) els.zpp0022Btn.addEventListener('click', runZpp0022);
+      if (els.zppDateCancel) els.zppDateCancel.addEventListener('click', () => {{
+        els.zppDateOverlay.hidden = true;
+      }});
+      if (els.zppDateOk) els.zppDateOk.addEventListener('click', () => {{
+        els.zppDateOverlay.hidden = true;
+        doRunZpp0059(els.zppDateFrom.value, els.zppDateTo.value);
+      }});
+      if (els.zppDateOverlay) els.zppDateOverlay.addEventListener('click', (e) => {{
+        if (e.target === els.zppDateOverlay) els.zppDateOverlay.hidden = true;
+      }});
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
       if (els.leadStrip) els.leadStrip.addEventListener('click', openDashboard);
@@ -2717,19 +2769,46 @@ def render_html(rows):
         btn.classList.remove('busy');
       }}
     }}
-    async function runZpp0059() {{
-      // Ask the local companion server (serve_daily_follow.py) to drive SAP via
-      // Script_0059.vbs, then apply the freshly-exported ZPP0059 progress.
+    function isoToDisplay(iso) {{
+      // "YYYY-MM-DD" → "DD.MM.YYYY" for the status text
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      return `${{d}}.${{m}}.${{y}}`;
+    }}
+    function isoToSap(iso) {{
+      // "YYYY-MM-DD" → "DD.MM.YYYY" for the SAP script
+      return isoToDisplay(iso);
+    }}
+    function openZpp0059Dialog() {{
       if (location.protocol === 'file:') {{
         els.importStatus.textContent = 'ZPP0059 needs the local server. Double-click Start_Daily_Follow.bat, then open the page it gives you.';
         return;
       }}
+      // Default: today - 7 to today
+      const today = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const fmt = d => `${{d.getFullYear()}}-${{pad(d.getMonth()+1)}}-${{pad(d.getDate())}}`;
+      const from = new Date(today); from.setDate(today.getDate() - 7);
+      els.zppDateFrom.value = fmt(from);
+      els.zppDateTo.value   = fmt(today);
+      els.zppDateOverlay.hidden = false;
+      els.zppDateFrom.focus();
+    }}
+    async function doRunZpp0059(dateFrom, dateTo) {{
       const btn = els.zpp0059Btn;
       btn.disabled = true;
       btn.classList.add('busy');
-      els.importStatus.textContent = 'ZPP0059: pulling data from SAP… (do not touch the SAP window)';
+      const rangeStr = dateFrom ? ` (${{isoToDisplay(dateFrom)}} – ${{isoToDisplay(dateTo)}})` : '';
+      els.importStatus.textContent = `ZPP0059: pulling data from SAP${{rangeStr}}… (do not touch the SAP window)`;
       try {{
-        const resp = await fetch('api/run-zpp0059', {{ method: 'POST' }});
+        const body = {{}};
+        if (dateFrom) body.date_from = isoToSap(dateFrom);
+        if (dateTo)   body.date_to   = isoToSap(dateTo);
+        const resp = await fetch('api/run-zpp0059', {{
+          method: 'POST',
+          headers: {{'Content-Type': 'application/json'}},
+          body: JSON.stringify(body)
+        }});
         const res = await resp.json().catch(() => ({{}}));
         if (!resp.ok || !res.ok) {{
           if (res.code === 'SAP_NOT_READY') alert(res.error);
@@ -2748,7 +2827,7 @@ def render_html(rows):
         const dbInfo = st.new_rows !== undefined
           ? ` [DB +${{st.new_rows}} new / ${{st.skipped_rows}} dup / ${{(st.total_rows||0).toLocaleString()}} total]`
           : '';
-        els.importStatus.textContent = `ZPP0059 updated${{fname}}${{dbInfo}} (${{nMat.toLocaleString()}} mat / ${{nLot.toLocaleString()}} lot)`;
+        els.importStatus.textContent = `ZPP0059 updated${{fname}}${{rangeStr}}${{dbInfo}} (${{nMat.toLocaleString()}} mat / ${{nLot.toLocaleString()}} lot)`;
       }} catch (error) {{
         console.error(error);
         els.importStatus.textContent = `ZPP0059 failed: ${{error.message}}`;
@@ -2757,6 +2836,7 @@ def render_html(rows):
         btn.classList.remove('busy');
       }}
     }}
+    function runZpp0059() {{ openZpp0059Dialog(); }}
     function clearData() {{
       currentRows = [];
       saved = {{}};

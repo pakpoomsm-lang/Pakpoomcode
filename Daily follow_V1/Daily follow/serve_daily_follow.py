@@ -693,8 +693,10 @@ def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
     return export
 
 
-def run_zpp0059() -> tuple[dict, dict, str, dict]:
-    """Drive SAP → upsert into DB → aggregate. Returns (mat, lot, filename, stats)."""
+def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, str, dict]:
+    """Drive SAP → upsert into DB → aggregate. Returns (mat, lot, filename, stats).
+    date_from / date_to override the rolling window when supplied (format DD.MM.YYYY).
+    """
     cscript = shutil.which("cscript")
     if not cscript:
         raise RuntimeError("cscript not found — must run on Windows with SAP GUI.")
@@ -705,10 +707,23 @@ def run_zpp0059() -> tuple[dict, dict, str, dict]:
 
     # Retry transient GUI hiccups. Never retry a timeout (would double the wait),
     # and bail out early if the SAP session dropped between attempts.
+    # Build the SAP script with the requested date window.
+    # Explicit dates from the caller win; otherwise use the rolling offset.
+    if date_from or date_to:
+        d_low  = date_from or (date.today() + timedelta(days=DATE_FROM_OFFSET_DAYS)).strftime("%d.%m.%Y")
+        d_high = date_to   or date.today().strftime("%d.%m.%Y")
+        patched = re.sub(r'(S_WKDT-LOW"\)\.text\s*=\s*")[^"]*(")',  rf"\g<1>{d_low}\g<2>",  SAP_SCRIPT_0059)
+        patched = re.sub(r'(S_WKDT-HIGH"\)\.text\s*=\s*")[^"]*(")', rf"\g<1>{d_high}\g<2>", patched)
+        script_text = patched
+        use_roll = False
+    else:
+        script_text = SAP_SCRIPT_0059
+        use_roll = DYNAMIC_DATES
+
     export = None
     for attempt in range(1, RUN_ATTEMPTS + 1):
         try:
-            export = _drive_sap_export()
+            export = _drive_sap_export(script_text=script_text, roll_dates=use_roll)
             break
         except subprocess.TimeoutExpired:
             raise
@@ -816,7 +831,12 @@ class Handler(BaseHTTPRequestHandler):
         route = self.path.rstrip("/")
         if route == "/api/run-zpp0059":
             try:
-                mat, lot, fname, stats = run_zpp0059()
+                length = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(length)) if length else {}
+                mat, lot, fname, stats = run_zpp0059(
+                    date_from=body.get("date_from", ""),
+                    date_to=body.get("date_to", ""),
+                )
                 self._send(200, json.dumps(
                     {"ok": True, "mat": mat, "lot": lot, "file": fname, "stats": stats}
                 ))
