@@ -86,6 +86,14 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # Employees excluded from working-hour calculation (permanent until removed)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS hour_exclusions (
+            emp_id TEXT PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     # Add type column for existing databases
     try:
         cursor.execute("SELECT type FROM holidays LIMIT 1")
@@ -925,6 +933,91 @@ def delete_holiday(date):
     conn.commit()
     conn.close()
     return jsonify({'success': True, 'message': f'ลบวันหยุด {date} เรียบร้อย'})
+
+
+@app.route('/api/employees/lookup')
+def lookup_employee():
+    """Look up a single employee by code (for auto-filling the name field)."""
+    emp_id = (request.args.get('emp_id') or '').strip()
+    if not emp_id:
+        return jsonify({'success': False, 'message': 'กรุณาระบุรหัสพนักงาน'}), 400
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT emp_id, first_name, last_name, shift, workplace FROM employees WHERE emp_id = ?',
+        (emp_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return jsonify({'success': False, 'message': 'ไม่พบรหัสพนักงานนี้'}), 404
+    return jsonify({'success': True, 'employee': {
+        'emp_id': row[0],
+        'name': f"{row[1]} {row[2]}",
+        'shift': row[3],
+        'workplace': row[4]
+    }})
+
+
+@app.route('/api/hour-exclusions')
+def get_hour_exclusions():
+    """List employees currently excluded from working-hour calculation."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT x.emp_id, e.first_name, e.last_name, e.shift, e.workplace
+        FROM hour_exclusions x
+        LEFT JOIN employees e ON e.emp_id = x.emp_id
+        ORDER BY x.created_at DESC
+    ''')
+    items = []
+    for row in cursor.fetchall():
+        name = f"{row[1]} {row[2]}".strip() if row[1] else '(ไม่พบในฐานข้อมูลพนักงาน)'
+        items.append({
+            'emp_id': row[0],
+            'name': name,
+            'shift': row[3] or '-',
+            'workplace': row[4] or '-'
+        })
+    conn.close()
+    return jsonify({'success': True, 'exclusions': items})
+
+
+@app.route('/api/hour-exclusions', methods=['POST'])
+def add_hour_exclusion():
+    """Add an employee to the working-hour exclusion list (permanent until removed)."""
+    data = request.json or {}
+    emp_id = (data.get('emp_id') or '').strip()
+    if not emp_id:
+        return jsonify({'success': False, 'message': 'กรุณาระบุรหัสพนักงาน'}), 400
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT first_name, last_name, shift, workplace FROM employees WHERE emp_id = ?',
+        (emp_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'success': False, 'message': 'ไม่พบรหัสพนักงานนี้'}), 404
+    cursor.execute('INSERT OR IGNORE INTO hour_exclusions (emp_id) VALUES (?)', (emp_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': f'ยกเว้นการคิดชั่วโมงของ {emp_id} แล้ว', 'employee': {
+        'emp_id': emp_id,
+        'name': f"{row[0]} {row[1]}",
+        'shift': row[2] or '-',
+        'workplace': row[3] or '-'
+    }})
+
+
+@app.route('/api/hour-exclusions/<emp_id>', methods=['DELETE'])
+def delete_hour_exclusion(emp_id):
+    """Remove an employee from the working-hour exclusion list."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM hour_exclusions WHERE emp_id = ?', (emp_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True, 'message': f'ยกเลิกการยกเว้นของ {emp_id} แล้ว'})
 
 
 @app.route('/api/attendance/incoming-substitutes')

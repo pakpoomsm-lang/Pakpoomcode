@@ -96,12 +96,18 @@
 </section>
 
 <section class="shift-hours-panel">
-    <div class="section-title">
-        <i class="bi bi-clock-history"></i>
-        <div>
-            <h2>ชั่วโมงการทำงานแต่ละ Shift</h2>
-            <p>มาทำงาน × 8.16 ชม. + OT × 2.32 ชม.</p>
+    <div class="shift-hours-panel-header">
+        <div class="section-title">
+            <i class="bi bi-clock-history"></i>
+            <div>
+                <h2>ชั่วโมงการทำงานแต่ละ Shift</h2>
+                <p>มาทำงาน × 8.16 ชม. + OT × 2.32 ชม.</p>
+            </div>
         </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openExclusionModal()">
+            <i class="bi bi-person-dash"></i> ยกเว้นการคิดชั่วโมง
+            <span class="badge bg-secondary ms-1" id="exclusionCountBadge" style="display:none">0</span>
+        </button>
     </div>
     <div class="shift-hours-grid" id="shiftHoursGrid">
         <div class="empty-cell compact"><i class="bi bi-arrow-repeat"></i> กำลังคำนวณข้อมูล...</div>
@@ -394,6 +400,60 @@
                                     ไม่มีข้อมูลพนักงานที่ลางาน
                                 </td>
                             </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hour Exclusion Modal -->
+<div class="modal fade" id="exclusionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#475467;color:#fff">
+                <h6 class="modal-title"><i class="bi bi-person-dash"></i> ยกเว้นการคิดชั่วโมงการทำงาน</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-secondary">
+                    <i class="bi bi-info-circle-fill"></i>
+                    พนักงานในรายการนี้จะ<strong>ไม่ถูกนำมาคิดชั่วโมงการทำงาน</strong>ในทุกวัน จนกว่าจะกดยกเลิก
+                </div>
+                <label class="form-label fw-bold">เพิ่มรหัสพนักงานที่ต้องการยกเว้น</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                    <input type="text" class="form-control" id="exclusionEmpIdInput"
+                           placeholder="กรอกรหัสพนักงาน" autocomplete="off"
+                           oninput="lookupExclusionName()"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();addExclusion();}">
+                    <button class="btn btn-secondary" type="button" id="addExclusionBtn" onclick="addExclusion()" disabled>
+                        <i class="bi bi-plus-lg"></i> เพิ่ม
+                    </button>
+                </div>
+                <div id="exclusionLookupFeedback" class="form-text mt-1" style="min-height:20px"></div>
+
+                <hr>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>รายชื่อที่ยกเว้นอยู่ (<span id="exclusionListCount">0</span>)</strong>
+                </div>
+                <div class="table-responsive app-table-wrap modal-table">
+                    <table class="table table-hover align-middle app-table">
+                        <thead>
+                            <tr>
+                                <th width="120">รหัส</th>
+                                <th>ชื่อ-นามสกุล</th>
+                                <th width="70">Shift</th>
+                                <th width="160">จุดงาน</th>
+                                <th width="90"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="exclusionTableBody">
+                            <tr><td colspan="5" class="empty-cell"><i class="bi bi-inbox"></i> ยังไม่มีรายการยกเว้น</td></tr>
                         </tbody>
                     </table>
                 </div>

@@ -7,6 +7,7 @@ let allWorkplaces = []; // Store all available workplaces (for report filter)
 let allGroups = [];     // Store all groups (for OT substitute modal)
 let currentDisplayedEmployees = []; // Employees currently shown after filters
 let currentLeaveEmployee = null; // Store current employee for leave option modal
+let excludedEmpIds = new Set(); // Employee codes excluded from working-hour calculation
 const preferredSupervisors = [
     { match: 'ภาคภูมิพรมชา', fallback: 'ภาคภูมิ พรมชา', displayName: 'ภาคภูมิ พรมชา (SV)' },
     { match: 'ศุภมาศปลงจิตร', fallback: 'ศุภมาศ ปลงจิตร', displayName: 'ศุภมาศ ปลงจิตร (FM)' },
@@ -24,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSupervisors();
     loadWorkplaces();
     loadGroups();
+    loadHourExclusions();
 
     // Set up event listeners
     document.getElementById('glFilter').addEventListener('change', filterEmployees);
@@ -450,6 +452,8 @@ function updateShiftHoursSummary(employees) {
 
     const shiftMap = new Map();
     employees.forEach(emp => {
+        // ข้ามพนักงานที่ถูกยกเว้นการคิดชั่วโมงการทำงาน
+        if (excludedEmpIds.has(emp.emp_id)) return;
         const shift = emp.shift || 'ไม่ระบุ';
         if (!shiftMap.has(shift)) {
             shiftMap.set(shift, { shift, work: 0, ot: 0 });
@@ -459,6 +463,11 @@ function updateShiftHoursSummary(employees) {
         if (attendanceTypes.includes('work')) summary.work += 1;
         if (attendanceTypes.includes('ot')) summary.ot += 1;
     });
+
+    if (!shiftMap.size) {
+        grid.innerHTML = '<div class="empty-cell compact"><i class="bi bi-inbox"></i> ไม่มีพนักงานที่นำมาคิดชั่วโมง (ทั้งหมดถูกยกเว้น)</div>';
+        return;
+    }
 
     const summaries = [...shiftMap.values()].sort((a, b) => {
         const ia = SHIFT_ORDER.indexOf(a.shift);
@@ -501,6 +510,127 @@ function renderShiftHoursCard(label, work, ot, isTotal = false) {
             </div>
         </div>
     `;
+}
+
+// ───────── การยกเว้นการคิดชั่วโมงการทำงาน ─────────
+function loadHourExclusions() {
+    return fetch('/api/hour-exclusions')
+        .then(r => r.json())
+        .then(data => {
+            const items = (data && data.exclusions) || [];
+            excludedEmpIds = new Set(items.map(x => x.emp_id));
+            updateExclusionBadge();
+            renderExclusionList(items);
+            // คำนวณชั่วโมงใหม่ตามรายการยกเว้นล่าสุด
+            updateShiftHoursSummary(currentDisplayedEmployees);
+        })
+        .catch(() => {});
+}
+
+function updateExclusionBadge() {
+    const badge = document.getElementById('exclusionCountBadge');
+    if (!badge) return;
+    const n = excludedEmpIds.size;
+    badge.textContent = n;
+    badge.style.display = n > 0 ? '' : 'none';
+}
+
+function openExclusionModal() {
+    const input = document.getElementById('exclusionEmpIdInput');
+    if (input) input.value = '';
+    document.getElementById('exclusionLookupFeedback').textContent = '';
+    document.getElementById('addExclusionBtn').disabled = true;
+    loadHourExclusions().then(() => {
+        new bootstrap.Modal(document.getElementById('exclusionModal')).show();
+    });
+}
+
+function lookupExclusionName() {
+    const input = document.getElementById('exclusionEmpIdInput');
+    const feedback = document.getElementById('exclusionLookupFeedback');
+    const addBtn = document.getElementById('addExclusionBtn');
+    const empId = input.value.trim();
+    addBtn.disabled = true;
+    if (!empId) {
+        feedback.textContent = '';
+        return;
+    }
+    // จับ request ล่าสุดเพื่อกัน race condition ขณะพิมพ์เร็ว ๆ
+    const token = Symbol('lookup');
+    lookupExclusionName._token = token;
+    fetch(`/api/employees/lookup?emp_id=${encodeURIComponent(empId)}`)
+        .then(r => r.json().then(body => ({ ok: r.ok, body })))
+        .then(({ ok, body }) => {
+            if (lookupExclusionName._token !== token) return; // มี request ใหม่กว่าแล้ว
+            if (ok && body.success) {
+                feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill"></i> ${escapeHtml(body.employee.name)} · Shift ${escapeHtml(body.employee.shift || '-')}</span>`;
+                addBtn.disabled = excludedEmpIds.has(empId);
+                if (excludedEmpIds.has(empId)) {
+                    feedback.innerHTML += ' <span class="text-muted">(อยู่ในรายการยกเว้นแล้ว)</span>';
+                }
+            } else {
+                feedback.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle-fill"></i> ${escapeHtml(body.message || 'ไม่พบรหัสพนักงานนี้')}</span>`;
+            }
+        })
+        .catch(() => {
+            if (lookupExclusionName._token !== token) return;
+            feedback.innerHTML = '<span class="text-danger">เกิดข้อผิดพลาดในการค้นหา</span>';
+        });
+}
+
+function addExclusion() {
+    const input = document.getElementById('exclusionEmpIdInput');
+    const empId = input.value.trim();
+    if (!empId) return;
+    fetch('/api/hour-exclusions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emp_id: empId })
+    })
+        .then(r => r.json().then(body => ({ ok: r.ok, body })))
+        .then(({ ok, body }) => {
+            if (!ok || !body.success) {
+                document.getElementById('exclusionLookupFeedback').innerHTML =
+                    `<span class="text-danger"><i class="bi bi-x-circle-fill"></i> ${escapeHtml(body.message || 'เพิ่มไม่สำเร็จ')}</span>`;
+                return;
+            }
+            input.value = '';
+            document.getElementById('exclusionLookupFeedback').textContent = '';
+            document.getElementById('addExclusionBtn').disabled = true;
+            loadHourExclusions();
+        })
+        .catch(() => {});
+}
+
+function removeExclusion(empId) {
+    fetch(`/api/hour-exclusions/${encodeURIComponent(empId)}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(() => loadHourExclusions())
+        .catch(() => {});
+}
+
+function renderExclusionList(items) {
+    const tbody = document.getElementById('exclusionTableBody');
+    const count = document.getElementById('exclusionListCount');
+    if (count) count.textContent = items.length;
+    if (!tbody) return;
+    if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-cell"><i class="bi bi-inbox"></i> ยังไม่มีรายการยกเว้น</td></tr>';
+        return;
+    }
+    tbody.innerHTML = items.map(x => `
+        <tr>
+            <td><span class="badge bg-secondary">${escapeHtml(x.emp_id)}</span></td>
+            <td>${escapeHtml(x.name)}</td>
+            <td class="text-center">${escapeHtml(x.shift || '-')}</td>
+            <td>${escapeHtml(x.workplace || '-')}</td>
+            <td class="text-end">
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeExclusion('${escapeHtml(x.emp_id)}')">
+                    <i class="bi bi-x-lg"></i> ยกเลิก
+                </button>
+            </td>
+        </tr>
+    `).join('');
 }
 
 function updateSummaryMetric(countId, percentId, barId, count, total) {
