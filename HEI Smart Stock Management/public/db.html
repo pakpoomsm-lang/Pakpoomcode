@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECP — Database Viewer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#f4f6f9;--white:#fff;--border:#dde2e8;
+  --text:#1e2535;--mid:#5a6478;--dim:#9aa3b2;
+  --red:#d93025;--red-bg:#fef2f1;--red-bd:#fad4d1;
+  --green:#1a7f4b;--green-bg:#f0faf4;--green-bd:#c3e8d4;
+  --yellow:#8a6000;--yellow-bg:#fffbeb;--yellow-bd:#fde99d;
+  --blue:#1a5faa;--blue-bg:#eff6ff;--blue-bd:#bfdbfe;
+  --purple:#5b21b6;--purple-bg:#f5f3ff;--purple-bd:#ddd6fe;
+  --mono:'IBM Plex Mono',monospace;
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+  --accent:var(--red);
+}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── HEADER ── */
+.header{
+  background:var(--white);border-bottom:3px solid var(--accent);
+  padding:0 28px;height:60px;display:flex;align-items:center;gap:16px;
+  position:sticky;top:0;z-index:100;box-shadow:var(--shadow);
+  transition:border-color .3s;
+}
+.logo{background:var(--accent);color:#fff;font-size:12px;font-weight:700;
+  padding:4px 9px;border-radius:4px;letter-spacing:1px;transition:background .3s;}
+.htitle{font-size:15px;font-weight:700;letter-spacing:1px;}
+.hsub{font-size:10px;color:var(--dim);letter-spacing:2px;font-family:var(--mono);}
+.hright{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.nav-btn{
+  background:var(--bg);border:1px solid var(--border);color:var(--mid);
+  padding:6px 14px;border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;text-decoration:none;font-weight:600;transition:all .2s;
+}
+.nav-btn:hover{background:var(--border);}
+.live-pill{
+  display:flex;align-items:center;gap:6px;padding:4px 10px;
+  border-radius:20px;background:var(--green-bg);border:1px solid var(--green-bd);
+  font-size:11px;font-weight:700;color:var(--green);font-family:var(--mono);
+}
+.live-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── DB SWITCHER ── */
+.db-switcher{
+  display:flex;gap:0;border:1px solid var(--border);border-radius:8px;
+  overflow:hidden;background:var(--bg);
+}
+.db-tab{
+  padding:7px 18px;font-size:12px;font-weight:700;cursor:pointer;
+  border:none;background:transparent;color:var(--mid);
+  font-family:'Sarabun',sans-serif;display:flex;align-items:center;gap:6px;
+  transition:all .2s;white-space:nowrap;
+}
+.db-tab:not(:last-child){border-right:1px solid var(--border);}
+.db-tab:hover:not(.active){background:var(--border);}
+.db-tab.active.mecp{background:var(--red);color:#fff;}
+.db-tab.active.incoming{background:var(--green);color:#fff;}
+
+/* ── MAIN ── */
+.main{max-width:1380px;margin:0 auto;padding:24px;}
+
+/* ── SECTION TITLE ── */
+.sec-title{
+  display:flex;align-items:center;gap:10px;
+  font-size:13px;font-weight:700;color:var(--mid);
+  letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;
+}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── STAT GRID ── */
+.stat-grid{display:grid;gap:10px;margin-bottom:24px;}
+.stat-grid.mecp-grid{grid-template-columns:repeat(7,1fr);}
+.stat-grid.incoming-grid{grid-template-columns:repeat(9,1fr);}
+.stat{
+  background:var(--white);border:1px solid var(--border);border-radius:8px;
+  padding:14px;text-align:center;box-shadow:var(--shadow);transition:transform .15s;
+}
+.stat:hover{transform:translateY(-2px);}
+.stat-n{font-size:26px;font-weight:700;font-family:var(--mono);line-height:1;margin-bottom:4px;}
+.stat-l{font-size:10px;color:var(--dim);font-weight:500;}
+.n-total{color:var(--blue)}.n-pend{color:var(--yellow)}.n-conf{color:var(--green)}
+.n-urg{color:var(--red)}.n-side{color:var(--purple)}.n-ub{color:var(--blue)}
+.n-qty{color:var(--text)}.n-today{color:var(--green)}.n-line{color:var(--mid)}
+
+/* ── FILTER ── */
+.filter-row{
+  background:var(--white);border:1px solid var(--border);border-radius:8px;
+  padding:14px 18px;display:flex;align-items:center;gap:10px;
+  margin-bottom:16px;flex-wrap:wrap;box-shadow:var(--shadow);
+}
+.flabel{font-size:12px;font-weight:700;color:var(--mid);}
+.fbtn{
+  border:1px solid var(--border);background:var(--bg);color:var(--mid);
+  padding:5px 13px;border-radius:16px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;font-weight:600;transition:all .2s;
+}
+.fbtn:hover{background:var(--border);}
+.fbtn.on.mecp-btn{background:var(--red);color:#fff;border-color:var(--red);}
+.fbtn.on.inc-btn{background:var(--green);color:#fff;border-color:var(--green);}
+.fbtn.on:not(.mecp-btn):not(.inc-btn){background:var(--red);color:#fff;border-color:var(--red);}
+.fsep{width:1px;height:22px;background:var(--border);}
+.fselect{
+  border:1px solid var(--border);background:var(--bg);color:var(--mid);
+  padding:5px 10px;border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;outline:none;font-weight:600;
+}
+.search{
+  margin-left:auto;display:flex;align-items:center;gap:7px;
+  background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 11px;
+}
+.search input{border:none;background:transparent;font-size:13px;font-family:'Sarabun',sans-serif;
+  color:var(--text);outline:none;width:220px;}
+.search input::placeholder{color:var(--dim);}
+
+/* ── TABLE CARD ── */
+.tcard{background:var(--white);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;box-shadow:var(--shadow);}
+.thead-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+}
+.tcard-title{font-size:13px;font-weight:700;}
+.tcount{font-size:11px;color:var(--dim);font-family:var(--mono);}
+.btn-csv{
+  background:var(--green);color:#fff;border:none;padding:7px 16px;
+  border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;font-weight:700;transition:background .2s;display:flex;align-items:center;gap:6px;
+}
+.btn-csv:hover{background:#15643b;}
+.btn-reload{
+  background:var(--bg);border:1px solid var(--border);color:var(--mid);
+  padding:7px 14px;border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;font-weight:600;transition:all .2s;
+}
+.btn-reload:hover{background:var(--border);}
+
+table{width:100%;border-collapse:collapse;}
+thead th{
+  background:#f8f9fb;padding:9px 12px;text-align:left;
+  font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.2px;
+  text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;
+  position:sticky;top:60px;
+}
+tbody tr{border-bottom:1px solid #f0f2f5;transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:#f8fbff;}
+td{padding:10px 12px;font-size:12px;color:var(--mid);vertical-align:middle;}
+
+.c-id{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);}
+.c-qty{font-family:var(--mono);font-weight:700;color:var(--text);font-size:13px;}
+.c-mono{font-family:var(--mono);font-size:11px;}
+.c-remark{font-size:11px;color:var(--dim);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.c-do{font-family:var(--mono);font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:14px;
+  font-size:11px;font-weight:700;white-space:nowrap;}
+.b-pending{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-bd);}
+.b-confirmed{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);}
+.b-urgent{background:var(--red-bg);color:var(--red);border:1px solid var(--red-bd);}
+.b-normal{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bd);}
+.b-side{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-bd);}
+.b-ubend{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bd);}
+.dot2{width:5px;height:5px;border-radius:50%;display:inline-block;}
+.d-pend{background:var(--yellow)}.d-conf{background:var(--green)}
+
+.rn{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:right;padding-right:8px;min-width:32px;}
+.cb-cell{width:34px;padding:0 10px !important;text-align:center;}
+input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--red);}
+tr.selected{background:#fff5f5 !important;}
+
+/* SELECTION TOOLBAR */
+.sel-bar{
+  display:none;align-items:center;gap:12px;
+  background:#fff0f0;border:1px solid var(--red-bd);border-radius:8px;
+  padding:10px 16px;margin-bottom:12px;
+}
+.sel-bar.show{display:flex;}
+.sel-count{font-size:13px;font-weight:700;color:var(--red);}
+.btn-del-sel{
+  background:var(--red);color:#fff;border:none;padding:7px 16px;
+  border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;font-weight:700;
+}
+.btn-del-sel:hover{background:#b02020;}
+.btn-clear-sel{
+  background:transparent;border:1px solid var(--red-bd);color:var(--red);
+  padding:6px 12px;border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:600;
+}
+
+/* EMPTY / LOADING */
+.empty,.loading{text-align:center;padding:56px;color:var(--dim);}
+.spin{width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--red);
+  border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* PAGINATION */
+.pager{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;border-top:1px solid var(--border);}
+.pinfo{font-size:11px;color:var(--dim);font-family:var(--mono);}
+.pbtns{display:flex;gap:5px;}
+.pbtn{
+  border:1px solid var(--border);background:var(--white);color:var(--mid);
+  padding:5px 11px;border-radius:5px;font-size:12px;cursor:pointer;
+  font-family:'Sarabun',sans-serif;font-weight:600;transition:all .15s;
+}
+.pbtn:hover:not(:disabled){background:var(--bg);}
+.pbtn:disabled{opacity:.35;cursor:default;}
+.pbtn.on{background:var(--red);color:#fff;border-color:var(--red);}
+
+/* DANGER ZONE */
+.danger-zone{
+  background:#fff5f5;border:1px solid var(--red-bd);border-radius:10px;
+  padding:18px 22px;margin-top:24px;
+}
+.danger-title{font-size:13px;font-weight:700;color:var(--red);letter-spacing:1px;margin-bottom:14px;}
+.danger-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.btn-danger{
+  background:var(--red);color:#fff;border:none;padding:8px 18px;
+  border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;
+  cursor:pointer;font-weight:700;transition:background .2s;
+}
+.btn-danger:hover{background:#b02020;}
+.btn-danger.outline{background:#fff;color:var(--red);border:1px solid var(--red);}
+.btn-danger.outline:hover{background:var(--red-bg);}
+.btn-del-row{
+  background:transparent;border:1px solid var(--red-bd);color:var(--red);
+  padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;
+  font-family:'Sarabun',sans-serif;font-weight:700;transition:all .15s;white-space:nowrap;
+}
+.btn-del-row:hover{background:var(--red);color:#fff;}
+
+/* FLASH / TOAST / MODAL */
+@keyframes flash{0%,100%{background:var(--white)}50%{background:#f0faf4}}
+.toast{
+  position:fixed;bottom:20px;right:20px;background:var(--text);color:#fff;
+  padding:11px 18px;border-radius:7px;font-size:13px;font-weight:600;
+  opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;z-index:999;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal-box{background:#fff;border-radius:12px;padding:28px;width:90%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.2);text-align:center;}
+.modal-icon{font-size:32px;margin-bottom:10px;}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text);}
+.modal-desc{font-size:13px;color:var(--mid);margin-bottom:22px;}
+.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header" id="mainHeader">
+  <div class="logo" id="headerLogo">MECP</div>
+  <div>
+    <div class="htitle">🗄️ Database Viewer</div>
+    <div class="hsub" id="headerSub">SQLITE · MECP.DB · ORDERS</div>
+  </div>
+
+  <!-- DB SWITCHER -->
+  <div class="db-switcher" style="margin-left:16px;">
+    <button class="db-tab mecp active" id="tab-mecp" onclick="switchDB('mecp')">
+      📋 orders <span style="font-family:var(--mono);font-size:10px;opacity:.8">mecp.db</span>
+    </button>
+    <button class="db-tab incoming" id="tab-incoming" onclick="switchDB('incoming')">
+      🚚 incoming <span style="font-family:var(--mono);font-size:10px;opacity:.8">incoming.db</span>
+    </button>
+  </div>
+
+  <div class="hright">
+    <div class="live-pill" id="livePill"><span class="dot"></span><span id="liveLabel">CONNECTING...</span></div>
+    <a class="nav-btn" href="/ubend-editor" style="background:#eff6ff;border-color:#bfdbfe;color:#1a5faa;">🔧 U-Bend Editor</a>
+    <a class="nav-btn" href="/dashboard">📊 Dashboard</a>
+    <a class="nav-btn" href="/">← หน้าหลัก</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ════ STATS ════ -->
+  <div class="sec-title" id="statsTitle">สรุปข้อมูล — mecp.db (orders)</div>
+
+  <!-- Stats: mecp.db -->
+  <div class="stat-grid mecp-grid" id="statsMecp">
+    <div class="stat"><div class="stat-n n-total" id="st-total">—</div><div class="stat-l">Order ทั้งหมด</div></div>
+    <div class="stat"><div class="stat-n n-pend"  id="st-pend">—</div><div class="stat-l">Pending</div></div>
+    <div class="stat"><div class="stat-n n-conf"  id="st-conf">—</div><div class="stat-l">Confirmed</div></div>
+    <div class="stat"><div class="stat-n n-urg"   id="st-urg">—</div><div class="stat-l">Urgent</div></div>
+    <div class="stat"><div class="stat-n n-side"  id="st-side">—</div><div class="stat-l">Side Plate</div></div>
+    <div class="stat"><div class="stat-n n-ub"    id="st-ub">—</div><div class="stat-l">U-Bend</div></div>
+    <div class="stat"><div class="stat-n n-qty"   id="st-qty">—</div><div class="stat-l">รวม (ชิ้น)</div></div>
+  </div>
+
+  <!-- Stats: incoming.db -->
+  <div class="stat-grid incoming-grid" id="statsIncoming" style="display:none">
+    <div class="stat"><div class="stat-n n-total" id="in-total">—</div><div class="stat-l">รับแล้วทั้งหมด</div></div>
+    <div class="stat"><div class="stat-n n-today" id="in-today">—</div><div class="stat-l">วันนี้</div></div>
+    <div class="stat"><div class="stat-n n-qty"   id="in-qty">—</div><div class="stat-l">รวม (ชิ้น)</div></div>
+    <div class="stat"><div class="stat-n n-line"  id="in-A">—</div><div class="stat-l">Line A</div></div>
+    <div class="stat"><div class="stat-n n-line"  id="in-B">—</div><div class="stat-l">Line B</div></div>
+    <div class="stat"><div class="stat-n n-line"  id="in-G">—</div><div class="stat-l">Line G</div></div>
+    <div class="stat"><div class="stat-n n-line"  id="in-T">—</div><div class="stat-l">Line T</div></div>
+    <div class="stat"><div class="stat-n n-line"  id="in-T2">—</div><div class="stat-l">Line T2</div></div>
+    <div class="stat"><div class="stat-n n-line"  id="in-H">—</div><div class="stat-l">Line H</div></div>
+  </div>
+
+  <!-- ════ FILTERS ════ -->
+  <div class="sec-title" id="filterTitle">ค้นหาและกรองข้อมูล</div>
+
+  <!-- Filter: mecp.db -->
+  <div class="filter-row" id="filterMecp">
+    <span class="flabel">สถานะ:</span>
+    <button class="fbtn on mecp-btn" data-g="status" onclick="setF('status','all',this)">ทั้งหมด</button>
+    <button class="fbtn mecp-btn" data-g="status" onclick="setF('status','pending',this)">⏳ Pending</button>
+    <button class="fbtn mecp-btn" data-g="status" onclick="setF('status','confirmed',this)">✅ Confirmed</button>
+    <div class="fsep"></div>
+    <span class="flabel">Part:</span>
+    <button class="fbtn on mecp-btn" data-g="part" onclick="setF('part','all',this)">ทั้งหมด</button>
+    <button class="fbtn mecp-btn" data-g="part" onclick="setF('part','Side Plate',this)">🔩 Side Plate</button>
+    <button class="fbtn mecp-btn" data-g="part" onclick="setF('part','U-Bend',this)">🔄 U-Bend</button>
+    <div class="fsep"></div>
+    <select class="fselect" onchange="setF('priority',this.value)">
+      <option value="all">Priority: ทั้งหมด</option>
+      <option value="urgent">🔴 Urgent</option>
+      <option value="normal">🟡 Normal</option>
+    </select>
+    <div class="search">
+      <span style="color:var(--dim)">🔍</span>
+      <input id="searchBox" type="text" placeholder="ค้นหา ID, Model, Part..." oninput="fetchData()">
+    </div>
+  </div>
+
+  <!-- Filter: incoming.db -->
+  <div class="filter-row" id="filterIncoming" style="display:none">
+    <span class="flabel">Line:</span>
+    <button class="fbtn on inc-btn" data-ig="line" onclick="setIF('line','all',this)">ทั้งหมด</button>
+    <button class="fbtn inc-btn" data-ig="line" onclick="setIF('line','A',this)">A</button>
+    <button class="fbtn inc-btn" data-ig="line" onclick="setIF('line','B',this)">B</button>
+    <button class="fbtn inc-btn" data-ig="line" onclick="setIF('line','G',this)">G</button>
+    <button class="fbtn inc-btn" data-ig="line" onclick="setIF('line','T',this)">T</button>
+    <button class="fbtn inc-btn" data-ig="line" onclick="setIF('line','T2',this)">T2</button>
+    <button class="fbtn inc-btn" data-ig="line" onclick="setIF('line','H',this)">H</button>
+    <div class="search">
+      <span style="color:var(--dim)">🔍</span>
+      <input id="incSearchBox" type="text" placeholder="ค้นหา Part No, Item Code, DO, พนักงาน..." oninput="fetchIncoming()">
+    </div>
+  </div>
+
+  <!-- Selection Toolbar -->
+  <div class="sel-bar" id="selBar">
+    <span class="sel-count" id="selCount">0 รายการที่เลือก</span>
+    <button class="btn-del-sel" onclick="confirmDeleteSelected()">🗑️ ลบที่เลือก</button>
+    <button class="btn-clear-sel" onclick="clearSelection()">✕ ยกเลิกเลือก</button>
+  </div>
+
+  <!-- ════ TABLE ════ -->
+  <div class="sec-title" id="tableTitle">ตารางข้อมูล</div>
+  <div class="tcard">
+    <div class="thead-bar">
+      <div>
+        <div class="tcard-title" id="tableCardTitle">📋 orders — mecp.db</div>
+        <div class="tcount" id="tcount">กำลังโหลด...</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-reload" onclick="refreshAll()">🔄 รีเฟรช</button>
+        <button class="btn-csv" onclick="exportCSV()">⬇️ Export CSV</button>
+      </div>
+    </div>
+    <div id="tbody">
+      <div class="loading"><div class="spin"></div><p>กำลังโหลดจาก SQLite...</p></div>
+    </div>
+    <div class="pager" id="pager" style="display:none">
+      <div class="pinfo" id="pinfo"></div>
+      <div class="pbtns" id="pbtns"></div>
+    </div>
+  </div>
+
+  <!-- ════ DANGER ZONE ════ -->
+  <!-- Danger: mecp.db -->
+  <div class="danger-zone" id="dangerMecp">
+    <div class="danger-title">⚠️ DANGER ZONE — mecp.db</div>
+    <div class="danger-row">
+      <span style="font-size:13px;color:var(--mid)">ลบตามวันที่:</span>
+      <input type="date" id="deleteDate" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+      <button class="btn-danger outline" onclick="confirmDeleteDate()">🗑️ ลบ Order ก่อนวันที่เลือก</button>
+      <div style="width:1px;height:28px;background:var(--red-bd);margin:0 4px;"></div>
+      <button class="btn-danger" onclick="confirmDeleteAll()">⚠️ ลบทั้งหมด</button>
+    </div>
+  </div>
+
+  <!-- Danger: incoming.db -->
+  <div class="danger-zone" id="dangerIncoming" style="display:none">
+    <div class="danger-title">⚠️ DANGER ZONE — incoming.db</div>
+    <div class="danger-row">
+      <span style="font-size:13px;color:var(--mid)">ลบตามวันที่:</span>
+      <input type="date" id="incDeleteDate" style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+      <button class="btn-danger outline" onclick="confirmIncDeleteDate()">🗑️ ลบรายการก่อนวันที่เลือก</button>
+      <div style="width:1px;height:28px;background:var(--red-bd);margin:0 4px;"></div>
+      <button class="btn-danger" onclick="confirmIncDeleteAll()">⚠️ ลบทั้งหมด</button>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<!-- Confirm Modal (generic) -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-icon">🗑️</div>
+    <div class="modal-title" id="modal-title">ยืนยันการลบ</div>
+    <div class="modal-desc" id="modal-desc">คุณแน่ใจหรือไม่?</div>
+    <div class="modal-btns">
+      <button class="btn-danger outline" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn-danger" id="modal-confirm-btn">🗑️ ลบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Stock Action Modal (สำหรับลบ mecp.db) -->
+<div class="modal-overlay" id="stock-modal" onclick="closeStockModal()">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:460px;text-align:left;">
+    <div class="modal-icon" style="text-align:center;">🗑️</div>
+    <div class="modal-title" id="sm-title" style="text-align:center;">ยืนยันการลบ</div>
+    <div class="modal-desc" id="sm-desc" style="text-align:center;margin-bottom:16px;"></div>
+
+    <!-- Stock choice -->
+    <div style="background:#f8fafc;border:1px solid #dde2e8;border-radius:10px;padding:14px;margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:700;color:#5a6478;letter-spacing:1px;margin-bottom:10px;">📦 จัดการ STOCK OVERVIEW</div>
+
+      <label id="sm-opt-keep" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:2px solid #fb923c;background:#fff7ed;margin-bottom:8px;transition:all .15s;">
+        <input type="radio" name="sm-stock" value="keep" checked style="margin-top:3px;accent-color:#ea580c;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#c2410c;">🔒 คง Stock ปัจจุบัน</div>
+          <div style="font-size:11px;color:#9a3412;margin-top:2px;">ลบ Order แต่หักจำนวนออกจาก Stock ถาวร — จำนวนคงเหลือไม่เปลี่ยน</div>
+        </div>
+      </label>
+
+      <label id="sm-opt-return" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:10px 12px;border-radius:8px;border:2px solid #86efac;background:#f0faf4;transition:all .15s;">
+        <input type="radio" name="sm-stock" value="return" style="margin-top:3px;accent-color:#16a34a;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#1a7f4b;">↩️ คืนจำนวนกลับ Stock</div>
+          <div style="font-size:11px;color:#166534;margin-top:2px;">ลบ Order และคืนจำนวนที่จ่ายออกกลับ — Stock จะเพิ่มขึ้น</div>
+        </div>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="nav-btn" onclick="closeStockModal()">ยกเลิก</button>
+      <button class="btn-danger" id="sm-confirm-btn">🗑️ ยืนยันลบ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let currentDB = 'mecp';   // 'mecp' | 'incoming'
+let allRows   = [];
+let page      = 1;
+const PER     = 20;
+let mecpFilters = { status:'all', part:'all', priority:'all' };
+let incFilters  = { line:'all' };
+let selectedIds = new Set();
+let ws = null, reconnectCount = 0;
+
+// ══════════════════════════════════════════
+// DB SWITCHER
+// ══════════════════════════════════════════
+function switchDB(db) {
+  currentDB = db;
+  selectedIds.clear();
+
+  const isMecp = db === 'mecp';
+  const accent  = isMecp ? '#d93025' : '#1a7f4b';
+
+  // header accent
+  document.getElementById('mainHeader').style.borderBottomColor = accent;
+  document.getElementById('headerLogo').style.background        = accent;
+  document.getElementById('headerSub').textContent = isMecp
+    ? 'SQLITE · MECP.DB · ORDERS'
+    : 'SQLITE · INCOMING.DB · รับ PART';
+
+  // tabs
+  document.getElementById('tab-mecp').classList.toggle('active', isMecp);
+  document.getElementById('tab-incoming').classList.toggle('active', !isMecp);
+
+  // stats
+  document.getElementById('statsMecp').style.display     = isMecp ? ''     : 'none';
+  document.getElementById('statsIncoming').style.display = isMecp ? 'none' : '';
+  document.getElementById('statsTitle').textContent = isMecp
+    ? 'สรุปข้อมูล — mecp.db (orders)'
+    : 'สรุปข้อมูล — incoming.db (รับ Part)';
+
+  // filters
+  document.getElementById('filterMecp').style.display     = isMecp ? '' : 'none';
+  document.getElementById('filterIncoming').style.display = isMecp ? 'none' : '';
+
+  // danger zones
+  document.getElementById('dangerMecp').style.display     = isMecp ? '' : 'none';
+  document.getElementById('dangerIncoming').style.display = isMecp ? 'none' : '';
+
+  // table title
+  document.getElementById('tableCardTitle').textContent = isMecp
+    ? '📋 orders — mecp.db'
+    : '🚚 incoming — incoming.db';
+  document.getElementById('tableTitle').textContent = isMecp
+    ? 'ตารางข้อมูล Orders'
+    : 'ตารางข้อมูล รับ Part (Incoming)';
+
+  // selection bar
+  document.getElementById('selBar').classList.remove('show');
+
+  refreshAll();
+}
+
+// ══════════════════════════════════════════
+// REFRESH ALL
+// ══════════════════════════════════════════
+function refreshAll() {
+  if (currentDB === 'mecp') { fetchStats(); fetchData(); }
+  else { fetchIncStats(); fetchIncoming(); }
+}
+
+// ══════════════════════════════════════════
+// ── MECP.DB ──
+// ══════════════════════════════════════════
+async function fetchStats() {
+  try {
+    const res = await fetch('/api/db/stats');
+    const s = await res.json();
+    document.getElementById('st-total').textContent = s.total.toLocaleString();
+    document.getElementById('st-pend').textContent  = s.pending.toLocaleString();
+    document.getElementById('st-conf').textContent  = s.confirmed.toLocaleString();
+    document.getElementById('st-urg').textContent   = s.urgent.toLocaleString();
+    document.getElementById('st-side').textContent  = s.side_plate.toLocaleString();
+    document.getElementById('st-ub').textContent    = s.ubend.toLocaleString();
+    document.getElementById('st-qty').textContent   = s.total_qty.toLocaleString();
+  } catch(e) {}
+}
+
+async function fetchData() {
+  const search = document.getElementById('searchBox').value;
+  let url = `/api/db/orders?limit=2000`;
+  if (mecpFilters.status !== 'all')   url += `&status=${mecpFilters.status}`;
+  if (mecpFilters.part !== 'all')     url += `&part=${encodeURIComponent(mecpFilters.part)}`;
+  if (mecpFilters.priority !== 'all') url += `&priority=${mecpFilters.priority}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    allRows = data.orders || [];
+    page = 1;
+    renderMecp();
+  } catch(e) {
+    document.getElementById('tbody').innerHTML = '<div class="empty">⚠️ โหลดข้อมูลไม่ได้</div>';
+  }
+}
+
+function setF(key, val, btn) {
+  mecpFilters[key] = val;
+  if (btn) {
+    const g = btn.dataset.g || key;
+    document.querySelectorAll(`.fbtn[data-g="${g}"]`).forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  fetchData();
+}
+
+function renderMecp() {
+  const total = allRows.length;
+  const start = (page-1)*PER;
+  const slice = allRows.slice(start, start+PER);
+  document.getElementById('tcount').textContent =
+    `แสดง ${Math.min(start+PER,total)} จาก ${total} รายการ (mecp.db)`;
+  if (!total) {
+    document.getElementById('tbody').innerHTML = '<div class="empty">🔍 ไม่พบข้อมูล</div>';
+    document.getElementById('pager').style.display = 'none';
+    return;
+  }
+  const pageIds = slice.map(o => o.id);
+  const allPageChecked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+  const rows = slice.map((o, i) => {
+    const checked  = selectedIds.has(o.id) ? 'checked' : '';
+    const selClass = selectedIds.has(o.id) ? 'selected' : '';
+    const sBadge = o.status === 'confirmed'
+      ? `<span class="badge b-confirmed"><span class="dot2 d-conf"></span>Confirmed</span>`
+      : `<span class="badge b-pending"><span class="dot2 d-pend"></span>Pending</span>`;
+    const pBadge = o.priority === 'urgent'
+      ? `<span class="badge b-urgent">🔴 Urgent</span>`
+      : `<span class="badge b-normal">🟡 Normal</span>`;
+    const partBadge = o.part === 'Side Plate'
+      ? `<span class="badge b-side">🔩 SP</span>`
+      : `<span class="badge b-ubend">🔄 UB</span>`;
+    const lotCell = o.lot
+      ? `<span class="c-mono" style="font-weight:700;color:var(--blue)">${o.lot}</span>`
+      : `<span style="color:var(--dim)">—</span>`;
+    return `<tr id="row-${o.id}" class="${selClass}">
+      <td class="cb-cell"><input type="checkbox" ${checked} onchange="toggleRow('${o.id}',this)"></td>
+      <td class="rn">${start+i+1}</td>
+      <td class="c-id">${o.id}</td>
+      <td class="c-mono">${o.date||'—'}</td>
+      <td class="c-mono">${o.time||'—'}</td>
+      <td>${partBadge}</td>
+      <td style="font-size:11px;color:var(--text);font-family:var(--mono)">${o.model||'—'}</td>
+      <td class="c-qty">${Number(o.qty).toLocaleString()}</td>
+      <td>${lotCell}</td>
+      <td class="c-mono">${o.line_num||'—'} / ${o.seq||'—'}</td>
+      <td class="c-mono">${o.pro_month||'—'}</td>
+      <td style="font-size:11px">${o.employee||'—'}</td>
+      <td>${pBadge}</td>
+      <td>${sBadge}</td>
+      <td class="c-mono">${o.confirm_time||'—'}</td>
+      <td style="font-size:11px">${o.work_status||'—'}</td>
+      <td class="c-remark" title="${o.remark||''}">${o.remark||'—'}</td>
+      <td><button class="btn-del-row" onclick="confirmDeleteOne('${o.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbody').innerHTML = `<table>
+    <thead><tr>
+      <th class="cb-cell"><input type="checkbox" ${allPageChecked?'checked':''} onchange="togglePageAll(this)"></th>
+      <th>#</th><th>Order ID</th><th>วันที่</th><th>เวลา</th>
+      <th>Part</th><th>Model</th><th>จำนวน</th>
+      <th>LOT</th><th>LINE/SEQ</th><th>PRO MONTH</th><th>พนักงาน</th>
+      <th>Priority</th><th>Status</th>
+      <th>Confirm Time</th><th>Work Status</th><th>หมายเหตุ</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  renderPager(total);
+}
+
+// ── DELETE: mecp.db ──
+// ── Stock Action Modal ──
+function openStockModal(title, desc, action) {
+  document.getElementById('sm-title').textContent = title;
+  document.getElementById('sm-desc').textContent  = desc;
+  // reset radio to 'keep' (default)
+  document.querySelector('input[name="sm-stock"][value="keep"]').checked = true;
+  document.getElementById('sm-confirm-btn').onclick = () => {
+    const sa = document.querySelector('input[name="sm-stock"]:checked')?.value || 'keep';
+    closeStockModal();
+    action(sa);
+  };
+  document.getElementById('stock-modal').classList.add('show');
+}
+function closeStockModal() {
+  document.getElementById('stock-modal').classList.remove('show');
+}
+// highlight radio selection visually
+document.addEventListener('change', e => {
+  if (e.target.name !== 'sm-stock') return;
+  document.getElementById('sm-opt-keep').style.borderColor   = e.target.value==='keep'   ? '#fb923c' : '#e5e7eb';
+  document.getElementById('sm-opt-keep').style.background    = e.target.value==='keep'   ? '#fff7ed' : '#fff';
+  document.getElementById('sm-opt-return').style.borderColor = e.target.value==='return' ? '#86efac' : '#e5e7eb';
+  document.getElementById('sm-opt-return').style.background  = e.target.value==='return' ? '#f0faf4' : '#fff';
+});
+
+function confirmDeleteOne(id) {
+  const order = allRows.find(o => o.id === id);
+  const isDispatched = order?.work_status === 'จัดและส่งแล้ว';
+  if (isDispatched) {
+    openStockModal(
+      `ลบ Order ${id}?`,
+      `Part: ${order.part||''} | Qty: ${(order.qty||0).toLocaleString()} pcs — Order นี้จ่ายออกแล้ว`,
+      (sa) => deleteOne(id, sa)
+    );
+  } else {
+    openModal('ลบ Order นี้?', `ID: ${id} จะถูกลบถาวร`, () => deleteOne(id, 'return'));
+  }
+}
+async function deleteOne(id, stockAction='return') {
+  try {
+    const res = await fetch(`/api/db/orders/${encodeURIComponent(id)}?stock_action=${stockAction}`, { method:'DELETE' });
+    if (res.ok) { showToast(`🗑️ ลบ ${id}`); fetchStats(); fetchData(); }
+    else showToast('❌ ลบไม่สำเร็จ');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+function confirmDeleteDate() {
+  const d = document.getElementById('deleteDate').value;
+  if (!d) { showToast('⚠️ เลือกวันที่ก่อน'); return; }
+  const display = new Date(d).toLocaleDateString('th-TH');
+  openStockModal(
+    'ลบ Order ก่อนวันที่?',
+    `ลบ Order ทั้งหมดก่อน ${display} (รวม Order ที่จ่ายออกแล้วด้วย)`,
+    (sa) => deleteByDate(d, sa)
+  );
+}
+async function deleteByDate(date, stockAction='return') {
+  try {
+    const res = await fetch(`/api/db/orders?before=${date}&stock_action=${stockAction}`, { method:'DELETE' });
+    const data = await res.json();
+    if (res.ok) { showToast('🗑️ ลบข้อมูลเก่าแล้ว'); fetchStats(); fetchData(); }
+    else showToast('❌ ' + (data.error||'ลบไม่สำเร็จ'));
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+function confirmDeleteAll() {
+  openStockModal(
+    '⚠️ ลบทั้งหมด?',
+    'Order ทุกรายการใน mecp.db จะถูกลบถาวร (รวม Order ที่จ่ายออกแล้วด้วย)',
+    (sa) => deleteAll(sa)
+  );
+}
+async function deleteAll(stockAction='return') {
+  try {
+    const res = await fetch(`/api/db/orders?stock_action=${stockAction}`, { method:'DELETE' });
+    const data = await res.json();
+    if (res.ok) { showToast('🗑️ ลบทั้งหมดแล้ว'); fetchStats(); fetchData(); }
+    else showToast('❌ ' + (data.error||''));
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── EXPORT: mecp.db ──
+function exportMecpCSV() {
+  if (!allRows.length) { showToast('ไม่มีข้อมูล'); return; }
+  const hdr = ['#','Order ID','วันที่','เวลา','Part','Model','จำนวน','LOT','LINE','SEQ','PRO MONTH','พนักงาน','Priority','Status','Confirm Time','Work Status','หมายเหตุ'];
+  const rows = allRows.map((o,i) => [
+    i+1, o.id, o.date||'', o.time||'', o.part, o.model, o.qty,
+    o.lot||'', o.line_num||'', o.seq||'', o.pro_month||'', o.employee||'',
+    o.priority, o.status, o.confirm_time||'', o.work_status||'', o.remark||''
+  ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv = '﻿' + [hdr.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download = `MECP_Orders_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.csv`;
+  a.click();
+  showToast('✅ Export CSV สำเร็จ!');
+}
+
+// ══════════════════════════════════════════
+// ── INCOMING.DB ──
+// ══════════════════════════════════════════
+async function fetchIncStats() {
+  try {
+    const res = await fetch('/api/incoming/stats');
+    const j   = await res.json();
+    if (!j.ok) return;
+    const s = j.stats;
+    document.getElementById('in-total').textContent = (s.total||0).toLocaleString();
+    document.getElementById('in-today').textContent = (s.today||0).toLocaleString();
+    document.getElementById('in-qty').textContent   = (s.total_qty||0).toLocaleString();
+    for (const ln of ['A','B','G','T','T2','H']) {
+      const el = document.getElementById(`in-${ln}`);
+      if (el) el.textContent = (s[`line_${ln}`]||0).toLocaleString();
+    }
+  } catch(e) {}
+}
+
+async function fetchIncoming() {
+  const search = document.getElementById('incSearchBox').value;
+  let url = '/api/incoming?limit=2000';
+  if (incFilters.line !== 'all') url += `&line=${incFilters.line}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    allRows = data.records || [];
+    page = 1;
+    renderIncoming();
+  } catch(e) {
+    document.getElementById('tbody').innerHTML = '<div class="empty">⚠️ โหลดข้อมูลไม่ได้</div>';
+  }
+}
+
+function setIF(key, val, btn) {
+  incFilters[key] = val;
+  if (btn) {
+    document.querySelectorAll(`.fbtn[data-ig="${btn.dataset.ig}"]`).forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  fetchIncoming();
+}
+
+function renderIncoming() {
+  const total = allRows.length;
+  const start = (page-1)*PER;
+  const slice = allRows.slice(start, start+PER);
+  document.getElementById('tcount').textContent =
+    `แสดง ${Math.min(start+PER,total)} จาก ${total} รายการ (incoming.db)`;
+  if (!total) {
+    document.getElementById('tbody').innerHTML = '<div class="empty">🔍 ไม่พบข้อมูล</div>';
+    document.getElementById('pager').style.display = 'none';
+    return;
+  }
+  const pageIds = slice.map(o => o.id);
+  const allPageChecked = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+  const rows = slice.map((o, i) => {
+    const checked  = selectedIds.has(o.id) ? 'checked' : '';
+    const selClass = selectedIds.has(o.id) ? 'selected' : '';
+    const lineSeq  = [o.line_num, o.seq].filter(Boolean).join(' / ') || '—';
+    const doShort  = o.do_num
+      ? `<span title="${o.do_num}" class="c-do">${o.do_num}</span>`
+      : '<span style="color:var(--dim)">—</span>';
+    return `<tr id="row-${o.id}" class="${selClass}">
+      <td class="cb-cell"><input type="checkbox" ${checked} onchange="toggleRow('${o.id}',this)"></td>
+      <td class="rn">${start+i+1}</td>
+      <td class="c-mono" style="font-size:10px;color:var(--dim)">${o.id||'—'}</td>
+      <td class="c-mono">${o.receive_date||'—'}</td>
+      <td class="c-mono">${o.receive_time||'—'}</td>
+      <td style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text)">${o.part_no||'—'}</td>
+      <td class="c-mono">${o.item_code||'—'}</td>
+      <td class="c-qty">${(o.qty||0).toLocaleString()} <span style="font-size:10px;color:var(--dim)">${o.unit||'PC'}</span></td>
+      <td class="c-mono" style="font-weight:700">${lineSeq}</td>
+      <td class="c-mono">${o.location||'—'}</td>
+      <td class="c-mono">${o.due_date||'—'} ${o.due_time||''}</td>
+      <td>${doShort}</td>
+      <td class="c-mono">${o.pro_month||'—'}</td>
+      <td style="font-size:11px">${o.employee||'—'}</td>
+      <td><button class="btn-del-row" onclick="confirmDeleteIncOne('${o.id}')">🗑️</button></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('tbody').innerHTML = `<table>
+    <thead><tr>
+      <th class="cb-cell"><input type="checkbox" ${allPageChecked?'checked':''} onchange="togglePageAll(this)"></th>
+      <th>#</th><th>Record ID</th><th>วันที่รับ</th><th>เวลา</th>
+      <th>Part No</th><th>Item Code</th><th>จำนวน</th>
+      <th>LINE / SEQ</th><th>Location</th><th>Due Date</th>
+      <th>DO Number</th><th>PRO MONTH</th><th>พนักงาน</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  renderPager(total);
+}
+
+// ── DELETE: incoming.db ──
+function confirmDeleteIncOne(id) {
+  openModal('ลบรายการนี้?', `ID: ${id} จะถูกลบถาวรจาก incoming.db`, () => deleteIncOne(id));
+}
+async function deleteIncOne(id) {
+  try {
+    const res = await fetch(`/api/incoming/${encodeURIComponent(id)}`, { method:'DELETE' });
+    if (res.ok) { showToast(`🗑️ ลบแล้ว`); fetchIncStats(); fetchIncoming(); }
+    else showToast('❌ ลบไม่สำเร็จ');
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+function confirmIncDeleteDate() {
+  const d = document.getElementById('incDeleteDate').value;
+  if (!d) { showToast('⚠️ เลือกวันที่ก่อน'); return; }
+  openModal('ลบรายการก่อนวันที่?', `ลบข้อมูลใน incoming.db ก่อน ${new Date(d).toLocaleDateString('th-TH')}`, () => deleteIncByDate(d));
+}
+async function deleteIncByDate(date) {
+  try {
+    const res = await fetch(`/api/incoming?before=${date}`, { method:'DELETE' });
+    const j = await res.json();
+    if (j.ok) { showToast(`🗑️ ลบแล้ว ${j.deleted} รายการ`); fetchIncStats(); fetchIncoming(); }
+    else showToast('❌ ' + (j.error||''));
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+function confirmIncDeleteAll() {
+  openModal('⚠️ ลบทั้งหมด?', 'รายการทุกรายการใน incoming.db จะถูกลบถาวร', deleteIncAll);
+}
+async function deleteIncAll() {
+  try {
+    const res = await fetch('/api/incoming', { method:'DELETE' });
+    const j = await res.json();
+    if (j.ok) { showToast(`🗑️ ลบแล้ว ${j.deleted} รายการ`); fetchIncStats(); fetchIncoming(); }
+    else showToast('❌ ' + (j.error||''));
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ── EXPORT: incoming.db ──
+function exportIncCSV() {
+  if (!allRows.length) { showToast('ไม่มีข้อมูล'); return; }
+  const hdr = ['#','Record ID','วันที่รับ','เวลา','Part No','Item Code','จำนวน','Unit','LINE','SEQ','Location','Due Date','Due Time','DO Number','PRO MONTH','พนักงาน','Raw QR'];
+  const rows = allRows.map((o,i) => [
+    i+1, o.id, o.receive_date||'', o.receive_time||'',
+    o.part_no||'', o.item_code||'', o.qty||0, o.unit||'PC',
+    o.line_num||'', o.seq||'', o.location||'',
+    o.due_date||'', o.due_time||'', o.do_num||'',
+    o.pro_month||'', o.employee||'', o.raw_qr||''
+  ].map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+  const csv = '﻿' + [hdr.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download = `MECP_Incoming_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.csv`;
+  a.click();
+  showToast('✅ Export CSV สำเร็จ!');
+}
+
+// ══════════════════════════════════════════
+// SHARED: exportCSV dispatcher
+// ══════════════════════════════════════════
+function exportCSV() {
+  if (currentDB === 'mecp') exportMecpCSV();
+  else exportIncCSV();
+}
+
+// ══════════════════════════════════════════
+// PAGER
+// ══════════════════════════════════════════
+function renderPager(total) {
+  const pages = Math.ceil(total/PER);
+  const pager = document.getElementById('pager');
+  if (pages <= 1) { pager.style.display='none'; return; }
+  pager.style.display = 'flex';
+  const s=(page-1)*PER+1, e=Math.min(page*PER,total);
+  document.getElementById('pinfo').textContent = `หน้า ${page}/${pages} · แถว ${s}–${e} จาก ${total}`;
+  let b = `<button class="pbtn" onclick="goP(${page-1})" ${page===1?'disabled':''}>←</button>`;
+  for (let i=1;i<=pages;i++) {
+    if (i===1||i===pages||Math.abs(i-page)<=1)
+      b += `<button class="pbtn ${i===page?'on':''}" onclick="goP(${i})">${i}</button>`;
+    else if (Math.abs(i-page)===2)
+      b += `<span style="padding:5px 3px;color:var(--dim)">…</span>`;
+  }
+  b += `<button class="pbtn" onclick="goP(${page+1})" ${page===pages?'disabled':''}>→</button>`;
+  document.getElementById('pbtns').innerHTML = b;
+}
+function goP(p) {
+  const total = allRows.length;
+  if (p<1||p>Math.ceil(total/PER)) return;
+  page = p;
+  if (currentDB==='mecp') renderMecp(); else renderIncoming();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════
+// SELECTION
+// ══════════════════════════════════════════
+function updateSelBar() {
+  const bar=document.getElementById('selBar'), cnt=document.getElementById('selCount');
+  const n=selectedIds.size;
+  cnt.textContent = `${n} รายการที่เลือก`;
+  bar.classList.toggle('show', n>0);
+}
+function toggleRow(id,cb) {
+  if (cb.checked) selectedIds.add(id); else selectedIds.delete(id);
+  const row=document.getElementById(`row-${id}`);
+  if (row) row.classList.toggle('selected', cb.checked);
+  updateSelBar();
+}
+function togglePageAll(cb) {
+  const start=(page-1)*PER;
+  const slice=allRows.slice(start, start+PER);
+  slice.forEach(o => { if (cb.checked) selectedIds.add(o.id); else selectedIds.delete(o.id); });
+  if (currentDB==='mecp') renderMecp(); else renderIncoming();
+  updateSelBar();
+}
+function clearSelection() {
+  selectedIds.clear();
+  if (currentDB==='mecp') renderMecp(); else renderIncoming();
+  updateSelBar();
+}
+function confirmDeleteSelected() {
+  if (!selectedIds.size) return;
+  if (currentDB === 'mecp') {
+    const hasDispatched = [...selectedIds].some(id => {
+      const o = allRows.find(r => r.id === id);
+      return o?.work_status === 'จัดและส่งแล้ว';
+    });
+    if (hasDispatched) {
+      openStockModal(
+        `ลบ ${selectedIds.size} รายการที่เลือก?`,
+        `มี Order ที่จ่ายออกแล้วรวมอยู่ด้วย — เลือกวิธีจัดการ Stock`,
+        (sa) => deleteSelected(sa)
+      );
+      return;
+    }
+  }
+  openModal(
+    `ลบ ${selectedIds.size} รายการที่เลือก?`,
+    `รายการ ${selectedIds.size} รายการจะถูกลบถาวร`,
+    () => deleteSelected('return')
+  );
+}
+async function deleteSelected(stockAction='return') {
+  const ids = [...selectedIds];
+  let ok=0, fail=0;
+  for (const id of ids) {
+    try {
+      const url = currentDB==='mecp'
+        ? `/api/db/orders/${encodeURIComponent(id)}?stock_action=${stockAction}`
+        : `/api/incoming/${encodeURIComponent(id)}`;
+      const res = await fetch(url, {method:'DELETE'});
+      if (res.ok) { ok++; selectedIds.delete(id); } else fail++;
+    } catch { fail++; }
+  }
+  showToast(`🗑️ ลบแล้ว ${ok} รายการ${fail?` · ล้มเหลว ${fail}`:''}`);
+  updateSelBar();
+  refreshAll();
+}
+
+// ══════════════════════════════════════════
+// WEBSOCKET (real-time: mecp only)
+// ══════════════════════════════════════════
+function connectWS() {
+  const proto = location.protocol==='https:'?'wss':'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen = () => { reconnectCount=0; setLive(true); };
+  ws.onmessage = (e) => {
+    let msg; try { msg=JSON.parse(e.data); } catch { return; }
+    if (['ORDER_CREATED','ORDER_CONFIRMED','INIT'].includes(msg.type)) {
+      if (currentDB==='mecp') { fetchStats(); fetchData(); }
+      if (msg.type==='ORDER_CREATED') showToast(`📥 Order ใหม่: ${msg.order?.id||''}`);
+      if (msg.type==='ORDER_CONFIRMED') showToast(`✅ Confirmed: ${msg.order?.id||''}`);
+    }
+  };
+  ws.onclose = () => {
+    setLive(false);
+    setTimeout(connectWS, Math.min(1000*Math.pow(1.5,reconnectCount++),10000));
+  };
+  ws.onerror = () => setLive(false);
+}
+function setLive(ok) {
+  const el=document.getElementById('liveLabel'), pill=el.closest('.live-pill');
+  el.textContent = ok ? 'LIVE' : 'RECONNECTING...';
+  pill.style.background  = ok ? 'var(--green-bg)' : 'var(--red-bg)';
+  pill.style.borderColor = ok ? 'var(--green-bd)' : 'var(--red-bd)';
+  pill.style.color       = ok ? 'var(--green)'    : 'var(--red)';
+  pill.querySelector('.dot').style.background = ok ? 'var(--green)' : 'var(--red)';
+}
+
+// ══════════════════════════════════════════
+// TOAST / MODAL
+// ══════════════════════════════════════════
+let tt;
+function showToast(msg) {
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),2800);
+}
+function openModal(title, desc, action) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-desc').textContent  = desc;
+  document.getElementById('modal-confirm-btn').onclick = ()=>{ closeModal(); action(); };
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+fetchStats();
+fetchData();
+connectWS();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+proxy setup
+10.235.117.*;10.235.*;localhost;127.0.0.1
+
+http://10.236.52.141:8080/accelerated_pac_base.pac

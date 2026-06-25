@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>U-Bend Usage Editor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#f4f6f9;--white:#fff;--border:#dde2e8;
+  --text:#1e2535;--mid:#5a6478;--dim:#9aa3b2;
+  --red:#d93025;--red-bg:#fef2f1;--red-bd:#fad4d1;
+  --green:#1a7f4b;--green-bg:#f0faf4;--green-bd:#c3e8d4;
+  --blue:#1a5faa;--blue-bg:#eff6ff;--blue-bd:#bfdbfe;
+  --orange:#c2410c;--orange-bg:#fff7ed;--orange-bd:#fed7aa;
+  --yellow:#8a6000;--yellow-bg:#fffbeb;--yellow-bd:#fde99d;
+  --mono:'IBM Plex Mono',monospace;
+  --shadow:0 1px 4px rgba(0,0,0,.08);
+}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* HEADER */
+.header{
+  background:var(--white);border-bottom:3px solid var(--blue);
+  padding:0 28px;height:60px;display:flex;align-items:center;gap:14px;
+  position:sticky;top:0;z-index:100;box-shadow:var(--shadow);
+}
+.logo{background:var(--blue);color:#fff;font-size:12px;font-weight:700;padding:4px 9px;border-radius:4px;letter-spacing:1px;}
+.htitle{font-size:15px;font-weight:700;letter-spacing:1px;}
+.hsub{font-size:10px;color:var(--dim);letter-spacing:2px;font-family:var(--mono);}
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.nav-btn{background:var(--bg);border:1px solid var(--border);color:var(--mid);padding:6px 14px;border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;cursor:pointer;text-decoration:none;font-weight:600;transition:all .2s;}
+.nav-btn:hover{background:var(--border);}
+
+/* TABS */
+.tab-bar{display:flex;gap:0;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:0 28px 0 0;}
+.tab{padding:7px 20px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--mid);font-family:'Sarabun',sans-serif;transition:all .2s;border-right:1px solid var(--border);}
+.tab:last-child{border-right:none;}
+.tab:hover:not(.active){background:var(--border);}
+.tab.active{background:var(--blue);color:#fff;}
+
+/* MAIN */
+.main{max-width:1400px;margin:0 auto;padding:22px 24px;}
+
+/* STATS */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px;}
+.stat-box{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);}
+.stat-ico{font-size:28px;}
+.stat-n{font-size:28px;font-weight:700;font-family:var(--mono);color:var(--blue);}
+.stat-l{font-size:11px;color:var(--dim);font-weight:600;letter-spacing:.5px;}
+
+/* SECTION TITLE */
+.sec-title{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--mid);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* CARD */
+.card{background:var(--white);border:1px solid var(--border);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);margin-bottom:22px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+.card-title{font-size:13px;font-weight:700;}
+.card-count{font-size:11px;color:var(--dim);font-family:var(--mono);}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.search-box{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 12px;flex:1;min-width:200px;}
+.search-box input{border:none;background:transparent;font-size:13px;font-family:'Sarabun',sans-serif;color:var(--text);outline:none;width:100%;}
+.search-box input::placeholder{color:var(--dim);}
+.btn{border:none;padding:7px 16px;border-radius:6px;font-size:12px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:700;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:#14498a;}
+.btn-green{background:var(--green);color:#fff;}
+.btn-green:hover{background:#15643b;}
+.btn-orange{background:#ea580c;color:#fff;}
+.btn-orange:hover{background:#c2410c;}
+.btn-ghost{background:var(--bg);border:1px solid var(--border);color:var(--mid);}
+.btn-ghost:hover{background:var(--border);}
+.btn-sm{padding:4px 10px;font-size:11px;}
+.btn-danger{background:var(--red);color:#fff;border:none;padding:5px 10px;border-radius:5px;font-size:11px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:700;transition:background .15s;}
+.btn-danger:hover{background:#b02020;}
+.btn-edit{background:#f0f9ff;border:1px solid var(--blue-bd);color:var(--blue);padding:4px 10px;border-radius:5px;font-size:11px;font-family:'Sarabun',sans-serif;cursor:pointer;font-weight:700;transition:all .15s;}
+.btn-edit:hover{background:var(--blue);color:#fff;}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;}
+thead th{background:#f8f9fb;padding:9px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.2px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:60px;}
+tbody tr{border-bottom:1px solid #f0f2f5;transition:background .1s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:#f5f8ff;}
+td{padding:9px 12px;font-size:12px;color:var(--mid);vertical-align:middle;}
+.c-code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);}
+.c-desc{font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.c-qty{font-family:var(--mono);font-weight:700;color:var(--blue);font-size:13px;}
+.c-model{font-family:var(--mono);font-size:10px;color:var(--mid);}
+.rn{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:right;padding-right:8px;}
+.actions{display:flex;gap:5px;align-items:center;}
+
+/* INLINE EDIT */
+.qty-edit-input{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--blue);border:1px solid var(--blue-bd);border-radius:5px;padding:3px 8px;width:72px;outline:none;background:#f0f9ff;}
+.qty-edit-input:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(26,95,170,.15);}
+
+/* PAGINATION */
+.pager{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);}
+.pinfo{font-size:11px;color:var(--dim);font-family:var(--mono);}
+.pbtns{display:flex;gap:4px;}
+.pbtn{border:1px solid var(--border);background:var(--white);color:var(--mid);padding:5px 11px;border-radius:5px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:600;transition:all .15s;}
+.pbtn:hover:not(:disabled){background:var(--bg);}
+.pbtn:disabled{opacity:.35;cursor:default;}
+.pbtn.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+/* EMPTY / LOADING */
+.empty,.loading{text-align:center;padding:48px;color:var(--dim);}
+.spin{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 10px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal-box{background:#fff;border-radius:12px;padding:28px;width:90%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:11px;font-weight:700;color:var(--mid);letter-spacing:.8px;text-transform:uppercase;margin-bottom:5px;display:block;}
+.form-input{width:100%;border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'Sarabun',sans-serif;color:var(--text);outline:none;background:var(--bg);transition:border .2s;}
+.form-input:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(26,95,170,.1);}
+.form-hint{font-size:10px;color:var(--dim);margin-top:4px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--text);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;z-index:999;max-width:320px;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.t-ok{background:#1a7f4b;}
+.toast.t-err{background:#d93025;}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;}
+.b-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bd);}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-bd);}
+.b-orange{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange-bd);}
+
+/* CONFIRM MODAL */
+.confirm-box{max-width:360px;text-align:center;}
+.confirm-box .icon{font-size:36px;margin-bottom:10px;}
+.confirm-box .ctitle{font-size:15px;font-weight:700;margin-bottom:6px;}
+.confirm-box .cdesc{font-size:12px;color:var(--mid);margin-bottom:20px;}
+.confirm-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* Section panels */
+.panel{display:none;}
+.panel.active{display:block;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">MECP</div>
+  <div>
+    <div class="htitle">🔧 U-Bend Usage Editor</div>
+    <div class="hsub">ubend_usage.db · CRUD</div>
+  </div>
+  <div class="tab-bar" style="margin-left:20px;">
+    <button class="tab active" onclick="switchTab('usage')">📋 Item Usage</button>
+    <button class="tab" onclick="switchTab('items')">📝 Items (COND)</button>
+    <button class="tab" onclick="switchTab('ubend')">🔩 U-Bend Types</button>
+  </div>
+  <div class="hright">
+    <a class="nav-btn" href="/db">🗄️ DB Viewer</a>
+    <a class="nav-btn" href="/">← หน้าหลัก</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- STATS -->
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="stat-ico">📝</div>
+      <div><div class="stat-n" id="st-items">—</div><div class="stat-l">Items (Item COND)</div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-ico">🔩</div>
+      <div><div class="stat-n" id="st-ubend">—</div><div class="stat-l">U-Bend Types</div></div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-ico">📋</div>
+      <div><div class="stat-n" id="st-usage">—</div><div class="stat-l">Usage Entries</div></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       PANEL 1: item_ubend_usage
+  ══════════════════════════════════════ -->
+  <div class="panel active" id="panel-usage">
+    <div class="sec-title">📋 Usage — Item COND × Item Ubend × จำนวน</div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">รายการ Usage ทั้งหมด</div>
+          <div class="card-count" id="usage-count">กำลังโหลด...</div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddUsageModal()">＋ เพิ่ม Usage</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <span style="color:var(--dim)">🔍</span>
+          <input id="usage-search" type="text" placeholder="ค้นหา Item COND, Item Ubend, Model, Description..." oninput="debounceUsage()">
+        </div>
+        <button class="btn btn-ghost" onclick="loadUsage()">🔄 รีเฟรช</button>
+      </div>
+      <div id="usage-tbody">
+        <div class="loading"><div class="spin"></div><p>กำลังโหลด...</p></div>
+      </div>
+      <div class="pager" id="usage-pager" style="display:none;">
+        <div class="pinfo" id="usage-pinfo"></div>
+        <div class="pbtns" id="usage-pbtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       PANEL 2: items
+  ══════════════════════════════════════ -->
+  <div class="panel" id="panel-items">
+    <div class="sec-title">📝 Items — Item COND (ตัวที่ใช้ค้นหา Usage)</div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">รายการ Item COND</div>
+          <div class="card-count" id="items-count">กำลังโหลด...</div>
+        </div>
+        <button class="btn btn-green" onclick="openAddItemModal()">＋ เพิ่ม Item COND</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <span style="color:var(--dim)">🔍</span>
+          <input id="items-search" type="text" placeholder="ค้นหา Item COND, Model..." oninput="debounceItems()">
+        </div>
+        <button class="btn btn-ghost" onclick="loadItems()">🔄 รีเฟรช</button>
+      </div>
+      <div id="items-tbody">
+        <div class="loading"><div class="spin"></div><p>กำลังโหลด...</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       PANEL 3: ubend_types
+  ══════════════════════════════════════ -->
+  <div class="panel" id="panel-ubend">
+    <div class="sec-title">🔩 U-Bend Types — รหัส U-Bend และรายละเอียด</div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">รายการ U-Bend Types</div>
+          <div class="card-count" id="ubend-count">กำลังโหลด...</div>
+        </div>
+        <button class="btn btn-orange" onclick="openAddUbendModal()">＋ เพิ่ม U-Bend Type</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-box">
+          <span style="color:var(--dim)">🔍</span>
+          <input id="ubend-search" type="text" placeholder="ค้นหา Ubend Code, Description..." oninput="debounceUbend()">
+        </div>
+        <button class="btn btn-ghost" onclick="loadUbendTypes()">🔄 รีเฟรช</button>
+      </div>
+      <div id="ubend-tbody">
+        <div class="loading"><div class="spin"></div><p>กำลังโหลด...</p></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ══ MODAL: Add Usage ══ -->
+<div class="modal-overlay" id="modal-usage">
+  <div class="modal-box">
+    <div class="modal-title">➕ เพิ่ม Usage Entry</div>
+    <div class="form-group">
+      <label class="form-label">Item COND <span style="color:var(--red)">*</span></label>
+      <input id="u-item_code" class="form-input" type="text" placeholder="เช่น SQ46A449G18" style="text-transform:uppercase">
+      <div class="form-hint">รหัส Item COND (ใช้ค้นหา usage) — ต้องมีใน Items ก่อน</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Item Ubend Code <span style="color:var(--red)">*</span></label>
+      <input id="u-ubend_code" class="form-input" type="text" placeholder="เช่น VU00J090G42" style="text-transform:uppercase">
+      <div class="form-hint">รหัส U-Bend ที่ใช้ — ต้องมีใน U-Bend Types ก่อน</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Usage (จำนวนต่อ Lot 1 ชิ้น) <span style="color:var(--red)">*</span></label>
+      <input id="u-qty" class="form-input" type="number" min="0.01" step="0.01" value="1" placeholder="1">
+      <div class="form-hint">เช่น 1 = ใช้ 1 ชิ้นต่อ Lot, 2 = ใช้ 2 ชิ้นต่อ Lot</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--blue-bg);border:1px solid var(--blue-bd);border-radius:7px;font-size:11px;color:var(--blue);margin-bottom:4px;">
+      💡 ถ้า Item COND หรือ Ubend Code ยังไม่มีในระบบ ให้เพิ่มที่แท็บ "Items" และ "U-Bend Types" ก่อน
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-usage')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="submitAddUsage()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Add Item ══ -->
+<div class="modal-overlay" id="modal-item">
+  <div class="modal-box">
+    <div class="modal-title">➕ เพิ่ม Item COND</div>
+    <div class="form-group">
+      <label class="form-label">Item COND Code <span style="color:var(--red)">*</span></label>
+      <input id="i-item_code" class="form-input" type="text" placeholder="เช่น SQ46A449G18" style="text-transform:uppercase">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Model</label>
+      <input id="i-model" class="form-input" type="text" placeholder="เช่น 20R51G">
+      <div class="form-hint">ชื่อ Model (ไม่จำเป็น)</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Status</label>
+      <select id="i-status" class="form-input">
+        <option value="o">o — Active</option>
+        <option value="x">x — Inactive</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-item')">ยกเลิก</button>
+      <button class="btn btn-green" onclick="submitAddItem()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Add Ubend Type ══ -->
+<div class="modal-overlay" id="modal-ubend">
+  <div class="modal-box">
+    <div class="modal-title">➕ เพิ่ม U-Bend Type</div>
+    <div class="form-group">
+      <label class="form-label">Ubend Code <span style="color:var(--red)">*</span></label>
+      <input id="ub-code" class="form-input" type="text" placeholder="เช่น VU00J090G42" style="text-transform:uppercase">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input id="ub-desc" class="form-input" type="text" placeholder="เช่น U-BEND ASSY">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Unit</label>
+      <input id="ub-unit" class="form-input" type="text" value="(PCS.)" placeholder="(PCS.)">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-ubend')">ยกเลิก</button>
+      <button class="btn btn-orange" onclick="submitAddUbend()">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM MODAL ══ -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal-box confirm-box">
+    <div class="icon">🗑️</div>
+    <div class="ctitle" id="confirm-title">ยืนยันการลบ?</div>
+    <div class="cdesc" id="confirm-desc">รายการนี้จะถูกลบถาวร</div>
+    <div class="confirm-btns">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">ยกเลิก</button>
+      <button class="btn btn-danger" style="padding:9px;" id="confirm-ok-btn">🗑️ ลบ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── state ───────────────────────────────────────────────
+let usagePage = 0;
+const PAGE = 80;
+let usageTotal = 0;
+let usageSearch = '';
+let debounceTimer = null;
+let currentTab = 'usage';
+
+// ─── tab ─────────────────────────────────────────────────
+function switchTab(t) {
+  currentTab = t;
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    el.classList.toggle('active', ['usage','items','ubend'][i]===t);
+  });
+  document.querySelectorAll('.panel').forEach(el=>el.classList.remove('active'));
+  document.getElementById(`panel-${t}`).classList.add('active');
+  if(t==='usage') loadUsage();
+  else if(t==='items') loadItems();
+  else if(t==='ubend') loadUbendTypes();
+}
+
+// ─── stats ───────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch('/api/ubend-db/stats').then(x=>x.json());
+    if(r.ok){
+      document.getElementById('st-items').textContent = r.items.toLocaleString();
+      document.getElementById('st-ubend').textContent = r.ubend_types.toLocaleString();
+      document.getElementById('st-usage').textContent = r.usage.toLocaleString();
+    }
+  } catch(e){}
+}
+
+// ─── USAGE TABLE ─────────────────────────────────────────
+function debounceUsage(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(()=>{ usagePage=0; loadUsage(); },300);
+}
+
+async function loadUsage(){
+  usageSearch = document.getElementById('usage-search').value;
+  const el = document.getElementById('usage-tbody');
+  el.innerHTML = '<div class="loading"><div class="spin"></div><p>กำลังโหลด...</p></div>';
+  try{
+    const url = `/api/ubend-db/usage?search=${encodeURIComponent(usageSearch)}&limit=${PAGE}&offset=${usagePage*PAGE}`;
+    const d = await fetch(url).then(x=>x.json());
+    if(!d.ok) throw new Error(d.error);
+    usageTotal = d.total;
+    renderUsageTable(d.rows);
+    document.getElementById('usage-count').textContent = `${d.total.toLocaleString()} รายการ`;
+    renderUsagePager();
+    loadStats();
+  } catch(e){
+    el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function renderUsageTable(rows){
+  const el = document.getElementById('usage-tbody');
+  if(!rows.length){ el.innerHTML='<div class="empty">ไม่พบข้อมูล</div>'; return; }
+  const start = usagePage*PAGE;
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th class="rn">#</th>
+      <th>Item COND</th>
+      <th>Model</th>
+      <th>Item Ubend</th>
+      <th>Description</th>
+      <th>Unit</th>
+      <th style="text-align:center">Usage / Lot</th>
+      <th style="text-align:center">จัดการ</th>
+    </tr></thead>
+    <tbody>${rows.map((r,i)=>`
+      <tr id="row-${r.usage_id}">
+        <td class="rn">${start+i+1}</td>
+        <td class="c-code">${r.item_code}</td>
+        <td class="c-model">${r.item_model||'—'}</td>
+        <td class="c-code" style="color:var(--orange)">${r.ubend_code}</td>
+        <td class="c-desc" title="${r.description||''}">${r.description||'—'}</td>
+        <td style="font-size:10px;color:var(--dim)">${r.unit||'—'}</td>
+        <td style="text-align:center">
+          <span class="c-qty" id="qty-${r.usage_id}">×${r.qty}</span>
+        </td>
+        <td>
+          <div class="actions" style="justify-content:center">
+            <button class="btn-edit btn-sm" onclick="startEditQty(${r.usage_id},${r.qty})">✏️ แก้ไข</button>
+            <button class="btn-danger btn-sm" onclick="confirmDelete('usage',${r.usage_id},'${r.item_code} → ${r.ubend_code}')">🗑️</button>
+          </div>
+        </td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function renderUsagePager(){
+  const pager = document.getElementById('usage-pager');
+  const totalPages = Math.ceil(usageTotal/PAGE);
+  if(totalPages<=1){ pager.style.display='none'; return; }
+  pager.style.display='flex';
+  const start = usagePage*PAGE+1;
+  const end   = Math.min((usagePage+1)*PAGE, usageTotal);
+  document.getElementById('usage-pinfo').textContent = `แสดง ${start}–${end} จาก ${usageTotal.toLocaleString()} รายการ`;
+  let html='';
+  html += `<button class="pbtn" onclick="gotoPage(${usagePage-1})" ${usagePage===0?'disabled':''}>‹</button>`;
+  const lo=Math.max(0,usagePage-2), hi=Math.min(totalPages-1,usagePage+2);
+  for(let p=lo;p<=hi;p++) html+=`<button class="pbtn${p===usagePage?' on':''}" onclick="gotoPage(${p})">${p+1}</button>`;
+  html += `<button class="pbtn" onclick="gotoPage(${usagePage+1})" ${usagePage>=totalPages-1?'disabled':''}>›</button>`;
+  document.getElementById('usage-pbtns').innerHTML = html;
+}
+
+function gotoPage(p){ usagePage=p; loadUsage(); }
+
+// ── inline edit qty ──────────────────────────────────────
+function startEditQty(id, qty){
+  const cell = document.getElementById(`qty-${id}`);
+  const row  = document.getElementById(`row-${id}`);
+  const actTd = row.querySelector('.actions');
+  cell.innerHTML = `<input class="qty-edit-input" id="qinput-${id}" type="number" min="0.01" step="0.01" value="${qty}" onkeydown="if(event.key==='Enter')saveQty(${id});if(event.key==='Escape')cancelEditQty(${id},${qty})">`;
+  actTd.innerHTML = `<div class="actions" style="justify-content:center">
+    <button class="btn btn-primary btn-sm" onclick="saveQty(${id})">💾 บันทึก</button>
+    <button class="btn btn-ghost btn-sm" onclick="cancelEditQty(${id},${qty})">✕</button>
+  </div>`;
+  document.getElementById(`qinput-${id}`).focus();
+}
+
+async function saveQty(id){
+  const inp = document.getElementById(`qinput-${id}`);
+  if(!inp) return;
+  const qty = parseFloat(inp.value);
+  if(isNaN(qty)||qty<=0){ toast('ใส่จำนวนให้ถูกต้อง','err'); return; }
+  try{
+    const r = await fetch(`/api/ubend-db/usage/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({qty})}).then(x=>x.json());
+    if(!r.ok) throw new Error(r.error);
+    toast('✅ บันทึกแล้ว','ok');
+    loadUsage();
+    loadStats();
+  } catch(e){ toast('❌ '+e.message,'err'); }
+}
+
+function cancelEditQty(id, qty){
+  document.getElementById(`qty-${id}`).innerHTML = `<span class="c-qty">×${qty}</span>`;
+  const row = document.getElementById(`row-${id}`);
+  row.querySelector('.actions').innerHTML = `
+    <button class="btn-edit btn-sm" onclick="startEditQty(${id},${qty})">✏️ แก้ไข</button>
+    <button class="btn-danger btn-sm" onclick="confirmDelete('usage',${id},'row')">🗑️</button>`;
+}
+
+// ─── ADD USAGE ───────────────────────────────────────────
+function openAddUsageModal(){
+  ['u-item_code','u-ubend_code'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('u-qty').value = '1';
+  openModal('modal-usage');
+}
+
+async function submitAddUsage(){
+  const item_code  = document.getElementById('u-item_code').value.trim().toUpperCase();
+  const ubend_code = document.getElementById('u-ubend_code').value.trim().toUpperCase();
+  const qty        = parseFloat(document.getElementById('u-qty').value);
+  if(!item_code||!ubend_code){ toast('กรุณาระบุ Item COND และ Ubend Code','err'); return; }
+  if(isNaN(qty)||qty<=0){ toast('ใส่ Usage ให้ถูกต้อง','err'); return; }
+  try{
+    const r = await fetch('/api/ubend-db/usage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_code,ubend_code,qty})}).then(x=>x.json());
+    if(!r.ok) throw new Error(r.error);
+    toast('✅ เพิ่ม Usage สำเร็จ','ok');
+    closeModal('modal-usage');
+    loadUsage(); loadStats();
+  } catch(e){ toast('❌ '+e.message,'err'); }
+}
+
+// ─── ITEMS TABLE ─────────────────────────────────────────
+function debounceItems(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(loadItems, 300);
+}
+
+async function loadItems(){
+  const search = document.getElementById('items-search').value;
+  const el = document.getElementById('items-tbody');
+  el.innerHTML = '<div class="loading"><div class="spin"></div><p>กำลังโหลด...</p></div>';
+  try{
+    const d = await fetch(`/api/ubend-db/items?search=${encodeURIComponent(search)}`).then(x=>x.json());
+    if(!d.ok) throw new Error(d.error);
+    document.getElementById('items-count').textContent = `${d.rows.length.toLocaleString()} รายการ`;
+    if(!d.rows.length){ el.innerHTML='<div class="empty">ไม่พบข้อมูล</div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr>
+        <th class="rn">#</th>
+        <th>Item COND</th>
+        <th>Model</th>
+        <th>Status</th>
+        <th>Usage Count</th>
+        <th style="text-align:center">จัดการ</th>
+      </tr></thead>
+      <tbody>${d.rows.map((r,i)=>`
+        <tr>
+          <td class="rn">${i+1}</td>
+          <td class="c-code">${r.item_code}</td>
+          <td class="c-model">${r.model||'—'}</td>
+          <td><span class="badge ${r.status==='o'?'b-green':'b-orange'}">${r.status==='o'?'Active':'Inactive'}</span></td>
+          <td><a href="#" onclick="filterUsageByItem('${r.item_code}');return false;" style="color:var(--blue);font-family:var(--mono);font-size:11px;font-weight:700;">ดู usage</a></td>
+          <td style="text-align:center">
+            <button class="btn-danger btn-sm" onclick="confirmDelete('item','${r.item_code}','${r.item_code}')">🗑️ ลบ</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  } catch(e){
+    el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function filterUsageByItem(code){
+  document.getElementById('usage-search').value = code;
+  usagePage = 0;
+  switchTab('usage');
+}
+
+function openAddItemModal(){
+  ['i-item_code','i-model'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('i-status').value='o';
+  openModal('modal-item');
+}
+
+async function submitAddItem(){
+  const item_code = document.getElementById('i-item_code').value.trim().toUpperCase();
+  const model     = document.getElementById('i-model').value.trim();
+  const status    = document.getElementById('i-status').value;
+  if(!item_code){ toast('กรุณาระบุ Item COND','err'); return; }
+  try{
+    const r = await fetch('/api/ubend-db/items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({item_code,model,status})}).then(x=>x.json());
+    if(!r.ok) throw new Error(r.error);
+    toast('✅ เพิ่ม Item สำเร็จ','ok');
+    closeModal('modal-item');
+    loadItems(); loadStats();
+  } catch(e){ toast('❌ '+e.message,'err'); }
+}
+
+// ─── UBEND TYPES TABLE ───────────────────────────────────
+function debounceUbend(){
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(loadUbendTypes, 300);
+}
+
+async function loadUbendTypes(){
+  const search = document.getElementById('ubend-search').value;
+  const el = document.getElementById('ubend-tbody');
+  el.innerHTML = '<div class="loading"><div class="spin"></div><p>กำลังโหลด...</p></div>';
+  try{
+    const d = await fetch(`/api/ubend-db/ubend-types?search=${encodeURIComponent(search)}`).then(x=>x.json());
+    if(!d.ok) throw new Error(d.error);
+    document.getElementById('ubend-count').textContent = `${d.rows.length.toLocaleString()} รายการ`;
+    if(!d.rows.length){ el.innerHTML='<div class="empty">ไม่พบข้อมูล</div>'; return; }
+    el.innerHTML = `<table>
+      <thead><tr>
+        <th class="rn">#</th>
+        <th>Ubend Code</th>
+        <th>Description</th>
+        <th>Unit</th>
+        <th style="text-align:center">จัดการ</th>
+      </tr></thead>
+      <tbody>${d.rows.map((r,i)=>`
+        <tr>
+          <td class="rn">${i+1}</td>
+          <td class="c-code" style="color:var(--orange)">${r.ubend_code}</td>
+          <td class="c-desc" title="${r.description||''}">${r.description||'—'}</td>
+          <td style="font-size:10px;color:var(--dim)">${r.unit||'—'}</td>
+          <td style="text-align:center">
+            <button class="btn-danger btn-sm" onclick="confirmDelete('ubend','${r.ubend_code}','${r.ubend_code}')">🗑️ ลบ</button>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  } catch(e){
+    el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function openAddUbendModal(){
+  ['ub-code','ub-desc'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ub-unit').value='(PCS.)';
+  openModal('modal-ubend');
+}
+
+async function submitAddUbend(){
+  const ubend_code  = document.getElementById('ub-code').value.trim().toUpperCase();
+  const description = document.getElementById('ub-desc').value.trim();
+  const unit        = document.getElementById('ub-unit').value.trim() || '(PCS.)';
+  if(!ubend_code){ toast('กรุณาระบุ Ubend Code','err'); return; }
+  try{
+    const r = await fetch('/api/ubend-db/ubend-types',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ubend_code,description,unit})}).then(x=>x.json());
+    if(!r.ok) throw new Error(r.error);
+    toast('✅ เพิ่ม U-Bend Type สำเร็จ','ok');
+    closeModal('modal-ubend');
+    loadUbendTypes(); loadStats();
+  } catch(e){ toast('❌ '+e.message,'err'); }
+}
+
+// ─── DELETE ──────────────────────────────────────────────
+let pendingDelete = null;
+
+function confirmDelete(type, id, label){
+  pendingDelete = {type, id};
+  document.getElementById('confirm-title').textContent = 'ยืนยันการลบ?';
+  const msgs = {
+    usage: `ลบ Usage: ${label}`,
+    item:  `ลบ Item COND: ${label}\n⚠️ Usage ที่เชื่อมอยู่จะยังคงอยู่`,
+    ubend: `ลบ U-Bend Type: ${label}\n⚠️ Usage ที่เชื่อมอยู่จะยังคงอยู่`,
+  };
+  document.getElementById('confirm-desc').textContent = msgs[type] || label;
+  document.getElementById('confirm-ok-btn').onclick = executeDelete;
+  openModal('modal-confirm');
+}
+
+async function executeDelete(){
+  if(!pendingDelete) return;
+  const {type, id} = pendingDelete;
+  const endpoints = {
+    usage: `/api/ubend-db/usage/${id}`,
+    item:  `/api/ubend-db/items/${encodeURIComponent(id)}`,
+    ubend: `/api/ubend-db/ubend-types/${encodeURIComponent(id)}`,
+  };
+  try{
+    const r = await fetch(endpoints[type],{method:'DELETE'}).then(x=>x.json());
+    if(!r.ok) throw new Error(r.error);
+    toast('🗑️ ลบแล้ว','ok');
+    closeModal('modal-confirm');
+    pendingDelete = null;
+    if(type==='usage') loadUsage();
+    else if(type==='item') loadItems();
+    else if(type==='ubend') loadUbendTypes();
+    loadStats();
+  } catch(e){ toast('❌ '+e.message,'err'); }
+}
+
+// ─── MODAL HELPERS ───────────────────────────────────────
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+// close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click', e=>{ if(e.target===el) el.classList.remove('show'); });
+});
+
+// ─── TOAST ───────────────────────────────────────────────
+let toastTimer = null;
+function toast(msg, type='ok'){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast t-${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 2800);
+}
+
+// ─── INIT ────────────────────────────────────────────────
+loadStats();
+loadUsage();
+</script>
+</body>
+</html>
