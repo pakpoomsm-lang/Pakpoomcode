@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python read_files.py:*)",
+      "Bash(tree:*)",
+      "Bash(python:*)",
+      "PowerShell(Remove-Item \"C:\\\\Users\\\\USER\\\\Desktop\\\\Claude\\\\OT\\\\run_ot_system.bat\" -Confirm:$false)",
+      "Bash(Select-String -Path \"C:\\\\Users\\\\USER\\\\Desktop\\\\Claude\\\\mecp-python\\\\mecp-python\\\\server.py\" -Pattern \"uvicorn|port|run\")",
+      "Bash(Select-Object -Last 20)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
