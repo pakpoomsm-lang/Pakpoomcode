@@ -8,6 +8,7 @@ let allGroups = [];     // Store all groups (for OT substitute modal)
 let currentDisplayedEmployees = []; // Employees currently shown after filters
 let currentLeaveEmployee = null; // Store current employee for leave option modal
 let excludedEmpIds = new Set(); // Employee codes excluded from working-hour calculation
+let shiftDMergeInfo = null; // ข้อมูล Shift D ที่ถูกรวมเข้ากับกะเช้า (สำหรับ modal รายละเอียด)
 const preferredSupervisors = [
     { match: 'ภาคภูมิพรมชา', fallback: 'ภาคภูมิ พรมชา', displayName: 'ภาคภูมิ พรมชา (SV)' },
     { match: 'ศุภมาศปลงจิตร', fallback: 'ศุภมาศ ปลงจิตร', displayName: 'ศุภมาศ ปลงจิตร (FM)' },
@@ -469,19 +470,42 @@ function updateShiftHoursSummary(employees) {
         return;
     }
 
+    // ยอดรวมทุก Shift (รวม D เสมอ)
+    const totals = [...shiftMap.values()].reduce((acc, s) => {
+        acc.work += s.work;
+        acc.ot += s.ot;
+        return acc;
+    }, { work: 0, ot: 0 });
+
+    // Shift D เข้ากะเช้าตลอด → นำไปรวมกับ Shift A/B ที่เข้ากะเช้าในอาทิตย์นั้น
+    // แล้วตัด card ของ Shift D ออก (กดที่ card กะเช้าเพื่อดูรายละเอียด D)
+    const workDate = document.getElementById('workDate').value;
+    const morningShift = getMorningShift(workDate);
+    const dGroup = shiftMap.get('D');
+    const morningGroup = shiftMap.get(morningShift);
+    shiftDMergeInfo = null;
+    if (dGroup && morningGroup) {
+        shiftDMergeInfo = {
+            morningShift,
+            own: { work: morningGroup.work, ot: morningGroup.ot },
+            d:   { work: dGroup.work,       ot: dGroup.ot }
+        };
+        // รวมตัวเลขของ D เข้ากับกะเช้าสำหรับการแสดงผลรวม
+        morningGroup.work += dGroup.work;
+        morningGroup.ot   += dGroup.ot;
+        shiftMap.delete('D');
+    }
+
     const summaries = [...shiftMap.values()].sort((a, b) => {
         const ia = SHIFT_ORDER.indexOf(a.shift);
         const ib = SHIFT_ORDER.indexOf(b.shift);
         return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
     });
 
-    const totals = summaries.reduce((acc, s) => {
-        acc.work += s.work;
-        acc.ot += s.ot;
-        return acc;
-    }, { work: 0, ot: 0 });
-
-    let html = summaries.map(s => renderShiftHoursCard(s.shift, s.work, s.ot)).join('');
+    let html = summaries.map(s => {
+        const mergedD = (shiftDMergeInfo && s.shift === morningShift) ? shiftDMergeInfo : null;
+        return renderShiftHoursCard(s.shift, s.work, s.ot, false, mergedD);
+    }).join('');
     if (summaries.length > 1) {
         html += renderShiftHoursCard('รวมทุก Shift', totals.work, totals.ot, true);
     }
@@ -492,24 +516,72 @@ function shiftHours(work, ot) {
     return (work * WORK_HOURS_PER_PERSON) + (ot * OT_HOURS_PER_PERSON);
 }
 
-function renderShiftHoursCard(label, work, ot, isTotal = false) {
+function fmtHours(hours) {
+    return hours.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderShiftHoursCard(label, work, ot, isTotal = false, mergedD = null) {
     const hours = shiftHours(work, ot);
+    const clickable = mergedD ? ' shift-hours-clickable" onclick="showShiftDDetail()' : '';
+    const mergeBadge = mergedD
+        ? '<span class="shift-hours-merge-badge" title="รวมชั่วโมงของ Shift D (กะเช้า)">+ D</span>'
+        : '';
+    const mergeHint = mergedD
+        ? '<div class="shift-hours-merge-hint"><i class="bi bi-info-circle"></i> รวม Shift D · กดเพื่อดูรายละเอียด</div>'
+        : '';
     return `
-        <div class="shift-hours-card${isTotal ? ' shift-hours-total' : ''}">
+        <div class="shift-hours-card${isTotal ? ' shift-hours-total' : ''}${clickable}">
             <div class="shift-hours-head">
                 ${isTotal ? '' : '<span class="shift-hours-label">Shift</span>'}
                 <span class="shift-hours-name">${escapeHtml(String(label))}</span>
+                ${mergeBadge}
             </div>
             <div class="shift-hours-value">
-                <strong>${hours.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                <strong>${fmtHours(hours)}</strong>
                 <span>ชม.</span>
             </div>
             <div class="shift-hours-detail">
                 <span><i class="bi bi-check-circle-fill"></i> มาทำงาน ${work} คน</span>
                 <span><i class="bi bi-stopwatch-fill"></i> OT ${ot} คน</span>
             </div>
+            ${mergeHint}
         </div>
     `;
+}
+
+// แสดงรายละเอียดชั่วโมง Shift D ที่ถูกรวมเข้ากับกะเช้า
+function showShiftDDetail() {
+    if (!shiftDMergeInfo) return;
+    const { morningShift, own, d } = shiftDMergeInfo;
+    const ownHours = shiftHours(own.work, own.ot);
+    const dHours = shiftHours(d.work, d.ot);
+    const totalHours = ownHours + dHours;
+
+    document.getElementById('shiftDDetailTitle').textContent =
+        `ชั่วโมงการทำงาน Shift ${morningShift} (กะเช้า) รวม Shift D`;
+
+    const rowsHtml = `
+        <tr>
+            <td><span class="badge bg-secondary">Shift ${escapeHtml(morningShift)}</span></td>
+            <td class="text-center">${own.work}</td>
+            <td class="text-center">${own.ot}</td>
+            <td class="text-end fw-bold">${fmtHours(ownHours)}</td>
+        </tr>
+        <tr>
+            <td><span class="badge" style="background:#6f42c1">Shift D</span></td>
+            <td class="text-center">${d.work}</td>
+            <td class="text-center">${d.ot}</td>
+            <td class="text-end fw-bold">${fmtHours(dHours)}</td>
+        </tr>
+        <tr class="table-active">
+            <td class="fw-bold">รวม</td>
+            <td class="text-center fw-bold">${own.work + d.work}</td>
+            <td class="text-center fw-bold">${own.ot + d.ot}</td>
+            <td class="text-end fw-bold text-primary">${fmtHours(totalHours)}</td>
+        </tr>
+    `;
+    document.getElementById('shiftDDetailBody').innerHTML = rowsHtml;
+    new bootstrap.Modal(document.getElementById('shiftDDetailModal')).show();
 }
 
 // ───────── การยกเว้นการคิดชั่วโมงการทำงาน ─────────
@@ -971,6 +1043,30 @@ function showLeaveOptionModal(empId, empName, shift) {
 }
 
 // คำนวณกะเช้า/ดึก ตามวันที่ (A/B สลับทุกอาทิตย์, D เช้าตลอด)
+// จุดอ้างอิง: อาทิตย์ของ 18 พ.ค. 2026 (จันทร์) = Shift A เช้า
+function shiftAIsDayForDate(workDate) {
+    const REFERENCE_MONDAY = new Date('2026-05-18T00:00:00');
+    const date = new Date(workDate);
+    if (isNaN(date.getTime())) return true;
+
+    // หาวันจันทร์ของอาทิตย์นั้น
+    const dow = date.getDay(); // 0=อา, 1=จ, ...
+    const daysToMonday = dow === 0 ? 6 : dow - 1;
+    const monday = new Date(date);
+    monday.setDate(date.getDate() - daysToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    // จำนวนอาทิตย์ห่างจาก reference — คู่ = Shift A เช้า, คี่ = Shift A ดึก
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const weeksDiff = Math.round((monday - REFERENCE_MONDAY) / msPerWeek);
+    return (weeksDiff % 2 === 0);
+}
+
+// Shift ที่เข้ากะเช้าระหว่าง A/B ของอาทิตย์นั้น (Shift D เข้ากะเช้าตลอด → ไปรวมกับกะนี้)
+function getMorningShift(workDate) {
+    return shiftAIsDayForDate(workDate) ? 'A' : 'B';
+}
+
 function getLeaveOptionsForShift(shift, workDate) {
     const DAY_OPTIONS = [
         { label: 'เต็มวัน',      time: '07:40-17:00' },
@@ -997,23 +1093,7 @@ function getLeaveOptionsForShift(shift, workDate) {
     if (s === 'D') return DAY_OPTIONS;
 
     // Shift A/B — คำนวณจากวันที่
-    // จุดอ้างอิง: อาทิตย์ 18 พ.ค. 2026 (จันทร์) = Shift A เช้า
-    const REFERENCE_MONDAY = new Date('2026-05-18T00:00:00');
-    const date = new Date(workDate);
-
-    // หาวันจันทร์ของอาทิตย์นั้น
-    const dow = date.getDay(); // 0=อา, 1=จ, ...
-    const daysToMonday = dow === 0 ? 6 : dow - 1;
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - daysToMonday);
-    monday.setHours(0, 0, 0, 0);
-
-    // จำนวนอาทิตย์ห่างจาก reference
-    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    const weeksDiff = Math.round((monday - REFERENCE_MONDAY) / msPerWeek);
-
-    // คู่ = Shift A เช้า, คี่ = Shift A ดึก
-    const shiftAIsDay = (weeksDiff % 2 === 0);
+    const shiftAIsDay = shiftAIsDayForDate(workDate);
 
     if (s === 'A') return shiftAIsDay ? DAY_OPTIONS : NIGHT_OPTIONS;
     if (s === 'B') return shiftAIsDay ? NIGHT_OPTIONS : DAY_OPTIONS;

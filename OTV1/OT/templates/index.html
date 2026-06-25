@@ -411,6 +411,39 @@
     </div>
 </div>
 
+<!-- Shift D Detail Modal (กะเช้า รวม Shift D) -->
+<div class="modal fade" id="shiftDDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-primary">
+                <h6 class="modal-title"><i class="bi bi-clock-history"></i> <span id="shiftDDetailTitle">ชั่วโมงการทำงาน</span></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:0.85rem">
+                    <i class="bi bi-info-circle"></i> Shift D เข้ากะเช้าตลอด จึงนำชั่วโมงไปรวมกับกะเช้าของอาทิตย์นี้
+                </p>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Shift</th>
+                                <th class="text-center">มาทำงาน (คน)</th>
+                                <th class="text-center">OT (คน)</th>
+                                <th class="text-end">ชั่วโมง</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shiftDDetailBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Hour Exclusion Modal -->
 <div class="modal fade" id="exclusionModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
