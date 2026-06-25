@@ -1841,7 +1841,7 @@ def render_html(rows):
     const SIM_SHIFTS = ['A', 'B'];
     let activeSimShift = localStorage.getItem('dailyFollowSimShift') || 'A';
     if (!SIM_SHIFTS.includes(activeSimShift)) activeSimShift = 'A';
-    let simShifts = {{ A: {{ sel: new Set(), wh: '' }}, B: {{ sel: new Set(), wh: '' }} }};
+    let simShifts = {{ A: {{ sel: new Set(), wh: '', manual: false }}, B: {{ sel: new Set(), wh: '', manual: false }} }};
     let selected = simShifts[activeSimShift].sel;
     let simPlanDate = todayISO();
     let byId = new Map();
@@ -2107,8 +2107,13 @@ def render_html(rows):
           b.classList.toggle('active', b.dataset.shift === activeSimShift));
       }}
       updateSimShiftLabel();
-      // Auto-pull OT hours for today if nothing was saved for either shift.
-      if (!simShifts.A.wh && !simShifts.B.wh) pullOtHours(true);
+      // Pull OT hours now, then keep them live with the 5s auto-refresh poll.
+      pullOtHours(true, false);
+      startSimPoll();
+      // Refresh immediately when the user returns to the tab (poll was idle).
+      document.addEventListener('visibilitychange', () => {{
+        if (!document.hidden) {{ pullOtHours(true, true); scheduleSimPoll(SIM_POLL_BASE); }}
+      }});
       els.line.value = DATA.defaultLine || 'ALL';
       els.month.value = 'ALL';
       els.hideHairBtn.classList.toggle('active', hideHairPin);
@@ -2170,6 +2175,7 @@ def render_html(rows):
       }});
       els.workHour.addEventListener('input', () => {{
         simShifts[activeSimShift].wh = els.workHour.value;
+        simShifts[activeSimShift].manual = true;   // poll won't overwrite a hand-typed value
         saveSelected();
         updateSimReadout();
       }});
@@ -2182,11 +2188,10 @@ def render_html(rows):
         loadSimPlanForDate(date);
         // tabs/label unchanged; refresh table + readout for the new day's plan
         render();
-        // auto-pull OT hours for this date if nothing saved yet
-        if (!simShifts.A.wh && !simShifts.B.wh) pullOtHours(true);
-        else if (els.simOtInfo) els.simOtInfo.textContent = '';
+        // Always refresh from OT for the chosen day; the poll keeps it live after.
+        pullOtHours(true, false);
       }});
-      if (els.simPullOt) els.simPullOt.addEventListener('click', () => pullOtHours(false));
+      if (els.simPullOt) els.simPullOt.addEventListener('click', () => pullOtHours(false, false));
       els.body.addEventListener('click', (e) => {{
         const cb = e.target;
         if (cb && cb.classList && cb.classList.contains('dlv-hide-btn')) {{
@@ -3231,6 +3236,7 @@ def render_html(rows):
         for (const id of (saved.sel || [])) {{ if (byId.has(id)) set.add(id); }}
         simShifts[s].sel = set;
         simShifts[s].wh = (saved.wh != null) ? saved.wh : '';
+        simShifts[s].manual = false;   // a freshly loaded day is not a manual override
       }}
       selected = simShifts[activeSimShift].sel;
       if (els.workHour) els.workHour.value = simShifts[activeSimShift].wh || '';
@@ -3261,12 +3267,23 @@ def render_html(rows):
       render();
     }}
     // Pull per-shift working hours from the OT program (via local server proxy).
-    async function pullOtHours(silent) {{
+    // Pull per-shift working hours from the OT program.
+    //   silent : don't flash the "กำลังดึง…" status (used by the auto-poll)
+    //   auto   : poll mode — keep any shift the user typed into by hand, and
+    //            never disturb the input box while it's focused.
+    let otPullInFlight = false;
+    async function pullOtHours(silent, auto) {{
+      if (otPullInFlight) return false;          // never overlap requests
+      otPullInFlight = true;
       const date = simPlanDate || todayISO();
-      if (els.simOtInfo) {{ els.simOtInfo.classList.remove('err'); els.simOtInfo.textContent = 'OT: กำลังดึง…'; }}
-      if (els.simPullOt) els.simPullOt.classList.add('busy');
+      if (!silent && els.simOtInfo) {{ els.simOtInfo.classList.remove('err'); els.simOtInfo.textContent = 'OT: กำลังดึง…'; }}
+      if (!silent && els.simPullOt) els.simPullOt.classList.add('busy');
+      // Abort a stuck request so the poll keeps making progress.
+      const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const killer = ctrl ? setTimeout(() => ctrl.abort(), 4000) : null;
       try {{
-        const res = await fetch('api/ot-working-hours?date=' + encodeURIComponent(date)).then(r => r.json());
+        const res = await fetch('api/ot-working-hours?date=' + encodeURIComponent(date),
+          ctrl ? {{ signal: ctrl.signal }} : undefined).then(r => r.json());
         if (!res || !res.success) {{
           if (els.simOtInfo) {{
             els.simOtInfo.classList.add('err');
@@ -3275,10 +3292,17 @@ def render_html(rows):
           return false;
         }}
         const sh = res.shifts || {{}};
+        const inputFocused = (document.activeElement === els.workHour);
         for (const s of SIM_SHIFTS) {{
+          if (auto && simShifts[s].manual) continue;     // respect manual override
           simShifts[s].wh = String((sh[s] && sh[s].hours) || 0);
+          if (!auto) simShifts[s].manual = false;        // explicit pull resets override
         }}
-        els.workHour.value = simShifts[activeSimShift].wh || '';
+        // Reflect the active shift in the box, unless the user is typing in it.
+        if (!(auto && (inputFocused || simShifts[activeSimShift].manual))) {{
+          const v = simShifts[activeSimShift].wh || '';
+          if (els.workHour.value !== v) els.workHour.value = v;
+        }}
         const a = (sh.A && sh.A.hours) || 0, b = (sh.B && sh.B.hours) || 0;
         if (els.simOtInfo) {{
           els.simOtInfo.classList.remove('err');
@@ -3291,9 +3315,29 @@ def render_html(rows):
         if (els.simOtInfo) {{ els.simOtInfo.classList.add('err'); els.simOtInfo.textContent = 'OT: เชื่อมต่อไม่ได้'; }}
         return false;
       }} finally {{
-        if (els.simPullOt) els.simPullOt.classList.remove('busy');
+        if (killer) clearTimeout(killer);
+        if (!silent && els.simPullOt) els.simPullOt.classList.remove('busy');
+        otPullInFlight = false;
       }}
     }}
+    // --- Auto-refresh poll (5s) with morning-rush safeguards -------------------
+    // Chained timer (no setInterval → no pile-up), random jitter so multiple
+    // screens don't hit the server in lock-step, pause when the tab is hidden,
+    // and exponential back-off when the OT app is unreachable.
+    const SIM_POLL_BASE = 5000, SIM_POLL_MAX = 30000;
+    let simPollTimer = null, simPollDelay = SIM_POLL_BASE;
+    function scheduleSimPoll(delay) {{
+      if (simPollTimer) clearTimeout(simPollTimer);
+      const jitter = Math.round((Math.random() - 0.5) * 0.4 * delay);  // ±20%
+      simPollTimer = setTimeout(simPollTick, Math.max(1500, delay + jitter));
+    }}
+    async function simPollTick() {{
+      if (document.hidden) {{ scheduleSimPoll(SIM_POLL_BASE); return; }}   // idle while not viewed
+      const ok = await pullOtHours(true, true);
+      simPollDelay = ok ? SIM_POLL_BASE : Math.min(simPollDelay * 2, SIM_POLL_MAX);
+      scheduleSimPoll(simPollDelay);
+    }}
+    function startSimPoll() {{ simPollDelay = SIM_POLL_BASE; scheduleSimPoll(SIM_POLL_BASE); }}
     function updateSimReadout() {{
       let rate = 0, qty = 0, n = 0;
       for (const id of selected) {{

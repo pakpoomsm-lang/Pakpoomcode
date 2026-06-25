@@ -109,6 +109,16 @@ def init_db():
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_emp_workplace ON employees(workplace)")
     # ────────────────────────────────────────────────────────────────────
 
+    # Concurrency for the morning rush: WAL lets the working-hours reads (polled
+    # every few seconds by Daily Follow) run WITHOUT blocking the rapid
+    # attendance writes, and vice-versa. Best-effort — silently kept on the old
+    # journal mode if the filesystem doesn't support WAL (e.g. a network share).
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -1024,6 +1034,13 @@ def delete_hour_exclusion(emp_id):
 WORK_HOURS_PER_PERSON = 8.16
 OT_HOURS_PER_PERSON   = 2.32
 
+# Short-lived cache for /api/working-hours. During the morning rush many Daily
+# Follow screens poll the same date every few seconds; this collapses them into
+# at most one DB aggregate per date per ~2s. The TTL is well under the 5s poll
+# so the displayed value is never noticeably stale.
+_WH_CACHE = {}
+_WH_CACHE_TTL = 2.0
+
 
 def _shift_a_is_morning(work_date_str):
     """Shift A เข้ากะเช้าในอาทิตย์ของวันที่นี้หรือไม่ (A/B สลับทุกอาทิตย์).
@@ -1043,9 +1060,15 @@ def _shift_a_is_morning(work_date_str):
 def working_hours():
     """ชั่วโมงการทำงานแยกตาม Shift A/B สำหรับวันที่ที่ระบุ
     (ข้ามพนักงานที่ยกเว้น และรวม Shift D เข้ากับกะเช้าของอาทิตย์นั้น)."""
+    import time
     work_date = (request.args.get('work_date') or '').strip()
     if not work_date:
         return jsonify({'success': False, 'message': 'กรุณาระบุวันที่'}), 400
+
+    now = time.time()
+    cached = _WH_CACHE.get(work_date)
+    if cached and (now - cached[0]) < _WH_CACHE_TTL:
+        return jsonify(cached[1])
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -1089,13 +1112,15 @@ def working_hours():
             'includes_d': includes_d, 'shift_d': shift_d
         }
 
-    return jsonify({
+    payload = {
         'success': True,
         'work_date': work_date,
         'morning_shift': morning,
         'rates': {'work': WORK_HOURS_PER_PERSON, 'ot': OT_HOURS_PER_PERSON},
         'shifts': shifts
-    })
+    }
+    _WH_CACHE[work_date] = (now, payload)
+    return jsonify(payload)
 
 
 @app.route('/api/attendance/incoming-substitutes')
