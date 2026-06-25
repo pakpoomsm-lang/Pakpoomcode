@@ -134,6 +134,7 @@ function displayEmployees(employees, incomingSubs = []) {
     currentDisplayedEmployees = employees;
     updateLeaderBulkActions();
     updateFilteredSummaryCards(employees);
+    updateShiftHoursSummary(employees);
     updateLeaderSummary(employees, incomingSubs);
 
     if (employees.length === 0) {
@@ -430,6 +431,76 @@ function updateFilteredSummaryCards(employees) {
     document.querySelectorAll('.summaryTotal').forEach(element => {
         element.textContent = total;
     });
+}
+
+// ชั่วโมงการทำงานต่อคน: มาทำงาน 8.16 ชม. + ทำ OT เพิ่มอีก 2.32 ชม.
+const WORK_HOURS_PER_PERSON = 8.16;
+const OT_HOURS_PER_PERSON = 2.32;
+const SHIFT_ORDER = ['A', 'B', 'D'];
+
+// คำนวณและแสดงชั่วโมงการทำงานแยกตาม Shift
+function updateShiftHoursSummary(employees) {
+    const grid = document.getElementById('shiftHoursGrid');
+    if (!grid) return;
+
+    if (!employees.length) {
+        grid.innerHTML = '<div class="empty-cell compact"><i class="bi bi-inbox"></i> ไม่มีข้อมูลพนักงานตามเงื่อนไขที่เลือก</div>';
+        return;
+    }
+
+    const shiftMap = new Map();
+    employees.forEach(emp => {
+        const shift = emp.shift || 'ไม่ระบุ';
+        if (!shiftMap.has(shift)) {
+            shiftMap.set(shift, { shift, work: 0, ot: 0 });
+        }
+        const summary = shiftMap.get(shift);
+        const attendanceTypes = (attendanceRecords[emp.emp_id] || {}).types || [];
+        if (attendanceTypes.includes('work')) summary.work += 1;
+        if (attendanceTypes.includes('ot')) summary.ot += 1;
+    });
+
+    const summaries = [...shiftMap.values()].sort((a, b) => {
+        const ia = SHIFT_ORDER.indexOf(a.shift);
+        const ib = SHIFT_ORDER.indexOf(b.shift);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+    const totals = summaries.reduce((acc, s) => {
+        acc.work += s.work;
+        acc.ot += s.ot;
+        return acc;
+    }, { work: 0, ot: 0 });
+
+    let html = summaries.map(s => renderShiftHoursCard(s.shift, s.work, s.ot)).join('');
+    if (summaries.length > 1) {
+        html += renderShiftHoursCard('รวมทุก Shift', totals.work, totals.ot, true);
+    }
+    grid.innerHTML = html;
+}
+
+function shiftHours(work, ot) {
+    return (work * WORK_HOURS_PER_PERSON) + (ot * OT_HOURS_PER_PERSON);
+}
+
+function renderShiftHoursCard(label, work, ot, isTotal = false) {
+    const hours = shiftHours(work, ot);
+    return `
+        <div class="shift-hours-card${isTotal ? ' shift-hours-total' : ''}">
+            <div class="shift-hours-head">
+                ${isTotal ? '' : '<span class="shift-hours-label">Shift</span>'}
+                <span class="shift-hours-name">${escapeHtml(String(label))}</span>
+            </div>
+            <div class="shift-hours-value">
+                <strong>${hours.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                <span>ชม.</span>
+            </div>
+            <div class="shift-hours-detail">
+                <span><i class="bi bi-check-circle-fill"></i> มาทำงาน ${work} คน</span>
+                <span><i class="bi bi-stopwatch-fill"></i> OT ${ot} คน</span>
+            </div>
+        </div>
+    `;
 }
 
 function updateSummaryMetric(countId, percentId, barId, count, total) {

@@ -419,6 +419,86 @@ body {
     font-size: 1.45rem;
 }
 
+/* ชั่วโมงการทำงานแยกตาม Shift */
+.shift-hours-panel {
+    margin-bottom: 18px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.shift-hours-panel .section-title {
+    margin-bottom: 12px;
+}
+
+.shift-hours-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+}
+
+.shift-hours-card {
+    padding: 14px 16px;
+    border: 1px solid #e8edf3;
+    border-radius: var(--radius);
+    background: #fbfdff;
+}
+
+.shift-hours-card.shift-hours-total {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+}
+
+.shift-hours-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.shift-hours-label {
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.shift-hours-name {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.shift-hours-value {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.shift-hours-value strong {
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--primary);
+}
+
+.shift-hours-value span {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.shift-hours-detail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    color: #475467;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
 .leader-summary-panel {
     margin-bottom: 18px;
     padding: 18px;
