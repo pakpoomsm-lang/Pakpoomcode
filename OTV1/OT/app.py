@@ -1020,6 +1020,84 @@ def delete_hour_exclusion(emp_id):
     return jsonify({'success': True, 'message': f'ยกเลิกการยกเว้นของ {emp_id} แล้ว'})
 
 
+# ชั่วโมงการทำงานต่อคน (ตรงกับฝั่งหน้าเว็บ)
+WORK_HOURS_PER_PERSON = 8.16
+OT_HOURS_PER_PERSON   = 2.32
+
+
+def _shift_a_is_morning(work_date_str):
+    """Shift A เข้ากะเช้าในอาทิตย์ของวันที่นี้หรือไม่ (A/B สลับทุกอาทิตย์).
+    จุดอ้างอิง: จันทร์ 18 พ.ค. 2026 = Shift A เช้า."""
+    from datetime import date as date_cls, timedelta
+    REFERENCE_MONDAY = date_cls(2026, 5, 18)
+    try:
+        d = date_cls.fromisoformat(work_date_str)
+    except Exception:
+        return True
+    monday = d - timedelta(days=d.weekday())   # วันจันทร์ของอาทิตย์นั้น
+    weeks = (monday - REFERENCE_MONDAY).days // 7
+    return (weeks % 2 == 0)
+
+
+@app.route('/api/working-hours')
+def working_hours():
+    """ชั่วโมงการทำงานแยกตาม Shift A/B สำหรับวันที่ที่ระบุ
+    (ข้ามพนักงานที่ยกเว้น และรวม Shift D เข้ากับกะเช้าของอาทิตย์นั้น)."""
+    work_date = (request.args.get('work_date') or '').strip()
+    if not work_date:
+        return jsonify({'success': False, 'message': 'กรุณาระบุวันที่'}), 400
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT emp_id FROM hour_exclusions')
+    excluded = {r[0] for r in cursor.fetchall()}
+    cursor.execute('''
+        SELECT e.shift, a.emp_id, a.attendance_type
+        FROM attendance_records a
+        JOIN employees e ON e.emp_id = a.emp_id
+        WHERE a.work_date = ? AND a.attendance_type IN ('work', 'ot')
+    ''', (work_date,))
+    agg = {}
+    for shift, emp_id, atype in cursor.fetchall():
+        if emp_id in excluded:
+            continue
+        s = (shift or 'ไม่ระบุ')
+        d = agg.setdefault(s, {'work': 0, 'ot': 0})
+        d[atype] = d.get(atype, 0) + 1
+    conn.close()
+
+    def hours(work, ot):
+        return round(work * WORK_HOURS_PER_PERSON + ot * OT_HOURS_PER_PERSON, 2)
+
+    morning = 'A' if _shift_a_is_morning(work_date) else 'B'
+    d_group = agg.get('D')
+
+    shifts = {}
+    for s in ('A', 'B'):
+        own = agg.get(s, {'work': 0, 'ot': 0})
+        work, ot = own['work'], own['ot']
+        shift_d = None
+        includes_d = False
+        if d_group and s == morning:
+            shift_d = {'work': d_group['work'], 'ot': d_group['ot'],
+                       'hours': hours(d_group['work'], d_group['ot'])}
+            work += d_group['work']
+            ot += d_group['ot']
+            includes_d = True
+        shifts[s] = {
+            'work': work, 'ot': ot, 'hours': hours(work, ot),
+            'includes_d': includes_d, 'shift_d': shift_d
+        }
+
+    return jsonify({
+        'success': True,
+        'work_date': work_date,
+        'morning_shift': morning,
+        'rates': {'work': WORK_HOURS_PER_PERSON, 'ot': OT_HOURS_PER_PERSON},
+        'shifts': shifts
+    })
+
+
 @app.route('/api/attendance/incoming-substitutes')
 def get_incoming_substitutes():
     """พนักงานจากทีมอื่นที่มาทำ OT แทนให้กับทีมของ GL นี้"""

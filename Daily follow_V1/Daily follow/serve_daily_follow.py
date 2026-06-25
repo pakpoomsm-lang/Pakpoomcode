@@ -144,6 +144,13 @@ PROGRESS_0022_FILE     = ROOT / "ZPP0022.xlsx"   # latest export, served to the 
 ZPP0022_TABLE          = "zpp0022_raw"
 SAP_EXPORT_DIR_0022    = str(Path(r"J:\7.541_HEI\Database follow\ZPP0022"))
 
+# --- OT program bridge -------------------------------------------------------
+# The OT recording app (Flask) runs on the same PC. We proxy its working-hours
+# API server-side so the Daily Follow page can read per-shift hours without
+# running into cross-origin (CORS) restrictions. Override with the OT_APP_URL
+# environment variable if the OT app uses a different host/port.
+OT_APP_URL = os.environ.get("OT_APP_URL", "http://127.0.0.1:5000")
+
 
 # SAP opens the exported file in Excel automatically. When True, the workbook
 # is closed again right after we have read it (only that file is closed; any
@@ -937,6 +944,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps(data))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/ot-working-hours":
+            # Proxy the OT app's per-shift working hours (server-side, no CORS).
+            import urllib.request
+            from urllib.error import URLError, HTTPError
+            req_date = (query.get("date", [""])[0] or "").strip()
+            if not req_date:
+                return self._send(400, json.dumps(
+                    {"success": False, "error": "missing date"}))
+            url = f"{OT_APP_URL}/api/working-hours?work_date={req_date}"
+            try:
+                # Bypass any HTTP proxy for the local OT app.
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(url, timeout=5) as resp:
+                    body = resp.read()
+                self._send(200, body)
+            except (URLError, HTTPError, OSError) as exc:
+                self._send(200, json.dumps({
+                    "success": False,
+                    "error": f"เชื่อมต่อโปรแกรม OT ไม่ได้ ({OT_APP_URL}). "
+                             f"ตรวจสอบว่าโปรแกรม OT เปิดอยู่. [{exc}]"
+                }))
             return
         target = (ROOT / path).resolve()
         if ROOT.resolve() not in target.parents and target != ROOT.resolve():

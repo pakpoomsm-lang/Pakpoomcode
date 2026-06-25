@@ -1130,6 +1130,70 @@ def render_html(rows):
       color: var(--primary-dark);
       padding-left: 2px;
     }}
+    .sim-panel-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }}
+    .sim-tabs {{
+      display: inline-flex;
+      gap: 4px;
+      padding: 3px;
+      border-radius: 9px;
+      background: #dbe6fb;
+    }}
+    .sim-tab {{
+      padding: 4px 14px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--primary-dark);
+      font: 800 11px/1 inherit;
+      letter-spacing: .4px;
+      cursor: pointer;
+    }}
+    .sim-tab.active {{
+      background: #fff;
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }}
+    .sim-plan-row {{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
+    .sim-date {{
+      height: 28px;
+      border: 1px solid #cdddf8;
+      border-radius: 8px;
+      padding: 0 8px;
+      font: 700 12px/1 inherit;
+      color: var(--primary-dark);
+      background: #fff;
+    }}
+    .sim-pull {{
+      height: 28px;
+      padding: 0 12px;
+      border: 1px solid #9cc0ff;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--primary);
+      font: 800 11px/1 inherit;
+      letter-spacing: .3px;
+      cursor: pointer;
+      white-space: nowrap;
+    }}
+    .sim-pull:hover {{ background: #eef4ff; }}
+    .sim-pull.busy {{ opacity: .6; cursor: default; }}
+    .sim-ot-info {{
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      white-space: nowrap;
+    }}
+    .sim-ot-info.err {{ color: var(--late); }}
     .sim {{
       display: inline-flex;
       align-items: stretch;
@@ -1580,16 +1644,27 @@ def render_html(rows):
           <div class="lead-strip empty" id="leadStrip"></div>
         </div>
         <div class="sim-panel">
-          <span class="sim-panel-title">Productivity Simulator</span>
-          <div class="sim" id="simBox" title="Tick rows at the left to plan today's run. Unit Rate = sum of (TS x Assy Order qty) for the ticked rows.">
+          <div class="sim-panel-head">
+            <span class="sim-panel-title">Productivity Simulator</span>
+            <div class="sim-tabs" id="simTabs">
+              <button class="sim-tab active" type="button" data-shift="A">Shift A</button>
+              <button class="sim-tab" type="button" data-shift="B">Shift B</button>
+            </div>
+          </div>
+          <div class="sim-plan-row">
+            <input id="simPlanDate" class="sim-date" type="date" title="วันที่วางแผน (ใช้ดึงชั่วโมงจาก OT และจดจำแผนรายวัน)">
+            <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT สำหรับวันที่นี้">&#8635; OT Hours</button>
+            <span id="simOtInfo" class="sim-ot-info"></span>
+          </div>
+          <div class="sim" id="simBox" title="ติ๊กแถวด้านซ้ายเพื่อวางแผนของแต่ละ Shift · Unit Rate = ผลรวม (TS x Assy Order) ของแถวที่ติ๊ก · Working ดึงจากโปรแกรม OT">
             <div class="sim-cell">
               <span class="sim-title">Unit Rate</span>
               <span class="sim-badge" id="simBadge">0</span>
               <span class="sim-sub" id="simSub">0 rows</span>
             </div>
             <div class="sim-cell">
-              <span class="sim-title">Working</span>
-              <input id="workHour" class="sim-input" type="number" min="0" step="0.5" placeholder="0" title="Enter available working hours">
+              <span class="sim-title" id="simWorkTitle">Working A</span>
+              <input id="workHour" class="sim-input" type="number" min="0" step="0.5" placeholder="0" title="ชั่วโมงการทำงานของ Shift นี้ (ดึงจาก OT หรือกรอกเอง)">
               <span class="sim-sub">Hrs</span>
             </div>
             <div class="sim-cell">
@@ -1701,6 +1776,9 @@ def render_html(rows):
       importStatus: document.getElementById('importStatus'), clearData: document.getElementById('clearDataBtn'),
       clearProgress: document.getElementById('clearProgressBtn'),
       simBadge: document.getElementById('simBadge'), simSub: document.getElementById('simSub'),
+      simTabs: document.getElementById('simTabs'), simPlanDate: document.getElementById('simPlanDate'),
+      simPullOt: document.getElementById('simPullOt'), simOtInfo: document.getElementById('simOtInfo'),
+      simWorkTitle: document.getElementById('simWorkTitle'),
       leadStrip: document.getElementById('leadStrip'),
       editTargetBtn: document.getElementById('editTargetBtn'),
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
@@ -1758,7 +1836,14 @@ def render_html(rows):
     let ROW_H = 27, measuredRowH = false;
     let searchTimer = 0;
     let scrollTicking = false;
-    let selected = new Set();
+    // Per-shift productivity planning. Each Shift (A/B) keeps its own ticked
+    // rows + Working hours; `selected` always points at the active shift's set.
+    const SIM_SHIFTS = ['A', 'B'];
+    let activeSimShift = localStorage.getItem('dailyFollowSimShift') || 'A';
+    if (!SIM_SHIFTS.includes(activeSimShift)) activeSimShift = 'A';
+    let simShifts = {{ A: {{ sel: new Set(), wh: '' }}, B: {{ sel: new Set(), wh: '' }} }};
+    let selected = simShifts[activeSimShift].sel;
+    let simPlanDate = todayISO();
     let byId = new Map();
     let fillSource = null;
     let fillDragging = false;
@@ -2012,9 +2097,18 @@ def render_html(rows):
     async function setup() {{
       await restoreServerState();
       indexRows(currentRows);
+      simPlanDate = todayISO();
+      if (els.simPlanDate) els.simPlanDate.value = simPlanDate;
       restoreSelected();
       refreshFilters();
-      els.workHour.value = localStorage.getItem('dailyFollowWorkHour') || '';
+      // Reflect the saved active shift on the tabs + Working label.
+      if (els.simTabs) {{
+        els.simTabs.querySelectorAll('.sim-tab').forEach(b =>
+          b.classList.toggle('active', b.dataset.shift === activeSimShift));
+      }}
+      updateSimShiftLabel();
+      // Auto-pull OT hours for today if nothing was saved for either shift.
+      if (!simShifts.A.wh && !simShifts.B.wh) pullOtHours(true);
       els.line.value = DATA.defaultLine || 'ALL';
       els.month.value = 'ALL';
       els.hideHairBtn.classList.toggle('active', hideHairPin);
@@ -2075,9 +2169,24 @@ def render_html(rows):
         updateSimReadout();
       }});
       els.workHour.addEventListener('input', () => {{
-        localStorage.setItem('dailyFollowWorkHour', els.workHour.value);
+        simShifts[activeSimShift].wh = els.workHour.value;
+        saveSelected();
         updateSimReadout();
       }});
+      if (els.simTabs) els.simTabs.addEventListener('click', (e) => {{
+        const btn = e.target.closest('.sim-tab');
+        if (btn && btn.dataset.shift) setActiveSimShift(btn.dataset.shift);
+      }});
+      if (els.simPlanDate) els.simPlanDate.addEventListener('change', () => {{
+        const date = els.simPlanDate.value || todayISO();
+        loadSimPlanForDate(date);
+        // tabs/label unchanged; refresh table + readout for the new day's plan
+        render();
+        // auto-pull OT hours for this date if nothing saved yet
+        if (!simShifts.A.wh && !simShifts.B.wh) pullOtHours(true);
+        else if (els.simOtInfo) els.simOtInfo.textContent = '';
+      }});
+      if (els.simPullOt) els.simPullOt.addEventListener('click', () => pullOtHours(false));
       els.body.addEventListener('click', (e) => {{
         const cb = e.target;
         if (cb && cb.classList && cb.classList.contains('dlv-hide-btn')) {{
@@ -2343,7 +2452,7 @@ def render_html(rows):
         row._id = i;
         byId.set(i, row);
       }});
-      selected.clear();
+      clearAllSimSelections();
     }}
     function passes(row, q) {{
       if (els.line.value !== 'ALL' && row.line !== els.line.value) return false;
@@ -2954,7 +3063,7 @@ def render_html(rows):
       leadDirty = true;
       progressCleared = false;
       byId = new Map();
-      selected.clear();
+      clearAllSimSelections();
       saveSelected();
       localStorage.removeItem('dailyFollowProgress');
       localStorage.removeItem('dailyFollowProgCleared');
@@ -3091,14 +3200,99 @@ def render_html(rows):
       }}
       return any;
     }}
+    function todayISO() {{
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }}
+    function loadSimPlanStore() {{
+      try {{ return JSON.parse(localStorage.getItem('dailyFollowSimPlan') || '{{}}'); }} catch (e) {{ return {{}}; }}
+    }}
+    // Persist the whole per-day plan (both shifts: ticked rows + working hours).
     function saveSelected() {{
-      localStorage.setItem('dailyFollowSel', JSON.stringify([...selected]));
+      simShifts[activeSimShift].wh = els.workHour.value;
+      const store = loadSimPlanStore();
+      store[simPlanDate] = {{
+        A: {{ sel: [...simShifts.A.sel], wh: simShifts.A.wh }},
+        B: {{ sel: [...simShifts.B.sel], wh: simShifts.B.wh }}
+      }};
+      localStorage.setItem('dailyFollowSimPlan', JSON.stringify(store));
+      localStorage.setItem('dailyFollowSimShift', activeSimShift);
     }}
     function restoreSelected() {{
-      selected.clear();
-      let ids = [];
-      try {{ ids = JSON.parse(localStorage.getItem('dailyFollowSel') || '[]'); }} catch (e) {{ ids = []; }}
-      for (const id of ids) {{ if (byId.has(id)) selected.add(id); }}
+      loadSimPlanForDate(simPlanDate);
+    }}
+    // Load a day's saved plan into simShifts; keep only ids that still exist.
+    function loadSimPlanForDate(date) {{
+      simPlanDate = date;
+      const plan = loadSimPlanStore()[date] || {{}};
+      for (const s of SIM_SHIFTS) {{
+        const saved = plan[s] || {{}};
+        const set = new Set();
+        for (const id of (saved.sel || [])) {{ if (byId.has(id)) set.add(id); }}
+        simShifts[s].sel = set;
+        simShifts[s].wh = (saved.wh != null) ? saved.wh : '';
+      }}
+      selected = simShifts[activeSimShift].sel;
+      if (els.workHour) els.workHour.value = simShifts[activeSimShift].wh || '';
+    }}
+    function clearAllSimSelections() {{
+      simShifts.A.sel.clear();
+      simShifts.B.sel.clear();
+      selected = simShifts[activeSimShift].sel;
+    }}
+    function updateSimShiftLabel() {{
+      if (els.simWorkTitle) els.simWorkTitle.textContent = 'Working ' + activeSimShift;
+    }}
+    // Switch the active Shift tab — swaps ticked rows + working hours shown.
+    function setActiveSimShift(shift) {{
+      if (!SIM_SHIFTS.includes(shift) || shift === activeSimShift) {{
+        if (shift === activeSimShift) return;
+      }}
+      simShifts[activeSimShift].wh = els.workHour.value;
+      activeSimShift = shift;
+      selected = simShifts[shift].sel;
+      els.workHour.value = simShifts[shift].wh || '';
+      if (els.simTabs) {{
+        els.simTabs.querySelectorAll('.sim-tab').forEach(b =>
+          b.classList.toggle('active', b.dataset.shift === shift));
+      }}
+      updateSimShiftLabel();
+      localStorage.setItem('dailyFollowSimShift', activeSimShift);
+      render();
+    }}
+    // Pull per-shift working hours from the OT program (via local server proxy).
+    async function pullOtHours(silent) {{
+      const date = simPlanDate || todayISO();
+      if (els.simOtInfo) {{ els.simOtInfo.classList.remove('err'); els.simOtInfo.textContent = 'OT: กำลังดึง…'; }}
+      if (els.simPullOt) els.simPullOt.classList.add('busy');
+      try {{
+        const res = await fetch('api/ot-working-hours?date=' + encodeURIComponent(date)).then(r => r.json());
+        if (!res || !res.success) {{
+          if (els.simOtInfo) {{
+            els.simOtInfo.classList.add('err');
+            els.simOtInfo.textContent = 'OT: ' + ((res && res.error) ? 'เชื่อมต่อไม่ได้' : 'ไม่มีข้อมูล');
+          }}
+          return false;
+        }}
+        const sh = res.shifts || {{}};
+        for (const s of SIM_SHIFTS) {{
+          simShifts[s].wh = String((sh[s] && sh[s].hours) || 0);
+        }}
+        els.workHour.value = simShifts[activeSimShift].wh || '';
+        const a = (sh.A && sh.A.hours) || 0, b = (sh.B && sh.B.hours) || 0;
+        if (els.simOtInfo) {{
+          els.simOtInfo.classList.remove('err');
+          els.simOtInfo.textContent = `OT: A=${{a}} · B=${{b}} (กะเช้า=${{res.morning_shift}})`;
+        }}
+        saveSelected();
+        updateSimReadout();
+        return true;
+      }} catch (e) {{
+        if (els.simOtInfo) {{ els.simOtInfo.classList.add('err'); els.simOtInfo.textContent = 'OT: เชื่อมต่อไม่ได้'; }}
+        return false;
+      }} finally {{
+        if (els.simPullOt) els.simPullOt.classList.remove('busy');
+      }}
     }}
     function updateSimReadout() {{
       let rate = 0, qty = 0, n = 0;
