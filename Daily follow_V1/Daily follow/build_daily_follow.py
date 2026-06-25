@@ -442,7 +442,10 @@ def render_html(rows):
       height: 100dvh;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      /* Allow the whole app to scroll vertically as a safety net: at high browser
+         zoom / small windows the header panels wrap and grow tall — without this
+         the table (flex:1) would be squeezed to nothing with no way to reach it. */
+      overflow: hidden auto;
     }}
     .top {{
       flex: 0 0 auto;
@@ -1191,7 +1194,10 @@ def render_html(rows):
       font-size: 11px;
       font-weight: 700;
       color: var(--muted);
-      white-space: nowrap;
+      /* Wrap instead of forcing the whole simulator panel wider (which used to
+         push it onto its own row and shove the table off-screen). */
+      flex: 1 1 100%;
+      line-height: 1.3;
     }}
     .sim-ot-info.err {{ color: var(--late); }}
     .sim {{
@@ -1371,7 +1377,9 @@ def render_html(rows):
     .table-wrap {{
       flex: 1 1 auto;
       overflow: auto;
-      min-height: 0;
+      /* Never let the header collapse the table to nothing — keep a usable
+         minimum and let the whole app scroll (see .app overflow) if needed. */
+      min-height: 240px;
       background: var(--surface);
     }}
     table {{
