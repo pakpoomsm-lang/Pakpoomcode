@@ -32,8 +32,13 @@ import build_daily_follow as bdf
 # ---------------------------------------------------------------------------
 # Configuration  (edit these to match your machine)
 # ---------------------------------------------------------------------------
-HOST = "127.0.0.1"
-PORT = 8059
+# BIND_HOST = "0.0.0.0" makes the server reachable from other PCs on the LAN
+# (e.g. http://10.235.117.215:8059). Override with the DAILY_FOLLOW_HOST /
+# DAILY_FOLLOW_PORT environment variables (set DAILY_FOLLOW_HOST=127.0.0.1 to
+# restrict access back to this machine only).
+HOST = "127.0.0.1"                                    # local URL for the browser on this PC
+BIND_HOST = os.environ.get("DAILY_FOLLOW_HOST", "0.0.0.0")
+PORT = int(os.environ.get("DAILY_FOLLOW_PORT", "8059"))
 ROOT = bdf.ROOT
 OUTPUT_FILE = bdf.OUTPUT_FILE
 PROGRESS_FILE = bdf.PROGRESS_FILE          # ZPP0059.xlsx — still kept for fallback
@@ -982,6 +987,23 @@ class Handler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+def _detect_lan_ip():
+    """Best-effort: find this PC's LAN IP (the address other PCs would use).
+    Opens a dummy UDP socket — no packets are actually sent."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return None
+    finally:
+        s.close()
+
+
 def main():
     # Pre-populate DB from the existing ZPP0059.xlsx if the DB is new.
     if PROGRESS_FILE.exists():
@@ -1002,8 +1024,14 @@ def main():
     bdf.main()
 
     url = f"http://{HOST}:{PORT}/{OUTPUT_FILE.name}"
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"Daily Follow server: {url}")
+    server = ThreadingHTTPServer((BIND_HOST, PORT), Handler)
+    print(f"Daily Follow server (this PC): {url}")
+    if BIND_HOST == "0.0.0.0":
+        lan_ip = _detect_lan_ip()
+        if lan_ip:
+            print(f"Daily Follow server (LAN):     http://{lan_ip}:{PORT}/{OUTPUT_FILE.name}")
+        print("(เครื่องอื่นเข้าผ่าน IP ของเครื่องนี้ได้ — เปิด Firewall ขาเข้า"
+              f" TCP {PORT} ด้วย)")
     print(f"SQLite database:     {DB_FILE}")
     print("Press Ctrl+C to stop.")
     try:
