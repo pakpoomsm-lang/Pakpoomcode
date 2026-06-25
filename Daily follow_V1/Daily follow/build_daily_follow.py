@@ -1546,6 +1546,28 @@ def render_html(rows):
       table {{ min-width: 0; font-size: 9px; }}
       th, td {{ padding: 1px 2px; }}
     }}
+    /* Narrow window, short window, OR high browser zoom: the header panels wrap
+       / the fixed header eats the viewport, pushing the table off-screen.
+       Compact the Target-leadtime chips and the Simulator so the header stays
+       short and the table remains visible without scrolling. */
+    @media (max-width: 1700px), (max-height: 820px) {{
+      .banner {{ height: 48px; }}
+      .controls {{ padding: 8px 16px; gap: 8px 12px; }}
+      .lchip {{ padding: 5px 8px; margin-right: 5px; gap: 6px; border-radius: 9px; }}
+      .lchip-name {{ font-size: 14px; min-width: 15px; }}
+      .lmetric {{ min-width: 44px; padding: 3px 7px; }}
+      .lmetric-l {{ font-size: 8px; }}
+      .lmetric-v {{ font-size: 14px; }}
+      .lead-track {{ row-gap: 5px; }}
+      .lead-panel {{ gap: 4px; padding: 7px 10px 8px; }}
+      .sim-panel {{ gap: 5px; padding: 7px 10px 8px; }}
+      .sim {{ gap: 10px; padding: 6px 11px; }}
+      .sim-cell {{ padding-right: 10px; gap: 4px; }}
+      .sim-input {{ width: 66px; height: 28px; font-size: 17px; }}
+      .sim-badge {{ height: 28px; font-size: 17px; }}
+      .sim-tab {{ padding: 3px 10px; }}
+      .sim-date, .sim-pull {{ height: 26px; }}
+    }}
     @media (max-width: 900px) {{
       .banner {{ height: 54px; padding: 0 12px; }}
       .brand {{ min-width: 0; }}
