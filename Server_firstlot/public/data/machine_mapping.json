@@ -1,0 +1,107 @@
+{
+  "machines": [
+    {"abbr": "AB05", "type": "ab", "num": 5,   "label": "Auto Brazing No.05"},
+    {"abbr": "AB06", "type": "ab", "num": 6,   "label": "Auto Brazing No.06"},
+    {"abbr": "AB09", "type": "ab", "num": 9,   "label": "Auto Brazing No.09"},
+    {"abbr": "AB10", "type": "ab", "num": 10,  "label": "Auto Brazing No.10"},
+    {"abbr": "AB14", "type": "ab", "num": 14,  "label": "Auto Brazing No.14"},
+    {"abbr": "AB15", "type": "ab", "num": 15,  "label": "Auto Brazing No.15"},
+    {"abbr": "AB16", "type": "ab", "num": 16,  "label": "Auto Brazing No.16"},
+    {"abbr": "AB18", "type": "ab", "num": 18,  "label": "Auto Brazing No.18"},
+    {"abbr": "AB19", "type": "ab", "num": 19,  "label": "Auto Brazing No.19"},
+
+    {"abbr": "OV1011", "type": "ov", "num": 10, "label": "Oven Oil No.10,11"},
+    {"abbr": "OV15", "type": "ov", "num": 15,   "label": "Oven Oil No.15"},
+    {"abbr": "OV16", "type": "ov", "num": 16,   "label": "Oven Oil No.16"},
+    {"abbr": "OV19", "type": "ov", "num": 19,   "label": "Oven Oil No.19"},
+    {"abbr": "OV45", "type": "ov", "num": 4,    "label": "Oven Oil No.4,5"},
+    {"abbr": "OV6", "type": "ov", "num": 6,     "label": "Oven Oil No.6"},
+
+    {"abbr": "DRY25", "type": "ov", "num": 25,  "label": "Dry Oven No.25"},
+    {"abbr": "DRY2A", "type": "ov", "num": 2,   "label": "Dry Oven LINE2-A"},
+    {"abbr": "DRY2B", "type": "ov", "num": 2,   "label": "Dry Oven LINE2-B"},
+    {"abbr": "DRY8", "type": "ov", "num": 8,    "label": "Dry Oven No.8"},
+
+    {"abbr": "EX13", "type": "ex", "num": 13,   "label": "Expander No.13"},
+    {"abbr": "EX17", "type": "ex", "num": 17,   "label": "Expander No.17"},
+    {"abbr": "EX18", "type": "ex", "num": 18,   "label": "Expander No.18"},
+    {"abbr": "EX20", "type": "ex", "num": 20,   "label": "Expander No.20"},
+    {"abbr": "EX22", "type": "ex", "num": 22,   "label": "Expander No.22"},
+    {"abbr": "EX4", "type": "ex", "num": 4,     "label": "Expander No.4"},
+    {"abbr": "EX5", "type": "ex", "num": 5,     "label": "Expander No.5"},
+    {"abbr": "EX6", "type": "ex", "num": 6,     "label": "Expander No.6"},
+    {"abbr": "EX7", "type": "ex", "num": 7,     "label": "Expander No.7"},
+
+    {"abbr": "FP06", "type": "fp", "num": 6,    "label": "Finpress No.06"},
+    {"abbr": "FP07", "type": "fp", "num": 7,    "label": "Finpress No.07"},
+    {"abbr": "FP14", "type": "fp", "num": 14,   "label": "Finpress No.14"},
+    {"abbr": "FP17", "type": "fp", "num": 17,   "label": "Finpress No.17"},
+    {"abbr": "FP18", "type": "fp", "num": 18,   "label": "Finpress No.18"},
+    {"abbr": "FP20", "type": "fp", "num": 20,   "label": "Finpress No.20"},
+    {"abbr": "FP21", "type": "fp", "num": 21,   "label": "Finpress No.21"},
+    {"abbr": "FPhp", "type": "fp", "num": 999,  "label": "Fin press (H/P Insert)"},
+
+    {"abbr": "FIN1", "type": "ins", "num": 1,   "label": "Fin Press No.1 (H/P Insert)"},
+    {"abbr": "FIN2", "type": "ins", "num": 2,   "label": "Fin Press No.2 (H/P Insert)"},
+    {"abbr": "FIN3", "type": "ins", "num": 3,   "label": "Fin Press No.3 (H/P Insert)"},
+
+    {"abbr": "HP01", "type": "hp", "num": 1,    "label": "Hairpin Bender No.01"},
+    {"abbr": "HP05", "type": "hp", "num": 5,    "label": "Hairpin Bender No.05"},
+    {"abbr": "HP12", "type": "hp", "num": 12,   "label": "Hairpin Bender No.12"},
+    {"abbr": "HP15", "type": "hp", "num": 15,   "label": "Hairpin Bender No.15"},
+    {"abbr": "HP17", "type": "hp", "num": 17,   "label": "Hairpin Bender No.17"},
+    {"abbr": "HP18", "type": "hp", "num": 18,   "label": "Hairpin Bender No.18"},
+    {"abbr": "HP19", "type": "hp", "num": 19,   "label": "Hairpin Bender No.19"},
+
+    {"abbr": "HI06", "type": "hi", "num": 6,    "label": "Hairpin Insert No.06"},
+    {"abbr": "HI07", "type": "hi", "num": 7,    "label": "Hairpin Insert No.07"},
+    {"abbr": "HI14", "type": "hi", "num": 14,   "label": "Hairpin Insert No.14"},
+    {"abbr": "HI17", "type": "hi", "num": 17,   "label": "Hairpin Insert No.17"},
+    {"abbr": "HI18", "type": "hi", "num": 18,   "label": "Hairpin Insert No.18"},
+    {"abbr": "HI20", "type": "hi", "num": 20,   "label": "Hairpin Insert No.20"},
+    {"abbr": "HI21", "type": "hi", "num": 21,   "label": "Hairpin Insert No.21"},
+
+    {"abbr": "CT03", "type": "ct", "num": 3,    "label": "Cutting No.03"},
+    {"abbr": "CT04", "type": "ct", "num": 4,    "label": "Cutting No.04"},
+    {"abbr": "CT05", "type": "ct", "num": 5,    "label": "Cutting No.05"},
+    {"abbr": "CT06", "type": "ct", "num": 6,    "label": "Cutting No.06"},
+    {"abbr": "CT13", "type": "ct", "num": 13,   "label": "Cutting No.13"},
+    {"abbr": "CT14", "type": "ct", "num": 14,   "label": "Cutting No.14"},
+    {"abbr": "CT15", "type": "ct", "num": 15,   "label": "Cutting No.15"},
+    {"abbr": "CT16", "type": "ct", "num": 16,   "label": "Cutting No.16"},
+    {"abbr": "CT17", "type": "ct", "num": 17,   "label": "Cutting No.17"},
+    {"abbr": "CT18", "type": "ct", "num": 18,   "label": "Cutting No.18"},
+
+    {"abbr": "FG", "type": "fg", "num": 0,      "label": "Finish Goods"},
+    {"abbr": "WIP1", "type": "wi", "num": 1,    "label": "WIP Fin Press"},
+    {"abbr": "WIPHP", "type": "wi", "num": 2,   "label": "WIP Hairpin Bender"},
+    {"abbr": "OFF", "type": "of", "num": 0,     "label": "Office"}
+  ],
+
+  "database_mappings": {
+    "expander_records": {
+      "machine_field": "machine",
+      "date_field": "date",
+      "type": "ex",
+      "examples": ["EX20 — Expand no.20", "EX22 — Expand no.22"]
+    },
+    "fp_records": {
+      "machine_field": "mc",
+      "date_field": "date",
+      "type": "fp",
+      "examples": ["Finpress no.21", "Finpress no.20"]
+    },
+    "hp_records": {
+      "machine_field": "mc",
+      "date_field": "saved_at",
+      "type": "hp",
+      "examples": ["Hairpin Bender 19", "Hairpin Bender 18"]
+    },
+    "cutting_records": {
+      "machine_field": "mc_line",
+      "date_field": "saved_at",
+      "type": "ct",
+      "examples": ["CT13", "CT17"]
+    }
+  }
+}

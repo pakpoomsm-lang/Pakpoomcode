@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout HEI Y2026</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:Arial,sans-serif; background:#111; padding:8px; }
+
+/* ── Title animation ── */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes glow {
+  0%, 100% { text-shadow: 0 0 8px #00e5ff, 0 0 20px #00bcd4, 0 0 40px #0097a7; }
+  50%       { text-shadow: 0 0 16px #fff, 0 0 40px #00e5ff, 0 0 80px #00bcd4; }
+}
+@keyframes borderPulse {
+  0%, 100% { box-shadow: 0 0 8px #00bcd4, inset 0 0 8px rgba(0,188,212,.15); }
+  50%       { box-shadow: 0 0 24px #00e5ff, inset 0 0 16px rgba(0,229,255,.25); }
+}
+@keyframes scanLine {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+/* ── Toolbar ── */
+#toolbar {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background: linear-gradient(135deg, #0a1628 0%, #0d2137 40%, #0a1e30 100%);
+  border:1.5px solid #00bcd4; border-radius:8px;
+  padding:8px 14px; margin-bottom:6px;
+  animation: borderPulse 3s ease-in-out infinite;
+  overflow:hidden; position:relative;
+}
+/* Scan-line shimmer */
+#toolbar::before {
+  content:'';
+  position:absolute; top:0; left:0;
+  width:25%; height:100%;
+  background: linear-gradient(90deg, transparent, rgba(0,229,255,.12), transparent);
+  animation: scanLine 3.5s linear infinite;
+  pointer-events:none;
+}
+
+/* Title text */
+#toolbar .title {
+  flex:1;
+  font-size:17px;
+  font-weight:900;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  text-align:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  background: linear-gradient(90deg,
+    #00e5ff 0%, #ffffff 20%, #00bcd4 40%,
+    #80deea 60%, #ffffff 80%, #00e5ff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 2.5s linear infinite;
+  position: relative;
+}
+.btn {
+  padding:4px 12px; border-radius:4px; border:none; cursor:pointer;
+  font-size:11px; font-weight:bold; transition:filter .15s;
+}
+.btn:hover { filter:brightness(1.2); }
+.btn-edit  { background:#1565C0; color:#fff; }
+.btn-save  { background:#2E7D32; color:#fff; }
+.btn-reset { background:#B71C1C; color:#fff; }
+.btn-dash  { background:#00838F; color:#fff; text-decoration:none; display:inline-flex; align-items:center; }
+.btn-dash:hover { filter:brightness(1.2); }
+
+/* ── Running machine indicator ── */
+@keyframes pulse {
+  0%,100% { transform:scale(1);   opacity:1; }
+  50%      { transform:scale(1.5); opacity:.7; }
+}
+.ml-running::after {
+  content: '';
+  position: absolute;
+  top: -5px; left: -5px;
+  width: 10px; height: 10px;
+  background: #00E676;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  animation: pulse 1.5s ease-in-out infinite;
+  z-index: 25;
+  box-shadow: 0 0 6px #00E676;
+}
+#edit-status { font-size:10px; color:#FFD600; display:none; }
+#hint { color:#aaa; font-size:10px; display:none; }
+
+/* ── Title icon & datetime ── */
+@keyframes iconFloat {
+  0%,100% { transform: translateY(0px) scale(1);   filter: drop-shadow(0 0 6px #00e5ff); }
+  50%      { transform: translateY(-4px) scale(1.1); filter: drop-shadow(0 0 14px #00e5ff); }
+}
+@keyframes dtBlink {
+  0%,49%  { opacity:1; }
+  50%,100%{ opacity:.55; }
+}
+#title-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+  animation: iconFloat 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px #00e5ff) brightness(1.4);
+  /* override the gradient clip so the img is visible */
+  -webkit-text-fill-color: unset;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+}
+#title-year {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  white-space: nowrap;
+  -webkit-text-fill-color: #80deea;
+  animation: dtBlink 1s step-start infinite;
+}
+
+/* ── Layout image container ── */
+.wrap {
+  position:relative; display:block; line-height:0;
+  border:2px solid #333; border-radius:3px; overflow:visible;
+  width:100%;
+}
+.wrap img { display:block; width:100%; max-width:1920px; height:auto; }
+
+/* ── No-image fallback ── */
+#no-img {
+  display:none; position:absolute; inset:0;
+  background:#c8bca4; align-items:center; justify-content:center;
+  flex-direction:column; gap:8px; text-align:center; padding:20px; z-index:3;
+}
+#no-img p { font-size:12px; color:#555; line-height:1.7; }
+#no-img strong { color:#B71C1C; }
+
+/* ── Machine label base ── */
+.ml {
+  position: absolute;
+  /* font & padding scale with image width via --lbl-scale (set by JS) */
+  font-size: calc(11px * var(--lbl-scale, 1));
+  font-weight: bold;
+  padding: calc(3px * var(--lbl-scale, 1)) calc(9px * var(--lbl-scale, 1));
+  border-radius: 4px;
+  border: 1.5px solid rgba(0,0,0,.35);
+  white-space: nowrap;
+  line-height: 1.4;
+  z-index: 10;
+  user-select: none;
+  cursor: pointer;
+  /* rotation via CSS variable */
+  transform: rotate(var(--rot, 0deg));
+  transition: filter .12s;
+}
+.ml:hover {
+  filter: brightness(1.25);
+  transform: rotate(var(--rot, 0deg)) scale(1.1);
+  z-index: 15;
+}
+/* In edit mode suppress scale on hover */
+body.edit-mode .ml:hover {
+  transform: rotate(var(--rot, 0deg));
+  filter: brightness(1.1);
+}
+body.edit-mode .ml { cursor: move; }
+.ml.grabbed {
+  opacity: .85; z-index: 50 !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.55);
+}
+.ml.selected {
+  outline: 2.5px solid #00E5FF;
+  box-shadow: 0 0 10px rgba(0,229,255,.7);
+  z-index: 20;
+}
+
+/* ── Delete button (shown in edit mode) ── */
+.del-btn {
+  display: none;
+  position: absolute;
+  top: -9px; right: -9px;
+  width: 17px; height: 17px;
+  background: #B71C1C; color: #fff;
+  border-radius: 50%;
+  font-size: 12px; font-weight: 900;
+  text-align: center; line-height: 17px;
+  cursor: pointer; z-index: 30;
+  border: 1.5px solid #fff;
+  transition: background .15s, transform .12s;
+}
+.del-btn:hover { background:#e53935; transform:scale(1.25); }
+body.edit-mode .del-btn { display: block; }
+
+/* ── Rotation handle (shown in edit mode) ── */
+.rot-handle {
+  display: none;
+  position: absolute;
+  top: -24px; left: 50%;
+  transform: translateX(-50%);
+  width: 16px; height: 16px;
+  background: #1565C0; color: #fff;
+  border-radius: 50%;
+  font-size: 11px; text-align: center; line-height: 16px;
+  cursor: grab; z-index: 30;
+  border: 1.5px solid #fff;
+  transition: background .15s;
+}
+.rot-handle:hover { background: #1976D2; }
+.rot-handle:active { cursor: grabbing; }
+/* Dashed line from handle to label */
+.rot-handle::before {
+  content: '';
+  position: absolute;
+  top: 16px; left: 50%;
+  transform: translateX(-50%);
+  width: 1px; height: 8px;
+  background: rgba(255,255,255,.5);
+}
+body.edit-mode .rot-handle { display: block; }
+
+/* Color variants */
+.c-br { background:rgba(224,120,32,.92); color:#fff; }
+.c-ov { background:rgba(93,122,97,.92);  color:#fff; }
+.c-ex { background:rgba(46,125,50,.92);  color:#fff; }
+.c-in { background:rgba(41,182,246,.92); color:#000; }
+.c-fp { background:rgba(239,108,0,.92);  color:#fff; }
+.c-hp { background:rgba(183,28,28,.92);  color:#fff; }
+.c-ct { background:rgba(198,40,40,.92);  color:#fff; border-color:#7f0000; }
+.c-wi { background:rgba(255,214,0,.92);  color:#000; border-color:#C8A800; }
+.c-fg { background:rgba(255,214,0,.92);  color:#000; border-color:#C8A800; }
+.c-of { background:rgba(255,214,0,.92);  color:#000; border-color:#C8A800; }
+
+/* ── Info panel ── */
+#info {
+  position:fixed; bottom:20px; right:20px; z-index:200;
+  background:#0d1f2d; color:#d8eef5;
+  border:2px solid #00bcd4; border-radius:8px;
+  padding:10px 16px; font-size:12px; display:none;
+  min-width:220px; box-shadow:0 4px 20px rgba(0,0,0,.6);
+}
+#info .info-lbl { font-size:9px; color:#555; }
+#info .info-name { font-size:14px; font-weight:bold; color:#00E5FF; margin:3px 0 6px; }
+#info .close-x { font-size:10px; color:#888; cursor:pointer; }
+#info .close-x:hover { color:#eee; }
+
+/* ── Undo bar ── */
+#undo-bar {
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+  background:#1a1a1a; color:#eee;
+  border:1px solid #555; border-radius:6px;
+  padding:8px 16px; display:none;
+  align-items:center; gap:12px; z-index:300;
+  font-size:11px; white-space:nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+.undo-btn {
+  background:#1565C0; color:#fff; border:none;
+  padding:3px 12px; border-radius:3px; cursor:pointer;
+  font-size:11px; font-weight:bold;
+}
+.undo-btn:hover { background:#1976D2; }
+
+/* ── Tooltip ── */
+#tip {
+  position:fixed; display:none; background:#111; color:#eee;
+  border:1px solid #00bcd4; border-radius:4px;
+  padding:4px 10px; font-size:10px;
+  pointer-events:none; z-index:999;
+}
+
+/* ── Legend ── */
+.leg { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.leg span {
+  padding:2px 7px; border-radius:3px; font-size:9px; font-weight:bold;
+  border:1px solid rgba(0,0,0,.2);
+}
+</style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <div class="title">
+    <img id="title-icon" src="/Layout_HEI/images/ac_icon_hei.png" alt="icon"
+         onerror="this.style.display='none'">
+    HEAT EXCHANGE INDOOR FACTORY LAYOUT
+    <span id="title-year"></span>
+  </div>
+  <span id="edit-status">✏️ Edit Mode — ลากเพื่อย้าย · ↻ หมุน · ✕ ลบ</span>
+  <span id="hint">คลิกป้ายเพื่อดูชื่อ</span>
+  <!-- Edit controls — visible only when ?edit=1 (via Admin page) -->
+  <button class="btn btn-edit"  id="btn-edit"  onclick="toggleEdit()" style="display:none">📐 Edit</button>
+  <button class="btn btn-save"  id="btn-save"  onclick="savePos()"    style="display:none">💾 Save</button>
+  <button class="btn btn-reset" id="btn-reset" onclick="resetPos()"   style="display:none">↺ Reset</button>
+  <!-- Dashboard button always visible -->
+  <a class="btn btn-dash" href="http://10.235.117.215:3001/dashboard/firstlot" target="_self">📊 Dashboard</a>
+</div>
+
+<!-- Layout container -->
+<div class="wrap" id="wrap">
+  <img id="bg" src="/Layout_HEI/images/layout_hei_bg.png" alt="Facility Layout"
+       onerror="document.getElementById('no-img').style.display='flex';
+                this.style.visibility='hidden';">
+  <div id="no-img">
+    <p>
+      <strong>⚠ ไม่พบไฟล์รูปภาพ</strong><br><br>
+      กรุณาบันทึกรูปเป็นชื่อ <strong>layout_HEI_bg.jpg</strong><br>
+      ในโฟลเดอร์ <strong>C:\Users\suphamat.p\Downloads\</strong><br><br>
+      (Right-click รูปในแชท → Save image as… → layout_HEI_bg.jpg)
+    </p>
+  </div>
+
+  <!-- ════ LINE 1 ════ -->
+  <div class="ml c-br" data-id="AB10"   data-m="Auto Brazing No.10"           style="left:26.2%;top:15.5%">Auto Brazing No.10</div>
+  <div class="ml c-br" data-id="AB15"   data-m="Auto Brazing No.15"           style="left:31.8%;top:22.8%">Auto Brazing No.15</div>
+  <div class="ml c-br" data-id="AB14"   data-m="Auto Brazing No.14"           style="left:31.8%;top:29.8%">Auto Brazing No.14</div>
+  <div class="ml c-br" data-id="AB19"   data-m="Auto Brazing No.19"           style="left:34.5%;top:38.5%">Auto Brazing No.19</div>
+  <div class="ml c-br" data-id="AB18"   data-m="Auto Brazing No.18"           style="left:31.8%;top:44.5%">Auto Brazing No.18</div>
+  <div class="ml c-ov" data-id="OV6"    data-m="Oven Oil No.6"                style="left:37.8%;top:12.5%">Oven Oil No.6</div>
+  <div class="ml c-ov" data-id="OV15"   data-m="Oven Oil No.15"               style="left:37.8%;top:22.8%">Oven Oil No.15</div>
+  <div class="ml c-ov" data-id="OV16"   data-m="Oven Oil No.16"               style="left:37.8%;top:29.8%">Oven Oil No.16</div>
+  <div class="ml c-ov" data-id="DRY8"   data-m="Dry Oven No.8"                style="left:43.0%;top:18.5%">Dry oven No.8</div>
+  <div class="ml c-ov" data-id="DRY25"  data-m="Dry Oven No.25"               style="left:43.0%;top:34.5%">Dry oven No.25</div>
+  <div class="ml c-ov" data-id="OV19"   data-m="Oven Oil No.19"               style="left:36.5%;top:57.5%">Oven Oil No.19</div>
+  <div class="ml c-ex" data-id="EX13"   data-m="Expander No.13"               style="left:45.5%;top:9.0%">Expander 13</div>
+  <div class="ml c-ex" data-id="EX18"   data-m="Expander No.18"               style="left:45.5%;top:22.8%">Expander 18</div>
+  <div class="ml c-ex" data-id="EX17"   data-m="Expander No.17"               style="left:45.5%;top:29.8%">Expander 17</div>
+  <div class="ml c-ex" data-id="EX20"   data-m="Expander No.20"               style="left:45.5%;top:37.5%">Expander 20</div>
+  <div class="ml c-ex" data-id="EX22"   data-m="Expander No.22"               style="left:45.5%;top:57.5%">Expander 22</div>
+  <div class="ml c-fp" data-id="FP14"   data-m="Finpress No.14"               style="left:78.5%;top:18.5%">Finpress No.14</div>
+  <div class="ml c-fp" data-id="FPhp"   data-m="Fin press (H/P Insert)"       style="left:75.5%;top:24.5%">Fin press no.▶</div>
+  <div class="ml c-fp" data-id="FP17"   data-m="Finpress No.17"               style="left:78.5%;top:30.0%">Finpress No.17</div>
+  <div class="ml c-fp" data-id="FP20"   data-m="Finpress No.20"               style="left:78.5%;top:40.5%">Finpress No.20</div>
+  <div class="ml c-fp" data-id="FP21"   data-m="Finpress No.21"               style="left:78.5%;top:56.5%">Finpress No.21</div>
+  <div class="ml c-fg" data-id="FG"     data-m="Finish Goods"                 style="left:21.0%;top:8.0%">FG</div>
+  <div class="ml c-wi" data-id="WIP1"   data-m="WIP Fin Press"                style="left:21.0%;top:32.0%">WIP Finpress</div>
+  <div class="ml c-of" data-id="OFF"    data-m="Office"                       style="left:21.0%;top:55.0%">Office</div>
+
+  <!-- ════ LINE 2 ════ -->
+  <div class="ml c-br" data-id="AB16"   data-m="Auto Brazing No.16"           style="left:27.0%;top:66.5%">Auto Brazing No.16</div>
+  <div class="ml c-br" data-id="AB05"   data-m="Auto Brazing No.05"           style="left:27.0%;top:75.5%">Auto Brazing No.05</div>
+  <div class="ml c-br" data-id="AB09"   data-m="Auto Brazing No.09"           style="left:27.0%;top:82.0%">Auto Brazing No.09</div>
+  <div class="ml c-br" data-id="AB06"   data-m="Auto Brazing No.06"           style="left:27.0%;top:89.5%">Auto Brazing No.06</div>
+  <div class="ml c-ov" data-id="OV45"   data-m="Oven Oil No.4,5"              style="left:39.0%;top:70.5%">Oven Oil No.4,5</div>
+  <div class="ml c-ov" data-id="OV1011" data-m="Oven Oil No.10,11"            style="left:39.0%;top:82.0%">Oven Oil No.10,11</div>
+  <div class="ml c-ov" data-id="DRY2A"  data-m="Dry Oven LINE2-A"             style="left:43.0%;top:74.5%">Dry oven</div>
+  <div class="ml c-ov" data-id="DRY2B"  data-m="Dry Oven LINE2-B"             style="left:43.0%;top:82.0%">Dry oven</div>
+  <div class="ml c-ex" data-id="EX4"    data-m="Expander No.4"                style="left:46.0%;top:63.5%">Expander 04</div>
+  <div class="ml c-ex" data-id="EX5"    data-m="Expander No.5"                style="left:46.0%;top:73.5%">Expander 05</div>
+  <div class="ml c-ex" data-id="EX6"    data-m="Expander No.6"                style="left:46.0%;top:82.0%">Expander 06</div>
+  <div class="ml c-ex" data-id="EX7"    data-m="Expander No.7"                style="left:46.0%;top:89.5%">Expander 07</div>
+  <div class="ml c-in" data-id="FIN3"   data-m="Fin Press No.3 (H/P Insert)"  style="left:58.0%;top:66.5%">Fin press no.3</div>
+  <div class="ml c-in" data-id="FIN2"   data-m="Fin Press No.2 (H/P Insert)"  style="left:58.0%;top:77.5%">Fin press no.2</div>
+  <div class="ml c-in" data-id="FIN1"   data-m="Fin Press No.1 (H/P Insert)"  style="left:58.0%;top:87.0%">Fin press no.1</div>
+  <div class="ml c-fp" data-id="FP18"   data-m="Finpress No.18"               style="left:73.0%;top:66.5%">Finpress No.18</div>
+  <div class="ml c-fp" data-id="FP06"   data-m="Finpress No.06"               style="left:73.0%;top:79.0%">Finpress No.06</div>
+  <div class="ml c-fp" data-id="FP07"   data-m="Finpress No.07"               style="left:73.0%;top:89.5%">Finpress No.07</div>
+
+  <!-- ════ HP BENDERS ════ -->
+  <div class="ml c-wi" data-id="WIPHP"  data-m="WIP Hairpin Bender"           style="left:85.5%;top:8.0%">WIP hairpin</div>
+  <div class="ml c-hp" data-id="HP05"   data-m="Hairpin Bender No.05"         style="left:87.0%;top:15.0%">H/P Bender 05</div>
+  <div class="ml c-hp" data-id="HP12"   data-m="Hairpin Bender No.12"         style="left:93.5%;top:7.5%">H/P Bender 12</div>
+  <div class="ml c-hp" data-id="HP19"   data-m="Hairpin Bender No.19"         style="left:87.0%;top:26.5%">H/P Bender 19</div>
+  <div class="ml c-hp" data-id="HP01"   data-m="Hairpin Bender No.01"         style="left:87.0%;top:63.5%">H/P Bender 01</div>
+  <div class="ml c-hp" data-id="HP17"   data-m="Hairpin Bender No.17"         style="left:87.0%;top:75.0%">H/P Bender 17</div>
+  <div class="ml c-hp" data-id="HP15"   data-m="Hairpin Bender No.15"         style="left:93.5%;top:63.5%">H/P Bender 15</div>
+  <div class="ml c-hp" data-id="HP18"   data-m="Hairpin Bender No.18"         style="left:93.5%;top:75.0%">H/P Bender 18</div>
+
+  <!-- ════ HAIRPIN INSERT ════ -->
+  <div class="ml c-in" data-id="HI14"  data-m="Hairpin Insert No.14"  style="left:60.0%;top:15.0%">Hairpin Insert14</div>
+  <div class="ml c-in" data-id="HI17"  data-m="Hairpin Insert No.17"  style="left:60.0%;top:22.0%">Hairpin Insert17</div>
+  <div class="ml c-in" data-id="HI20"  data-m="Hairpin Insert No.20"  style="left:60.0%;top:29.0%">Hairpin Insert20</div>
+  <div class="ml c-in" data-id="HI21"  data-m="Hairpin Insert No.21"  style="left:60.0%;top:36.0%">Hairpin Insert21</div>
+  <div class="ml c-in" data-id="HI18"  data-m="Hairpin Insert No.18"  style="left:60.0%;top:66.0%">Hairpin Insert18</div>
+  <div class="ml c-in" data-id="HI06"  data-m="Hairpin Insert No.06"  style="left:60.0%;top:73.0%">Hairpin Insert06</div>
+  <div class="ml c-in" data-id="HI07"  data-m="Hairpin Insert No.07"  style="left:60.0%;top:80.0%">Hairpin Insert07</div>
+
+  <!-- ════ CUTTING MACHINES ════ -->
+  <div class="ml c-ct" data-id="CT17"  data-m="Cutting No.17"  style="left:2.0%;top:15.0%">CT17</div>
+  <div class="ml c-ct" data-id="CT05"  data-m="Cutting No.05"  style="left:2.0%;top:22.0%">CT05</div>
+  <div class="ml c-ct" data-id="CT16"  data-m="Cutting No.16"  style="left:2.0%;top:29.0%">CT16</div>
+  <div class="ml c-ct" data-id="CT15"  data-m="Cutting No.15"  style="left:2.0%;top:36.0%">CT15</div>
+  <div class="ml c-ct" data-id="CT13"  data-m="Cutting No.13"  style="left:2.0%;top:43.0%">CT13</div>
+  <div class="ml c-ct" data-id="CT14"  data-m="Cutting No.14"  style="left:2.0%;top:50.0%">CT14</div>
+  <div class="ml c-ct" data-id="CT04"  data-m="Cutting No.04"  style="left:2.0%;top:57.0%">CT04</div>
+  <div class="ml c-ct" data-id="CT06"  data-m="Cutting No.06"  style="left:2.0%;top:64.0%">CT06</div>
+  <div class="ml c-ct" data-id="CT18"  data-m="Cutting No.18"  style="left:2.0%;top:71.0%">CT18</div>
+  <div class="ml c-ct" data-id="CT03"  data-m="Cutting No.03"  style="left:2.0%;top:78.0%">CT03</div>
+</div>
+
+<!-- Legend -->
+<div class="leg">
+  <span style="background:#E07820;color:#fff">Auto Brazing</span>
+  <span style="background:#5D7A61;color:#fff">Oven</span>
+  <span style="background:#2E7D32;color:#fff">Expander</span>
+  <span style="background:#29B6F6;color:#000">H/P Insert</span>
+  <span style="background:#EF6C00;color:#fff">Fin Press</span>
+  <span style="background:#FFD600;color:#000;border:1px solid #C8A800">WIP / FG / Office</span>
+  <span style="background:#B71C1C;color:#fff">H/P Bender</span>
+  <span style="background:#C62828;color:#fff;border:1px solid #7f0000">Cutting (CT)</span>
+</div>
+
+<!-- Info panel (simple name display) -->
+<div id="info">
+  <div class="info-lbl">SELECTED MACHINE</div>
+  <div class="info-name" id="info-name">—</div>
+  <div class="close-x" onclick="document.getElementById('info').style.display='none'">✕ Close</div>
+</div>
+
+<!-- Machine Records Table Modal (filter: Machine + current Shift) -->
+<div id="machine-detail-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:500;justify-content:center;align-items:center;">
+  <div style="background:#fff;border-radius:8px;padding:22px;max-width:760px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,0.3);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <h2 id="modal-title" style="margin:0;color:#222;font-size:20px;"></h2>
+      <span id="modal-shift" style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:8px;background:#e3f2fd;color:#1565c0;"></span>
+    </div>
+    <div id="modal-sub" style="color:#888;font-size:12px;margin-bottom:14px;"></div>
+    <div id="modal-loading" style="text-align:center;color:#999;padding:20px;">Loading...</div>
+    <div id="modal-content" style="display:none;max-height:440px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f5f5f5;position:sticky;top:0;">
+            <th style="padding:10px;text-align:center;color:#555;border-bottom:2px solid #ddd;width:100px;">Date</th>
+            <th style="padding:10px;text-align:center;color:#555;border-bottom:2px solid #ddd;width:60px;">Time</th>
+            <th style="padding:10px;text-align:left;color:#555;border-bottom:2px solid #ddd;">Checker (ID)</th>
+            <th style="padding:10px;text-align:center;color:#555;border-bottom:2px solid #ddd;width:60px;">Line</th>
+            <th style="padding:10px;text-align:center;color:#555;border-bottom:2px solid #ddd;width:60px;">Seq</th>
+            <th style="padding:10px;text-align:left;color:#555;border-bottom:2px solid #ddd;" id="md-item-head">Item FG</th>
+          </tr>
+        </thead>
+        <tbody id="md-tbody"></tbody>
+      </table>
+    </div>
+    <div id="modal-error" style="display:none;color:#d32f2f;padding:24px;text-align:center;"></div>
+    <div style="margin-top:18px;text-align:right;">
+      <button onclick="document.getElementById('machine-detail-modal').style.display='none'" style="padding:8px 18px;background:#666;color:#fff;border:none;border-radius:4px;cursor:pointer;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Undo bar -->
+<div id="undo-bar">
+  <span id="undo-msg"></span>
+  <button class="undo-btn" onclick="undoDelete()">↩ Undo</button>
+  <span style="color:#555;cursor:pointer;font-size:13px;" onclick="document.getElementById('undo-bar').style.display='none'">✕</span>
+</div>
+
+<!-- Tooltip -->
+<div id="tip"></div>
+
+<script>
+/* ─────────────────────────────────────────────────
+   Constants & State
+───────────────────────────────────────────────── */
+const STORE = 'hei_pos_v2';
+
+const wrap    = document.getElementById('wrap');
+const tip     = document.getElementById('tip');
+const info    = document.getElementById('info');
+const infoN   = document.getElementById('info-name');
+const editSt  = document.getElementById('edit-status');
+const btnSave = document.getElementById('btn-save');
+const btnRst  = document.getElementById('btn-reset');
+const hint    = document.getElementById('hint');
+const undoBar = document.getElementById('undo-bar');
+const undoMsg = document.getElementById('undo-msg');
+
+let editMode = false;
+
+/* ── Drag (move) state ── */
+let dragEl   = null;
+let dragOX   = 0, dragOY = 0;
+
+/* ── Rotation state ── */
+let rotEl     = null;
+let rotCenter = { x:0, y:0 };
+let rotBase   = 0;   /* angle at grab minus current label rotation */
+
+/* ── Delete undo stack ── */
+let undoStack  = [];
+let undoTimer  = null;
+
+/* ─────────────────────────────────────────────────
+   Helpers
+───────────────────────────────────────────────── */
+function getAngleDeg(cx, cy, mx, my) {
+  return Math.atan2(my - cy, mx - cx) * 180 / Math.PI;
+}
+
+function getCurrentRot(el) {
+  return parseFloat(el.dataset.rot || '0');
+}
+
+function applyRot(el, deg) {
+  el.dataset.rot = deg.toFixed(2);
+  el.style.setProperty('--rot', deg.toFixed(2) + 'deg');
+}
+
+/* ─────────────────────────────────────────────────
+   Toggle Edit Mode
+───────────────────────────────────────────────── */
+function toggleEdit() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  editSt.style.display  = editMode ? 'inline' : 'none';
+  hint.style.display    = editMode ? 'none'   : 'inline';
+  btnSave.style.display = editMode ? 'inline-block' : 'none';
+  btnRst.style.display  = editMode ? 'inline-block' : 'none';
+  document.getElementById('btn-edit').textContent = editMode ? '✅ Done' : '📐 Edit';
+
+  document.querySelectorAll('.ml').forEach(el => {
+    if (editMode) {
+      addHandles(el);
+    } else {
+      removeHandles(el);
+    }
+  });
+}
+
+/* ─────────────────────────────────────────────────
+   Add / Remove handles
+───────────────────────────────────────────────── */
+function addHandles(el) {
+  if (el.querySelector('.del-btn')) return; // already added
+
+  /* ── Delete button ── */
+  const del = document.createElement('span');
+  del.className = 'del-btn';
+  del.textContent = '×';
+  del.title = 'ลบป้ายนี้';
+  del.addEventListener('mousedown', e => e.stopPropagation());
+  del.addEventListener('click', e => {
+    e.stopPropagation();
+    deleteLabel(el);
+  });
+  el.appendChild(del);
+
+  /* ── Rotation handle ── */
+  const rot = document.createElement('span');
+  rot.className = 'rot-handle';
+  rot.textContent = '↻';
+  rot.title = 'หมุนป้ายนี้';
+  rot.addEventListener('mousedown', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    startRotation(e, el);
+  });
+  el.appendChild(rot);
+}
+
+function removeHandles(el) {
+  el.querySelectorAll('.del-btn, .rot-handle').forEach(h => h.remove());
+}
+
+/* ─────────────────────────────────────────────────
+   Delete & Undo
+───────────────────────────────────────────────── */
+function deleteLabel(el) {
+  /* Push to undo stack */
+  undoStack.push(el);
+  el.style.display = 'none';
+  el.dataset.deleted = '1';
+
+  /* Show undo bar */
+  undoMsg.textContent = 'ลบ "' + (el.dataset.m || el.textContent.replace('×↻','').trim()) + '" แล้ว';
+  undoBar.style.display = 'flex';
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => {
+    undoBar.style.display = 'none';
+    undoStack = undoStack.filter(x => x !== el); /* clear from stack after timeout */
+  }, 5000);
+}
+
+function undoDelete() {
+  const el = undoStack.pop();
+  if (!el) return;
+  el.style.display = '';
+  delete el.dataset.deleted;
+  undoBar.style.display = 'none';
+  clearTimeout(undoTimer);
+}
+
+/* ─────────────────────────────────────────────────
+   Rotation
+───────────────────────────────────────────────── */
+function startRotation(e, el) {
+  rotEl = el;
+  const rect = el.getBoundingClientRect();
+  rotCenter.x = rect.left + rect.width  / 2;
+  rotCenter.y = rect.top  + rect.height / 2;
+  /* base = mouseAngle - currentRotation */
+  rotBase = getAngleDeg(rotCenter.x, rotCenter.y, e.clientX, e.clientY) - getCurrentRot(el);
+}
+
+/* ─────────────────────────────────────────────────
+   Drag (move)
+───────────────────────────────────────────────── */
+wrap.addEventListener('mousedown', e => {
+  if (!editMode) return;
+  const el = e.target.closest('.ml');
+  if (!el) return;
+  if (e.target.classList.contains('del-btn')) return;
+  if (e.target.classList.contains('rot-handle')) return;
+  e.preventDefault();
+  dragEl = el;
+  dragEl.classList.add('grabbed');
+  const wr = wrap.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  dragOX = e.clientX - er.left;
+  dragOY = e.clientY - er.top;
+});
+
+/* ─────────────────────────────────────────────────
+   Mouse move — handles both drag and rotation
+───────────────────────────────────────────────── */
+document.addEventListener('mousemove', e => {
+  /* Move */
+  if (dragEl) {
+    const wr = wrap.getBoundingClientRect();
+    let lx = (e.clientX - wr.left - dragOX) / wr.width  * 100;
+    let ly = (e.clientY - wr.top  - dragOY) / wr.height * 100;
+    dragEl.style.left = Math.max(0, Math.min(97, lx)).toFixed(2) + '%';
+    dragEl.style.top  = Math.max(0, Math.min(97, ly)).toFixed(2) + '%';
+  }
+  /* Rotate */
+  if (rotEl) {
+    const angle = getAngleDeg(rotCenter.x, rotCenter.y, e.clientX, e.clientY) - rotBase;
+    applyRot(rotEl, angle);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if (dragEl) { dragEl.classList.remove('grabbed'); dragEl = null; }
+  rotEl = null;
+});
+
+/* ─────────────────────────────────────────────────
+   Click — view mode info panel + tooltip
+───────────────────────────────────────────────── */
+document.querySelectorAll('.ml').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    if (editMode) return;
+    tip.textContent = el.dataset.m;
+    tip.style.display = 'block';
+  });
+  el.addEventListener('mousemove', e => {
+    tip.style.left = (e.clientX + 14) + 'px';
+    tip.style.top  = (e.clientY -  8) + 'px';
+  });
+  el.addEventListener('mouseleave', () => tip.style.display = 'none');
+
+  el.addEventListener('click', () => {
+    if (editMode) return;
+    document.querySelectorAll('.ml.selected').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+    infoN.textContent = el.dataset.m;
+    info.style.display = 'block';
+
+    /* Fetch machine detail from API */
+    const key = extractKey(el.dataset.m);
+    if (key) {
+      const [type, num] = key.split(':');
+      fetchMachineDetail(type, num, el.dataset.m);
+    }
+  });
+});
+
+/* ─────────────────────────────────────────────────
+   Machine Detail Popup — fetch & display
+───────────────────────────────────────────────── */
+function esc(s) {
+  return (s == null ? '' : String(s))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function fetchMachineDetail(type, num, machineName) {
+  const modal   = document.getElementById('machine-detail-modal');
+  const title   = document.getElementById('modal-title');
+  const shiftEl = document.getElementById('modal-shift');
+  const subEl   = document.getElementById('modal-sub');
+  const loading = document.getElementById('modal-loading');
+  const content = document.getElementById('modal-content');
+  const error   = document.getElementById('modal-error');
+  const tbody   = document.getElementById('md-tbody');
+  const itemHd  = document.getElementById('md-item-head');
+
+  /* Show modal */
+  modal.style.display = 'flex';
+  title.textContent   = machineName;
+  shiftEl.textContent = '';
+  subEl.textContent   = '';
+  loading.style.display = 'block';
+  content.style.display = 'none';
+  error.style.display   = 'none';
+  tbody.innerHTML = '';
+
+  /* HP process → Item column header shows "Item Hairpin" */
+  itemHd.textContent = (type === 'hp') ? 'Item Hairpin' : 'Item FG';
+
+  try {
+    const res  = await fetch(`/api/machine-records/${type}/${num}`);
+    const data = await res.json();
+    loading.style.display = 'none';
+
+    if (!data.ok) {
+      error.style.display = 'block';
+      error.textContent = 'Error loading records';
+      return;
+    }
+
+    shiftEl.textContent = (data.shift === 'day' ? '☀ DAY' : '🌙 NIGHT') + ' SHIFT';
+    subEl.textContent   = data.count + ' record' + (data.count === 1 ? '' : 's') + ' this shift';
+
+    if (!data.records || data.records.length === 0) {
+      error.style.display = 'block';
+      error.textContent = 'ยังไม่มีข้อมูล Shift นี้';
+      return;
+    }
+
+    tbody.innerHTML = data.records.map((r, i) => `
+      <tr style="border-bottom:1px solid #eee;background:${i % 2 ? '#fafafa' : '#fff'}">
+        <td style="padding:9px;text-align:center;color:#555;">${esc(r.date) || '—'}</td>
+        <td style="padding:9px;text-align:center;color:#555;">${esc(r.time) || '—'}</td>
+        <td style="padding:9px;color:#222;">${esc(r.checker) || '—'}</td>
+        <td style="padding:9px;text-align:center;color:#222;">${esc(r.line) || '—'}</td>
+        <td style="padding:9px;text-align:center;color:#222;">${esc(r.seq) || '—'}</td>
+        <td style="padding:9px;color:#1565c0;font-weight:600;">${esc(r.item) || '—'}</td>
+      </tr>`).join('');
+
+    content.style.display = 'block';
+  } catch (e) {
+    loading.style.display = 'none';
+    error.style.display = 'block';
+    error.textContent = 'API Error: ' + e.message;
+  }
+}
+
+/* ─────────────────────────────────────────────────
+   Save / Load / Reset  — server-side shared storage
+   Positions are % values → resolution-independent.
+   Server file is shared across ALL PCs.
+   localStorage used only as offline fallback cache.
+───────────────────────────────────────────────── */
+function _collectPos() {
+  const data = {};
+  document.querySelectorAll('.ml').forEach(el => {
+    data[el.dataset.id] = {
+      l: el.style.left,
+      t: el.style.top,
+      r: el.dataset.rot || '0',
+      d: el.dataset.deleted === '1' ? '1' : '0'
+    };
+  });
+  return data;
+}
+
+function _applyPos(data) {
+  document.querySelectorAll('.ml').forEach(el => {
+    const p = data[el.dataset.id];
+    if (!p) return;
+    if (p.l) el.style.left = p.l;
+    if (p.t) el.style.top  = p.t;
+    if (p.r && p.r !== '0') applyRot(el, parseFloat(p.r));
+    if (p.d === '1') { el.style.display = 'none'; el.dataset.deleted = '1'; }
+  });
+}
+
+function _flashMsg(text, bg) {
+  const f = document.createElement('div');
+  f.textContent = text;
+  Object.assign(f.style, {
+    position:'fixed', top:'50%', left:'50%',
+    transform:'translate(-50%,-50%)',
+    background: bg || '#2E7D32', color:'#fff',
+    padding:'12px 28px', borderRadius:'8px',
+    fontSize:'14px', fontWeight:'bold',
+    zIndex:'1000', pointerEvents:'none', boxShadow:'0 4px 16px rgba(0,0,0,.4)'
+  });
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 1800);
+}
+
+async function savePos() {
+  const data = _collectPos();
+  const json = JSON.stringify(data);
+
+  /* Always cache locally as backup */
+  try { localStorage.setItem(STORE, json); } catch(e) {}
+
+  /* Save to server so ALL PCs share the same layout */
+  try {
+    const res = await fetch('/Layout_HEI/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: json
+    });
+    const d = await res.json();
+    if (d.ok) {
+      _flashMsg('✅ บันทึกตำแหน่งแล้ว! (ทุก PC เห็นผล)', '#1B5E20');
+    } else {
+      _flashMsg('⚠️ บันทึก Local เท่านั้น — Server Error', '#B71C1C');
+    }
+  } catch(e) {
+    _flashMsg('⚠️ บันทึก Local เท่านั้น (Offline)', '#E65100');
+  }
+}
+
+async function loadPos() {
+  /* 1. Try server first (shared across all PCs) */
+  try {
+    const res  = await fetch('/Layout_HEI/positions');
+    const data = await res.json();
+    if (data && Object.keys(data).length > 0) {
+      _applyPos(data);
+      /* Cache locally for offline fallback */
+      try { localStorage.setItem(STORE, JSON.stringify(data)); } catch(e) {}
+      return;
+    }
+  } catch(e) { /* server unavailable — fall through to local cache */ }
+
+  /* 2. Fall back to localStorage cache */
+  try {
+    const data = JSON.parse(localStorage.getItem(STORE) || '{}');
+    if (Object.keys(data).length > 0) _applyPos(data);
+  } catch(e) {}
+}
+
+async function resetPos() {
+  if (!confirm('รีเซ็ตตำแหน่ง / การหมุน / ป้ายที่ลบ ทั้งหมด — ทุก PC จะเห็นค่าเริ่มต้น?')) return;
+
+  /* Clear server */
+  try {
+    await fetch('/Layout_HEI/positions', { method: 'DELETE' });
+  } catch(e) {}
+
+  /* Clear local cache */
+  try { localStorage.removeItem(STORE); } catch(e) {}
+
+  location.reload();
+}
+
+/* ─────────────────────────────────────────────────
+   Label Scale — proportional to image render width
+   Design width = 1920 px
+───────────────────────────────────────────────── */
+const _DESIGN_W = 1920;
+function _updateLabelScale() {
+  const img = document.getElementById('bg');
+  const w   = img ? img.offsetWidth : wrap.offsetWidth;
+  const s   = w > 0 ? (w / _DESIGN_W) : 1;
+  wrap.style.setProperty('--lbl-scale', Math.max(0.4, Math.min(1, s)).toFixed(4));
+}
+window.addEventListener('resize', _updateLabelScale);
+window.addEventListener('load',   _updateLabelScale);
+
+/* ─────────────────────────────────────────────────
+   ?edit=1  — Show Edit controls (Admin only)
+───────────────────────────────────────────────── */
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('edit') === '1') {
+    document.getElementById('btn-edit').style.display = 'inline-block';
+  }
+})();
+
+/* ─────────────────────────────────────────────────
+   Machine Running Status — poll APIs every 60s
+   Sources: /fp/api/records  +  /expander/firstlot/api/records
+   Match: normalize mc name → compare with data-m
+───────────────────────────────────────────────── */
+/* Match by TYPE keyword + NUMBER
+   เช่น "EX20 — Expand no.20"  ===  "Expander No.20"  →  key = "ex:20"
+        "Finpress no.21"        ===  "Finpress No.21"  →  key = "fp:21"   */
+function extractKey(s) {
+  if (!s) return null;
+  const t = s.toLowerCase();
+  let type = '';
+  if      (/expan/.test(t) || /^ex\d/.test(t))              type = 'ex';
+  else if (/finpress|fin.press/.test(t))                    type = 'fp';
+  else if (/braz/.test(t))                                  type = 'ab';
+  else if (/oven/.test(t))                                  type = 'ov';
+  else if (/bender|hpb|^hb\d/.test(t))                      type = 'hp';  // added ^hb\d
+  else if (/hairpin.insert|hairpininsert|^hi\d/.test(t))    type = 'hi';  // added ^hi\d
+  else if (/h\/p.ins|insert/.test(t))                       type = 'ins';
+  else if (/cut|^ct\d/.test(t))                             type = 'ct';  // added ^ct\d
+  if (!type) return null;
+  const nums = t.match(/\d+/g);
+  if (!nums) return null;
+  const num = parseInt(nums[nums.length - 1], 10); // normalize leading zeros
+  return type + ':' + num;
+}
+
+/* Build map: key → [label elements] */
+const labelMap = {};
+document.querySelectorAll('.ml[data-m]').forEach(el => {
+  const key = extractKey(el.dataset.m);
+  if (key) { (labelMap[key] = labelMap[key] || []).push(el); }
+});
+
+/* ── Shift Schedule ──
+   Day:   07:40 - 19:39
+   Night: 19:40 - 07:39
+*/
+function getCurrentShift() {
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const timeInMin = h * 60 + m;
+
+  const DAY_START = 7 * 60 + 40;      // 07:40 = 460 min
+  const NIGHT_START = 19 * 60 + 40;   // 19:40 = 1180 min
+
+  return (timeInMin >= DAY_START && timeInMin < NIGHT_START) ? 'day' : 'night';
+}
+
+/* Start datetime of the CURRENT shift.
+   Day   → today 07:40
+   Night → today 19:40  (if now ≥ 19:40)  else  yesterday 19:40 */
+function getShiftStart() {
+  const now = new Date();
+  const timeInMin = now.getHours() * 60 + now.getMinutes();
+  const DAY_START = 7 * 60 + 40;
+  const NIGHT_START = 19 * 60 + 40;
+  const s = new Date(now);
+  if (timeInMin >= DAY_START && timeInMin < NIGHT_START) {
+    s.setHours(7, 40, 0, 0);                 // day shift
+  } else if (timeInMin >= NIGHT_START) {
+    s.setHours(19, 40, 0, 0);                // night, started today
+  } else {
+    s.setDate(s.getDate() - 1);              // night, started yesterday
+    s.setHours(19, 40, 0, 0);
+  }
+  return s;
+}
+
+/* Parse a record's date/time into a Date object.
+   Handles: ISO "2026-06-06T05:46:31", "2026-06-06"+time, "06/06/2026"+time
+   Auto-converts Thai Buddhist Era years (≥ 2500) → Gregorian (subtract 543). */
+function recordDateTime(dateVal, timeVal) {
+  if (!dateVal) return null;
+  dateVal = dateVal.toString();
+  if (dateVal.includes('T')) {               // full ISO timestamp
+    const dt = new Date(dateVal);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  let y, mo, d;
+  if (dateVal.includes('/')) {               // DD/MM/YYYY
+    const p = dateVal.split('/').map(Number);
+    d = p[0]; mo = p[1]; y = p[2];
+  } else if (dateVal.includes('-')) {        // YYYY-MM-DD
+    const p = dateVal.split('-').map(Number);
+    y = p[0]; mo = p[1]; d = p[2];
+  } else { return null; }
+  if (y >= 2500) y -= 543;                  // Thai Buddhist Era → Gregorian
+  let h = 0, mi = 0;
+  if (timeVal && timeVal.toString().includes(':')) {
+    const tp = timeVal.toString().split(':').map(Number);
+    h = tp[0]; mi = tp[1] || 0;
+  }
+  return new Date(y, mo - 1, d, h, mi, 0, 0);
+}
+
+let lastShift = getCurrentShift();
+
+const IDLE_TIMEOUT_MS = 90 * 60 * 1000;   // 1h30m — no new data ⇒ Light OFF
+
+async function fetchRunning() {
+  const now = Date.now();
+  const shiftStart = getShiftStart().getTime();
+
+  /* Combined cutoff: whichever is MORE recent wins.
+       • after a shift change → shiftStart dominates  (older-shift data ignored)
+       • mid-shift            → (now − 90m) dominates  (idle machines time out) */
+  const cutoff = Math.max(shiftStart, now - IDLE_TIMEOUT_MS);
+  const active = new Set();
+
+  /* Log shift transitions */
+  const currentShift = getCurrentShift();
+  if (currentShift !== lastShift) {
+    lastShift = currentShift;
+    console.log('[Shift Change] ' + currentShift.toUpperCase() +
+                ' shift @ ' + new Date().toLocaleTimeString() + ' — window reset');
+  }
+
+  /* field + date + time per API */
+  const sources = [
+    { url: '/fp/api/records',                field: 'mc',      dateField: 'date',     timeField: 'time' },
+    { url: '/expander/firstlot/api/records', field: 'machine', dateField: 'date',     timeField: 'time' },
+    { url: '/hp/api/records',                field: 'mc',      dateField: 'saved_at', timeField: null   },
+    { url: '/cutting/api/cutting-records',   field: 'mc_line', dateField: 'saved_at', timeField: null   },
+  ];
+
+  for (const { url, field, dateField, timeField } of sources) {
+    try {
+      const res  = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const rows = Array.isArray(data) ? data : (data.records || data.data || []);
+      rows.forEach(r => {
+        const mc = r[field] || '';
+        if (!mc) return;
+        const rdt = recordDateTime(r[dateField], timeField ? r[timeField] : null);
+        /* ON if a record is within current shift AND newer than the idle timeout */
+        if (rdt && rdt.getTime() >= cutoff) {
+          const key = extractKey(mc);
+          if (key) active.add(key);
+        }
+      });
+    } catch(e) { /* API ไม่ตอบ — ข้ามไป */ }
+  }
+
+  /* Reset & apply */
+  document.querySelectorAll('.ml-running').forEach(el => el.classList.remove('ml-running'));
+  active.forEach(key => {
+    (labelMap[key] || []).forEach(el => el.classList.add('ml-running'));
+  });
+}
+
+fetchRunning();
+setInterval(fetchRunning, 60000);
+
+/* ─────────────────────────────────────────────────
+   Live Clock
+───────────────────────────────────────────────── */
+function updateClock() {
+  const now  = new Date();
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dd   = String(now.getDate()).padStart(2,'0');
+  const mm   = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  const day  = days[now.getDay()];
+  const hh   = String(now.getHours()).padStart(2,'0');
+  const min  = String(now.getMinutes()).padStart(2,'0');
+  const ss   = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('title-year').textContent =
+    `${day} ${dd}/${mm}/${yyyy}  ${hh}:${min}:${ss}`;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+/* ─────────────────────────────────────────────────
+   Init
+───────────────────────────────────────────────── */
+window.addEventListener('load', async () => {
+  _updateLabelScale();          // set initial scale from rendered image
+  await loadPos();              // load shared positions from server
+  hint.style.display = 'inline';
+});
+</script>
+</body>
+</html>

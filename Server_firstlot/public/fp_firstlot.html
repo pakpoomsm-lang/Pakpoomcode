@@ -1,0 +1,1937 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FP First Lot Confirmation (HEI)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+body { background: #b8b8b8; font-size: 11px; min-width: 1130px; }
+.wrapper { padding: 3px; }
+
+/* ── Header ── */
+.header { display: flex; border: 2px solid #999; margin-bottom: 2px; }
+.header-title {
+  flex: 1; background: #000080; color: #FFD700;
+  font-size: 22px; font-weight: bold; font-style: italic;
+  text-align: center; padding: 8px; text-decoration: underline;
+}
+.header-sheetno {
+  width: 165px; background: #000080; color: white; font-style: italic;
+  font-size: 13px; text-align: center; padding: 6px;
+  border-left: 2px solid white;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.header-sheetno input {
+  background: white; border: 1px solid #aaa; width: 130px;
+  text-align: center; padding: 2px; font-size: 12px;
+}
+
+/* ── Steps bar ── */
+.steps-bar {
+  background: #00CED1; text-align: center; font-weight: bold;
+  padding: 3px; font-size: 12px; border: 1px solid #999; margin-bottom: 2px;
+}
+
+/* ── Tag scanning table ── */
+.tag-red {
+  display: block; background: #CC2200; color: white;
+  font-weight: bold; font-size: 10px; padding: 1px 4px; text-align: center;
+}
+.tag-gray {
+  display: block; background: #555; color: white;
+  font-size: 10px; padding: 1px 4px; text-align: center;
+}
+.ts-table { width:100%; border-collapse:collapse; background:#b8b8b8; }
+.ts-table th {
+  background:#cfcfcf; border:1px solid #888; padding:2px 5px;
+  font-size:11px; white-space:nowrap; text-align:center;
+}
+.ts-table td { border:1px solid #888; padding:3px; vertical-align:middle; }
+/* caliper display widget */
+.caliper-disp {
+  background:#111; border:2px solid #444; border-radius:3px;
+  padding:3px 7px; min-width:62px; flex-shrink:0;
+}
+.caliper-brand { font-size:7px; color:#777; text-align:center; margin-bottom:1px; letter-spacing:0.5px; }
+.caliper-num {
+  font-family:'Courier New',monospace; color:#00FF00; font-size:18px;
+  font-weight:bold; letter-spacing:3px; text-shadow:0 0 5px #00CC00;
+  text-align:right; line-height:1;
+}
+.caliper-btns { display:flex; justify-content:space-between; margin-top:3px; gap:2px; }
+.caliper-btn-g { background:#1a5c1a; color:white; font-size:6.5px; padding:1px 3px; border-radius:1px; white-space:nowrap; }
+.caliper-btn-b { background:#1a1a5c; color:white; font-size:6.5px; padding:1px 3px; border-radius:1px; white-space:nowrap; }
+
+/* ── Labels & Inputs ── */
+.lbl {
+  background: #6e6e6e; color: white; font-weight: bold;
+  padding: 1px 4px; white-space: nowrap; font-size: 11px;
+}
+.inp {
+  background: white; border: 1px solid #666;
+  height: 17px; padding: 0 3px; font-size: 11px; width: 100%;
+}
+.inp-cyan { background: #00FFFF !important; }
+.inp-gray { background: #d4d4d4 !important; }
+.inp-yellow { background: #FFFF00 !important; }
+
+/* ── Section header ── */
+.sec-red { background: #CC0000; color: #FFFF00; font-weight: bold; padding: 2px 5px; font-size: 11px; }
+.sec-blue-hdr {
+  background: #CC0000; color: #FFFF00; font-weight: bold;
+  text-align: center; padding: 2px; font-size: 11px;
+}
+
+/* ── Measurement table ── */
+.meas-tbl { width: 100%; border-collapse: collapse; margin-top: 3px; }
+.meas-tbl th {
+  background: #cfcfcf; border: 1px solid #aaa;
+  text-align: center; padding: 1px 2px; font-size: 10px;
+}
+.meas-tbl td { border: 1px solid #aaa; padding: 0; }
+.meas-tbl td.rlbl {
+  background: #cfcfcf; font-weight: bold; font-size: 10px;
+  padding: 2px 4px; white-space: nowrap;
+}
+.meas-tbl input {
+  border: none; width: 100%; height: 18px;
+  text-align: center; font-size: 11px; padding: 0 2px;
+  background: white;
+}
+
+/* ── Result box (black background) ── */
+.rbox {
+  background: #000; color: #00FF00; min-height: 22px; min-width: 60px;
+  text-align: center; font-weight: bold; font-size: 14px;
+  padding: 2px 4px; border: 1px solid #333;
+}
+.rbox.ng { color: #FF4444; }
+
+/* ── Avg/Result labels ── */
+.lbl-y { background: #444; color: #FFD700; font-weight: bold; font-size: 10px; padding: 1px 4px; }
+
+/* ── OK / NG buttons ── */
+.btn-ok {
+  background: #000080; color: white; font-size: 20px; font-weight: bold;
+  padding: 6px 22px; border: 2px solid #333; cursor: pointer; border-radius: 2px;
+}
+.btn-ng {
+  background: #CC0000; color: white; font-size: 20px; font-weight: bold;
+  padding: 6px 22px; border: 2px solid #333; cursor: pointer; border-radius: 2px;
+}
+.btn-ok:hover { background: #0000AA; }
+.btn-ng:hover { background: #EE0000; }
+.btn-ok.selected { background: #0000CC; box-shadow: 0 0 6px #88aaff; }
+.btn-ng.selected { background: #FF0000; box-shadow: 0 0 6px #ffaaaa; }
+
+/* ── NG image placeholder ── */
+.ng-img {
+  width: 46px; height: 38px; background: #3a3a3a; border: 1px solid #888;
+  display: flex; align-items: center; justify-content: center;
+  color: #aaa; font-size: 8px; text-align: center;
+}
+
+/* ── Drawing ── */
+.drawing-area {
+  background: #000; min-height: 130px; display: flex;
+  align-items: center; justify-content: center; color: #444;
+  font-size: 10px; border: 1px solid #555; font-style: italic;
+}
+
+/* ── Final Results bar ── */
+.final-bar {
+  background: #000080; color: #FFFF00; font-weight: bold;
+  font-size: 16px; text-align: center; padding: 5px; margin-top: 3px;
+}
+
+.box2 { border: 2px solid #888; background: #b8b8b8; padding: 3px; margin-bottom: 3px; }
+
+/* ── Image zoom (hover + lightbox) ── */
+.zoomable {
+  cursor: zoom-in;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border-radius: 2px;
+}
+.zoomable:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 10px rgba(0,0,0,0.6);
+  z-index: 10; position: relative;
+}
+#img-lightbox {
+  display: none; position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.88);
+  z-index: 9999; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+#img-lightbox.active { display: flex; }
+#img-lightbox img {
+  max-width: 92vw; max-height: 92vh;
+  border: 3px solid #fff; border-radius: 4px;
+  box-shadow: 0 0 40px rgba(255,255,255,0.3);
+}
+
+/* ── print button ── */
+.print-btn {
+  background: #006600; color: white; font-weight: bold; font-size: 13px;
+  padding: 5px 18px; border: 2px solid #333; cursor: pointer; border-radius: 3px;
+  margin-right: 6px;
+}
+.clear-btn {
+  background: #884400; color: white; font-weight: bold; font-size: 13px;
+  padding: 5px 18px; border: 2px solid #333; cursor: pointer; border-radius: 3px;
+}
+.print-btn:hover { background: #008800; }
+.clear-btn:hover { background: #AA6600; }
+.group-btn {
+  background: #005500; color: white; font-weight: bold; font-size: 13px;
+  padding: 5px 18px; border: 2px solid #333; cursor: pointer; border-radius: 3px;
+  margin-right: 6px;
+}
+.group-btn:hover { background: #007700; }
+.finish-btn {
+  background: #550055; color: white; font-weight: bold; font-size: 13px;
+  padding: 5px 18px; border: 2px solid #333; cursor: pointer; border-radius: 3px;
+  margin-right: 6px;
+}
+.finish-btn:hover { background: #880088; }
+.dash-btn {
+  background: #333300; color: #FFD700; font-weight: bold; font-size: 13px;
+  padding: 5px 18px; border: 2px solid #333; cursor: pointer; border-radius: 3px;
+  margin-right: 6px;
+}
+.dash-btn:hover { background: #555500; }
+.record-btn {
+  background: #003399; color: white; font-weight: bold; font-size: 13px;
+  padding: 5px 18px; border: 2px solid #333; cursor: pointer; border-radius: 3px;
+  margin-right: 6px;
+}
+.record-btn:hover { background: #0055CC; }
+/* toast notification */
+#toast {
+  display:none; position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+  padding:10px 28px; border-radius:6px; font-size:14px; font-weight:bold;
+  color:#fff; z-index:99999; box-shadow:0 4px 14px rgba(0,0,0,0.5);
+  min-width:280px; text-align:center; pointer-events:none;
+}
+@media print { .no-print { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<div class="header">
+  <div class="header-title">FP FIRST LOT CONFIRMATION (HEI)</div>
+  <div class="header-sheetno">
+    <span>Sheet No.</span>
+    <input type="text" id="sheetNo" value="CH-541-02-01  Rev.07" readonly>
+  </div>
+  <div style="display:flex;align-items:center;background:#000080;padding:0 10px;border-left:2px solid white;">
+    <button onclick="openSharedDashboard()" style="padding:6px 14px;font-size:13px;font-weight:700;color:#90caf9;background:rgba(21,101,192,.35);border:1px solid #1565c0;border-radius:7px;cursor:pointer;white-space:nowrap">📊 Dashboard</button>
+  </div>
+</div>
+
+<!-- STEPS BAR -->
+<div class="steps-bar">Please follow the steps from 1 to 2 , 2 to 3 and until the last one.</div>
+
+<!-- ═══════════════ SCAN STEPS 1–5 ═══════════════ -->
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:2px;margin-bottom:2px;">
+
+  <!-- 1. Scan Checker -->
+  <div style="border:1px solid #888;background:#b8b8b8;padding:2px;">
+    <span class="tag-red">1. Scan</span>
+    <span class="tag-gray">Checker</span>
+    <input type="text" class="inp" id="checker" style="margin-top:2px;"
+           oninput="showScanData('checker','disp_checker')" onchange="showScanData('checker','disp_checker')" placeholder="Scan / Type...">
+    <div style="background:#000;color:#00FF00;font-family:'Courier New',monospace;
+                font-size:13px;font-weight:bold;padding:3px 5px;margin-top:3px;
+                min-height:22px;border:1px solid #333;letter-spacing:1px;
+                text-overflow:ellipsis;overflow:hidden;white-space:nowrap;"
+         id="disp_checker">&nbsp;</div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><span style="color:#999;font-size:10px;font-weight:bold;white-space:nowrap;min-width:52px;text-transform:uppercase;">Checker:</span><input type="text" readonly id="name_checker" style="flex:1;background:#111;color:#aaa;border:1px solid #333;padding:3px 6px;font-size:12px;font-weight:bold;width:100%;box-sizing:border-box;outline:none;" placeholder="—"></div>
+  </div>
+
+    <!-- 2. Scan M/C No. -->
+  <div style="border:1px solid #888;background:#b8b8b8;padding:2px;">
+    <span class="tag-red">2. Scan</span>
+    <span class="tag-gray">M/C No.</span>
+    <input type="text" class="inp" id="mc_no" style="margin-top:2px;"
+           oninput="showScanData('mc_no','disp_mc')" onchange="showScanData('mc_no','disp_mc')" placeholder="Scan / Type...">
+    <div style="background:#000;color:#00FF00;font-family:'Courier New',monospace;
+                font-size:13px;font-weight:bold;padding:3px 5px;margin-top:3px;
+                min-height:22px;border:1px solid #333;letter-spacing:1px;
+                text-overflow:ellipsis;overflow:hidden;white-space:nowrap;"
+         id="disp_mc">&nbsp;</div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><span style="color:#999;font-size:10px;font-weight:bold;white-space:nowrap;min-width:52px;text-transform:uppercase;">Machine:</span><input type="text" readonly id="name_mc" style="flex:1;background:#111;color:#aaa;border:1px solid #333;padding:3px 6px;font-size:12px;font-weight:bold;width:100%;box-sizing:border-box;outline:none;" placeholder="—"></div>
+  </div>
+
+  <!-- 3. Scan Tag Feeder -->
+  <div style="border:1px solid #888;background:#b8b8b8;padding:2px;">
+    <span class="tag-red">3. Scan</span>
+    <span class="tag-gray">Tag Feeder</span>
+    <input type="text" class="inp" id="tag_feeder" style="margin-top:2px;"
+           oninput="showScanData('tag_feeder','disp_feeder')"
+           onchange="showScanData('tag_feeder','disp_feeder')"
+           onpaste="setTimeout(()=>showScanData('tag_feeder','disp_feeder'),10)"
+           placeholder="Scan / Type...">
+    <div style="background:#000;color:#00FFFF;font-family:'Courier New',monospace;
+                font-size:13px;font-weight:bold;padding:3px 5px;margin-top:3px;
+                min-height:22px;border:1px solid #333;letter-spacing:1px;
+                text-overflow:ellipsis;overflow:hidden;white-space:nowrap;"
+         id="disp_feeder">&nbsp;</div>
+    <button onclick="clearTagFeeder()" style="margin-top:3px;width:100%;background:#8B0000;color:#fff;border:none;padding:2px 0;font-size:10px;cursor:pointer;border-radius:2px;font-weight:bold;">✕ Clear</button>
+  </div>
+
+  <!-- 4. Scan Tag Vendor -->
+  <div style="border:1px solid #888;background:#b8b8b8;padding:2px;">
+    <span class="tag-red">4. Scan</span>
+    <span class="tag-gray">Tag Vendor</span>
+    <input type="text" class="inp" id="tag_vendor" style="margin-top:2px;" oninput="onTagVendorScan()" onchange="onTagVendorScan()">
+    <!-- Vendor detection display -->
+    <div id="disp_vendor"
+         style="background:#000;font-family:'Courier New',monospace;font-size:11px;
+                font-weight:bold;padding:2px 5px;margin-top:2px;min-height:17px;
+                border:1px solid #333;overflow:hidden;white-space:nowrap;color:#555;"></div>
+    <button onclick="clearTagVendor()" style="margin-top:3px;width:100%;background:#8B0000;color:#fff;border:none;padding:2px 0;font-size:10px;cursor:pointer;border-radius:2px;font-weight:bold;">✕ Clear</button>
+    <!-- UACJ only: Scan Item Raw Mat -->
+    <div id="uacj_item_wrap" style="display:none;margin-top:3px;border-top:1px solid #666;padding-top:3px;">
+      <span class="tag-red" style="font-size:9px;">UACJ</span>
+      <span class="tag-gray" style="font-size:9px;">Scan Item Raw Mat</span>
+      <input type="text" class="inp" id="scan_item_mat" style="margin-top:2px;width:100%;"
+             oninput="onItemMatScan()" onchange="onItemMatScan()"
+             placeholder="Scan Item Raw Mat...">
+      <!-- แสดงรหัสที่ตัด 5 ตัวหน้าออกแล้ว -->
+      <div id="disp_item_mat"
+           style="background:#000;font-family:'Courier New',monospace;font-size:11px;
+                  font-weight:bold;padding:2px 5px;margin-top:2px;min-height:17px;
+                  border:1px solid #333;overflow:hidden;white-space:nowrap;color:#555;"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ═══════════════ INFO SECTION ═══════════════ -->
+<div style="border:1px solid #aaa;padding:4px;background:#b8b8b8;margin-bottom:3px;">
+
+  <!-- Row 1: Date · Time · Line · Seq. · Lot -->
+  <div style="display:flex;gap:4px;margin-bottom:4px;">
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">DATE</div><input type="date" class="inp" id="rec_date" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">TIME</div><input type="time" class="inp" id="rec_time" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">LINE</div><input type="text" class="inp" id="line" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" placeholder="—"></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">SEQ.</div><input type="text" class="inp" id="seq" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" placeholder="—"></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">LOT</div><input type="text" class="inp" id="lot" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" placeholder="—"></div>
+  </div>
+
+  <!-- Row 2: Attribute · Holes · Fin Die · Prod. Month · Item · Desc. · Desc. -->
+  <div style="display:flex;gap:4px;margin-bottom:4px;">
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">ATTRIBUTE</div><input type="text" class="inp" id="attribute" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">HOLES</div><input type="text" class="inp" id="holes" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">FIN DIE</div><input type="text" class="inp" id="fin_die" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">PROD. MONTH</div><input type="text" class="inp" id="prod_month" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">ITEM</div><input type="text" class="inp" id="item" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" oninput="lookupFromItem(this.value.trim())"></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:2;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">DESC.</div><input type="text" class="inp" id="desc1" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;"></div>
+  </div>
+
+  <!-- Row 3: Model · MAT. Type · MAT. Size · Oil Type · AL Item -->
+  <div style="display:flex;gap:4px;">
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">MODEL</div><input type="text" class="inp" id="model" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#ffffff;padding:5px 8px;border:2px solid #bbb;border-radius:3px;flex:1;min-width:0;"><div style="color:#555;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">MAT. TYPE</div><input type="text" class="inp" id="mat_type" style="background:transparent;color:#000000;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">MAT. SIZE</div><input type="text" class="inp" id="mat_size" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+    <div id="oil_type_card" style="background:#ffffff;padding:5px 8px;border:2px solid #bbb;border-radius:3px;flex:1;min-width:0;"><div style="color:#555;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">OIL TYPE</div><select class="inp" id="oil_type" style="background:#e8e8e8;color:#000000;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" onchange="_checkOilTypeAndLock()"><option value=""></option><option>AF3G</option><option>K18C</option></select></div>
+    <div style="background:#2b2b2b;padding:5px 8px;border:1px solid #555;border-radius:3px;flex:1;min-width:0;"><div style="color:#aaa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-bottom:1px;">AL ITEM</div><input type="text" class="inp" id="al_item" style="background:transparent;color:#ffffff;border:none;outline:none;font-size:14px;font-weight:bold;width:100%;padding:0;font-family:inherit;" ></div>
+  </div>
+  <!-- Status bar: shows spec/AL lookup progress + retry button -->
+  <div style="display:flex;align-items:center;gap:6px;padding:2px 6px;
+              background:#111;border:1px solid #333;border-radius:3px;margin-top:2px;">
+    <span id="spec_status"
+          style="flex:1;font-size:11px;font-family:'Courier New',monospace;color:#888;">
+    </span>
+    <button onclick="lookupFromItem(document.getElementById('item').value.trim())"
+            title="Re-run spec and AL ITEM lookup with current ITEM value"
+            style="background:#2b2b2b;color:#aaa;border:1px solid #555;border-radius:3px;
+                   padding:2px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">
+      &#8635; Retry Lookup
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN BODY ═══════════════ -->
+<div id="body_lock_wrap" style="position:relative;">
+<!-- Lock Overlay — แสดงเมื่อ Mat Type ยังไม่ผ่านการตรวจสอบ -->
+<div id="body_lock_overlay"
+     style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.72);
+            z-index:50;border-radius:4px;cursor:not-allowed;
+            align-items:center;justify-content:center;">
+  <div style="color:#FFAAAA;font-size:16px;font-weight:bold;text-align:center;
+              padding:16px 28px;background:rgba(30,0,0,0.92);
+              border:2px solid #FF4444;border-radius:10px;line-height:1.8;">
+    🔒 กรุณาสแกน Tag Vendor ให้ถูกต้องก่อน<br>
+    <span style="font-size:12px;color:#FF8888;font-weight:normal;">Mat Type ยังไม่ผ่านการตรวจสอบ</span>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:700px 800px;gap:3px;">
+
+  <!-- ══════ LEFT COLUMN : Measurement Sections ══════ -->
+  <div>
+
+    <!-- ── Oil Type Lock Wrap (Sections 6–9, LEFT column) ── -->
+    <div id="oil_lock_wrap_left" style="position:relative;">
+    <div id="oil_lock_overlay_left"
+         style="display:flex;position:absolute;inset:0;background:rgba(0,0,0,0.75);
+                z-index:40;border-radius:4px;cursor:not-allowed;
+                align-items:center;justify-content:center;">
+      <div style="color:#FFE082;font-size:16px;font-weight:bold;text-align:center;
+                  padding:16px 28px;background:rgba(40,25,0,0.95);
+                  border:2px solid #FF9800;border-radius:10px;line-height:1.8;">
+        🔒 กรุณาตรวจสอบ Mat Type และเลือก Oil Type ก่อน<br>
+        <span style="font-size:12px;color:#FFCC80;font-weight:normal;">ต้องผ่านทั้ง Mat Type และ Oil Type ก่อนดำเนินการต่อ</span>
+      </div>
+    </div>
+
+    <!-- ── Section 6: FIN Pitch ── -->
+    <div class="box2">
+      <div class="sec-red">6. Enter Measurement Values from Vernier</div>
+      <div style="display:flex;gap:5px;margin-top:4px;">
+
+        <!-- Reference Image: Fin Pitch (actual photo) -->
+        <div style="flex-shrink:0;text-align:center;">
+          <div style="font-size:10px;font-weight:bold;margin-bottom:3px;color:#222;">Fin Pitch (mm)</div>
+          <img src="/fp/img/fin_pitch_ref.png"
+               style="display:block;height:110px;width:auto;border:2px solid #888;border-radius:2px;object-fit:cover;">
+        </div>
+
+        <!-- Table -->
+        <div style="flex:1;">
+          <table class="meas-tbl">
+            <tr>
+              <th style="width:115px;"></th>
+              <th>Point1</th><th>Point2</th><th>Point3</th><th>Point4</th>
+            </tr>
+            <tr>
+              <td class="rlbl">FIN Pitch Actual</td>
+              <td><input type="number" id="pa1" step="0.001" oninput="calcPitch()" onblur="_checkPitchFieldNG(1)" onkeydown="_pitchKeydown(event,1)" placeholder="0.000"></td>
+              <td><input type="number" id="pa2" step="0.001" oninput="calcPitch()" onblur="_checkPitchFieldNG(2)" onkeydown="_pitchKeydown(event,2)" placeholder="0.000"></td>
+              <td><input type="number" id="pa3" step="0.001" oninput="calcPitch()" onblur="_checkPitchFieldNG(3)" onkeydown="_pitchKeydown(event,3)" placeholder="0.000"></td>
+              <td><input type="number" id="pa4" step="0.001" oninput="calcPitch()" onblur="_checkPitchFieldNG(4)" onkeydown="_pitchKeydown(event,4)" placeholder="0.000"></td>
+            </tr>
+            <tr>
+              <td class="rlbl">FIN Pitch Calculate</td>
+              <td><input type="number" id="pc1" class="inp-cyan" readonly></td>
+              <td><input type="number" id="pc2" class="inp-cyan" readonly></td>
+              <td><input type="number" id="pc3" class="inp-cyan" readonly></td>
+              <td><input type="number" id="pc4" class="inp-cyan" readonly></td>
+            </tr>
+          </table>
+
+          <div id="spec7_label" style="font-size:10px;font-weight:bold;margin-top:3px;color:#222;">
+            SPEC : — (— , —) mm
+          </div>
+
+          <!-- MIN / SPEC / MAX + Avg + Result -->
+          <div style="display:grid;grid-template-columns:48px 80px 12px auto 1fr;
+                      gap:2px;margin-top:3px;align-items:center;">
+            <span class="lbl" style="font-size:10px;">MIN</span>
+            <input id="p7min" type="number" class="inp inp-gray" readonly>
+            <span></span>
+            <span class="lbl-y" style="font-size:10px;">Avg.</span>
+            <input id="p7avg" type="number" class="inp inp-gray" readonly>
+          </div>
+          <div style="display:grid;grid-template-columns:48px 80px 12px auto 1fr;
+                      gap:2px;margin-top:1px;align-items:center;">
+            <span class="lbl" style="font-size:10px;">SPEC.</span>
+            <input id="p7spec" type="number" class="inp inp-gray" readonly>
+            <span></span>
+            <span class="lbl-y" style="font-size:10px;">Result</span>
+            <div class="rbox" id="p7result" style="font-size:13px;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:48px 80px;gap:2px;margin-top:1px;align-items:center;">
+            <span class="lbl" style="font-size:10px;">MAX</span>
+            <input id="p7max" type="number" class="inp inp-gray" readonly>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 7: FIN Flare ── -->
+    <div class="box2">
+      <div class="sec-red">7. Enter Measurement Values from Vernier</div>
+      <div style="display:flex;gap:5px;margin-top:4px;">
+
+        <!-- Reference Image: Fin Flare (actual photo) -->
+        <div style="flex-shrink:0;text-align:center;">
+          <div style="font-size:10px;font-weight:bold;margin-bottom:3px;color:#222;">Fin Flare (mm)</div>
+          <img src="/fp/img/fin_flare_ref.png"
+               style="display:block;height:110px;width:auto;border:2px solid #888;border-radius:2px;object-fit:cover;">
+        </div>
+
+        <!-- Table -->
+        <div style="flex:1;">
+          <table class="meas-tbl">
+            <tr>
+              <th style="width:115px;"></th>
+              <th>Point1</th><th>Point2</th><th>Point3</th><th>Point4</th>
+            </tr>
+            <tr>
+              <td class="rlbl">FIN Flare Actual</td>
+              <td><input type="number" id="fa1" step="0.001" oninput="calcFlare()" placeholder="0.000"></td>
+              <td><input type="number" id="fa2" step="0.001" oninput="calcFlare()" placeholder="0.000"></td>
+              <td><input type="number" id="fa3" step="0.001" oninput="calcFlare()" placeholder="0.000"></td>
+              <td><input type="number" id="fa4" step="0.001" oninput="calcFlare()" placeholder="0.000"></td>
+            </tr>
+          </table>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:5px;">
+            <span class="lbl-y">Avg.</span>
+            <input id="f8avg" type="number" class="inp inp-gray" readonly style="width:80px;">
+            <span class="lbl-y" style="margin-left:10px;">Result</span>
+            <div class="rbox" id="f8result" style="flex:1;font-size:13px;"></div>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:6px;font-size:8.5px;line-height:1.7;color:#333;">
+            <div>
+              <strong>SPEC PIPE 7 :</strong><br>
+              D1 = 8.00–9.00 mm ⇒ Normal<br>
+              D1 &gt; 9.00 mm ⇒ Abnormal
+            </div>
+            <div>
+              <strong>SPEC PIPE 5 :</strong><br>
+              D1 = 5.80–6.80 mm ⇒ Normal<br>
+              D1 &gt; 6.80 mm ⇒ Abnormal
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 8: Q'ty Fin ── -->
+    <div class="box2">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <span class="sec-red" style="white-space:nowrap;">8. Enter numbers</span>
+        <span style="font-weight:bold;">Q'ty Fin</span>
+        <input type="number" id="qty_fin" class="inp" style="width:100px;" oninput="calcQty()">
+        <span style="font-weight:bold;margin-left:8px;">Q'ty Fin calculate</span>
+        <input type="number" id="qty_calc" class="inp inp-cyan" readonly style="width:90px;">
+        <span class="lbl-y">Result</span>
+        <div class="rbox" id="q9result" style="min-width:60px;font-size:13px;"></div>
+      </div>
+      <div id="q9spec_label" style="font-size:10px;color:#FF6600;margin-top:4px;font-weight:bold;">
+        SPEC : — (-5 , +5) pcs.
+      </div>
+      <div style="font-size:9px;color:#555;margin-top:1px;">SC , MI , JP : N (-5 , +5) /Unit</div>
+      <div style="display:flex;gap:4px;align-items:center;margin-top:3px;">
+        <span class="lbl" style="font-size:10px;">MIN</span>
+        <input id="q9min"  type="number" class="inp inp-gray" readonly style="width:80px;">
+        <span class="lbl" style="font-size:10px;margin-left:6px;">SPEC.</span>
+        <input id="q9spec" type="number" class="inp inp-gray" readonly style="width:80px;">
+        <span class="lbl" style="font-size:10px;margin-left:6px;">MAX</span>
+        <input id="q9max"  type="number" class="inp inp-gray" readonly style="width:80px;">
+      </div>
+    </div>
+
+    <!-- ── Section 9: Appearance Check Coil ── -->
+    <div class="box2">
+      <div class="sec-blue-hdr">9. Click select "OK" or "NG"</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+        <!-- OK/NG buttons + result -->
+        <div style="flex-shrink:0;">
+          <div style="font-weight:bold;font-size:14px;text-align:center;padding:3px;">Appearance Check Coil</div>
+          <div style="text-align:center;font-size:10px;color:#333;margin-bottom:6px;">Click select</div>
+          <div style="display:flex;justify-content:center;gap:10px;">
+            <button class="btn-ok" id="coil_ok" onclick="setAppear('coil','OK')">OK</button>
+            <button class="btn-ng" id="coil_ng" onclick="setAppear('coil','NG')">NG</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:center;">
+            <span class="lbl-y">Result</span>
+            <div class="rbox" id="coil-result" style="min-width:80px;font-size:18px;font-weight:bold;"></div>
+          </div>
+        </div>
+        <!-- Reference image (คลิกเพื่อขยาย) -->
+        <img src="/fp/img/coil_ref.png" class="zoomable"
+             onclick="zoomImg('/fp/img/coil_ref.png')"
+             style="height:160px;width:auto;border:2px solid #888;object-fit:cover;flex-shrink:0;"
+             title="คลิกเพื่อขยายรูป">
+      </div>
+    </div>
+
+    </div><!-- end oil_lock_wrap_left -->
+
+  </div><!-- end LEFT -->
+
+  <!-- ══════ RIGHT COLUMN : Appearance 10,11 + Final / Scan ══════ -->
+  <div>
+
+    <!-- ── Oil Type Lock Wrap (Sections 10–11, RIGHT column) ── -->
+    <div id="oil_lock_wrap_right" style="position:relative;">
+    <div id="oil_lock_overlay_right"
+         style="display:flex;position:absolute;inset:0;background:rgba(0,0,0,0.75);
+                z-index:40;border-radius:4px;cursor:not-allowed;
+                align-items:center;justify-content:center;">
+      <div style="color:#FFE082;font-size:16px;font-weight:bold;text-align:center;
+                  padding:16px 28px;background:rgba(40,25,0,0.95);
+                  border:2px solid #FF9800;border-radius:10px;line-height:1.8;">
+        🔒 กรุณาตรวจสอบ Mat Type และเลือก Oil Type ก่อน<br>
+        <span style="font-size:12px;color:#FFCC80;font-weight:normal;">ต้องผ่านทั้ง Mat Type และ Oil Type ก่อนดำเนินการต่อ</span>
+      </div>
+    </div>
+
+    <!-- ── Section 10: Appearance Check Flare ── -->
+    <div class="box2">
+      <div class="sec-blue-hdr">10. Click select "OK" or "NG"</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+        <div style="flex-shrink:0;">
+          <div style="font-weight:bold;font-size:14px;text-align:center;padding:3px;">Appearance Check Flare</div>
+          <div style="text-align:center;font-size:10px;color:#333;margin-bottom:6px;">Click select</div>
+          <div style="display:flex;justify-content:center;gap:10px;">
+            <button class="btn-ok" id="flare_ok" onclick="setAppear('flare','OK')">OK</button>
+            <button class="btn-ng" id="flare_ng" onclick="setAppear('flare','NG')">NG</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:center;">
+            <span class="lbl-y">Result</span>
+            <div class="rbox" id="flare-result" style="min-width:80px;font-size:18px;font-weight:bold;"></div>
+          </div>
+        </div>
+        <img src="/fp/img/flare_appear_ref.png" class="zoomable"
+             onclick="zoomImg('/fp/img/flare_appear_ref.png')"
+             style="height:160px;width:auto;border:2px solid #888;border-radius:2px;object-fit:cover;flex-shrink:0;"
+             title="คลิกเพื่อขยายรูป">
+      </div>
+    </div>
+
+    <!-- ── Section 11: Appearance Check Slit ── -->
+    <div class="box2">
+      <div class="sec-blue-hdr">11. Click select "OK" or "NG"</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+        <div style="flex-shrink:0;">
+          <div style="font-weight:bold;font-size:14px;text-align:center;padding:3px;">Appearance Check Slit</div>
+          <div style="background:#FFFF00;color:#CC0000;font-weight:bold;text-align:center;
+                      padding:2px;font-size:11px;margin-bottom:4px;">
+            Slit ต้องไม่ขาดและไม่เป็นครีบ
+          </div>
+          <div style="text-align:center;font-size:10px;color:#333;margin-bottom:6px;">Click select</div>
+          <div style="display:flex;justify-content:center;gap:10px;">
+            <button class="btn-ok" id="slit_ok" onclick="setAppear('slit','OK')">OK</button>
+            <button class="btn-ng" id="slit_ng" onclick="setAppear('slit','NG')">NG</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;justify-content:center;">
+            <span class="lbl-y">Result</span>
+            <div class="rbox" id="slit-result" style="min-width:80px;font-size:18px;font-weight:bold;"></div>
+          </div>
+        </div>
+        <img src="/fp/img/slit_ref.png" class="zoomable"
+             onclick="zoomImg('/fp/img/slit_ref.png')"
+             style="height:160px;width:auto;border:2px solid #888;border-radius:2px;object-fit:cover;flex-shrink:0;"
+             title="คลิกเพื่อขยายรูป">
+      </div>
+    </div>
+
+    <!-- Final Results -->
+    <div class="final-bar">Final Results</div>
+    <div style="border:2px solid #888;background:#000;margin-top:3px;padding:5px;text-align:center;">
+      <div id="finalResult" style="font-size:28px;font-weight:bold;color:#00FF00;min-height:40px;
+                                   letter-spacing:4px;">
+      </div>
+    </div>
+
+    <!-- 12. Leader Confirm Scan -->
+    <div class="box2" style="margin-top:3px;">
+      <div class="sec-blue-hdr">12. Leader Confirm Scan</div>
+      <input type="text" class="inp" id="scan13" style="margin-top:2px;width:100%;" placeholder="Scan final..."
+             oninput="showScanData('scan13','disp_scan13')"
+             onchange="showScanData('scan13','disp_scan13')"
+             onpaste="setTimeout(()=>showScanData('scan13','disp_scan13'),10)">
+      <div style="background:#000;color:#00FF00;font-family:'Courier New',monospace;
+                  font-size:13px;font-weight:bold;padding:3px 5px;margin-top:3px;
+                  min-height:22px;border:1px solid #333;letter-spacing:1px;
+                  text-overflow:ellipsis;overflow:hidden;white-space:nowrap;"
+           id="disp_scan13">&nbsp;</div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><span style="color:#999;font-size:10px;font-weight:bold;white-space:nowrap;min-width:52px;text-transform:uppercase;">Confirmer:</span><input type="text" readonly id="name_confirm" style="flex:1;background:#111;color:#aaa;border:1px solid #333;padding:3px 6px;font-size:12px;font-weight:bold;width:100%;box-sizing:border-box;outline:none;" placeholder="—"></div>
+    </div>
+
+    </div><!-- end oil_lock_wrap_right -->
+
+    <!-- Buttons — outside lock wrap so always accessible -->
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:6px;" class="no-print">
+      <button class="group-btn"  onclick="recordGroupLot()">&#128230; Group Lot</button>
+      <button class="finish-btn" onclick="recordFinishType()">&#10003; Finish Type</button>
+      <button class="clear-btn"  onclick="clearAll()">&#10006; Clear All</button>
+    </div>
+
+  </div><!-- end MIDDLE -->
+
+
+</div><!-- end MAIN BODY grid -->
+</div><!-- end body_lock_wrap -->
+</div><!-- end wrapper -->
+
+<!-- ── Lightbox overlay ── -->
+<div id="img-lightbox" onclick="closeLightbox()">
+  <img id="lb-img" src="" alt="zoom">
+</div>
+
+<!-- ── Die Pipe Error Modal ── -->
+<div id="diePipeErrorOverlay"
+     style="display:none;position:fixed;inset:0;z-index:9000;
+            background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
+  <div style="background:#1a0505;border:2px solid #da3633;border-radius:16px;
+              padding:36px 40px;max-width:480px;width:92%;text-align:center;
+              box-shadow:0 8px 48px rgba(218,54,51,0.45);position:relative;">
+    <!-- ไอคอนเตือน -->
+    <div style="font-size:64px;line-height:1;margin-bottom:16px;">⛔</div>
+    <!-- หัวข้อ -->
+    <div style="font-size:20px;font-weight:800;color:#ef9a9a;margin-bottom:8px;letter-spacing:.5px;">
+      Dia Pipe ไม่ตรงกับเครื่องจักร
+    </div>
+    <!-- รายละเอียด -->
+    <div id="diePipeErrorDetail"
+         style="font-size:14px;color:#ffcdd2;margin-bottom:6px;line-height:1.7;
+                background:rgba(218,54,51,0.15);border-radius:8px;padding:12px 16px;">
+    </div>
+    <!-- ข้อความแนะนำ -->
+    <div style="font-size:13px;color:#ff8a80;margin-bottom:24px;font-weight:600;">
+      กรุณาตรวจสอบเครื่องจักรหรือ Tag Feeder อีกครั้ง
+    </div>
+    <!-- ปุ่มปิด -->
+    <button onclick="closeDiePipeErrorModal()"
+            style="background:#da3633;color:#fff;border:none;border-radius:8px;
+                   padding:12px 40px;font-size:15px;font-weight:700;cursor:pointer;
+                   letter-spacing:.5px;transition:background .15s;"
+            onmouseover="this.style.background='#ff5252'"
+            onmouseout="this.style.background='#da3633'">
+      ✓ รับทราบ
+    </button>
+  </div>
+</div>
+
+<!-- ── Fin Pitch NG Modal ── -->
+<div id="finPitchNGOverlay"
+     style="display:none;position:fixed;inset:0;z-index:9000;
+            background:rgba(0,0,0,0.82);align-items:center;justify-content:center;">
+  <div style="background:#1a1200;border:2px solid #f97316;border-radius:16px;
+              padding:36px 40px;max-width:480px;width:92%;text-align:center;
+              box-shadow:0 8px 48px rgba(249,115,22,0.45);">
+    <div style="font-size:64px;line-height:1;margin-bottom:16px;">⚠️</div>
+    <div style="font-size:20px;font-weight:800;color:#fdba74;margin-bottom:8px;letter-spacing:.5px;">
+      Fin Pitch ไม่อยู่ใน SPEC
+    </div>
+    <div id="finPitchNGDetail"
+         style="font-size:14px;color:#fed7aa;margin-bottom:6px;line-height:1.7;
+                background:rgba(249,115,22,0.15);border-radius:8px;padding:12px 16px;">
+    </div>
+    <div style="font-size:13px;color:#fb923c;margin-bottom:24px;font-weight:600;">
+      ทำการตรวจสอบ Fin Pitch ใหม่อีกครั้ง
+    </div>
+    <button onclick="closeFinPitchNGModal()"
+            style="background:#f97316;color:#fff;border:none;border-radius:8px;
+                   padding:12px 40px;font-size:15px;font-weight:700;cursor:pointer;
+                   letter-spacing:.5px;transition:background .15s;"
+            onmouseover="this.style.background='#fb923c'"
+            onmouseout="this.style.background='#f97316'">
+      🔍 ตรวจสอบใหม่
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════ JAVASCRIPT ═══════════════ -->
+<script>
+// ── Pitch Spec ────────────────────────────────────────────────
+let PITCH_NOMINAL = 1.85;   // dynamic — updated by fillSpecSection7()
+let PITCH_LO      = -0.00;  // diff(-) from nominal
+let PITCH_HI      =  0.03;  // diff(+) from nominal
+
+let _pitchNGField = null;   // field id ที่ต้อง focus กลับหลังปิด modal
+
+function calcPitch() {
+  const mc        = _getCurrentMC();
+  const useOffset = MC_PITCH_OFFSET.includes(mc);
+  const OFFSET    = 0.25;   // calculate = actual − 0.25
+
+  const raw  = [1,2,3,4].map(i => parseFloat(document.getElementById('pa'+i).value));
+  const vals = raw.filter(v => !isNaN(v));
+
+  // Fill calculate row: offset machines → actual − 0.25, others → actual
+  [1,2,3,4].forEach(i => {
+    const v = raw[i-1];
+    document.getElementById('pc'+i).value =
+      isNaN(v) ? '' : (useOffset ? (v - OFFSET) : v).toFixed(3);
+  });
+
+  if (vals.length === 0) {
+    ['p7avg','p7spec'].forEach(id => document.getElementById(id).value = '');
+    setRbox('p7result', '');
+    updateFinal();
+    return;
+  }
+
+  // Avg + OK/NG ใช้ค่า Calculate (หลัง offset ถ้ามี)
+  const calcVals = useOffset ? vals.map(v => v - OFFSET) : vals;
+  const avg  = calcVals.reduce((a,b)=>a+b,0) / calcVals.length;
+  const spec = PITCH_NOMINAL;
+  const specMin = spec + PITCH_LO;
+  const specMax = spec + PITCH_HI;
+
+  document.getElementById('p7avg').value  = avg.toFixed(3);
+  document.getElementById('p7spec').value = spec.toFixed(3);
+
+  const ok = calcVals.every(v => v >= specMin && v <= specMax);
+  setRbox('p7result', ok ? 'OK' : 'NG');
+  updateFinal();
+}
+
+// ── ตรวจสอบ Fin Pitch Calculate เมื่อออกจากช่อง (onblur) ──────────
+function _checkPitchFieldNG(idx) {
+  const pcVal = parseFloat((document.getElementById('pc' + idx) || {}).value);
+  if (isNaN(pcVal)) return;   // ยังไม่มีค่า calculate
+
+  const spec    = PITCH_NOMINAL;
+  const specMin = spec + PITCH_LO;
+  const specMax = spec + PITCH_HI;
+
+  if (!(pcVal >= specMin && pcVal <= specMax)) {
+    _pitchNGField = 'pa' + idx;   // เก็บ field ที่จะ focus กลับ
+    showFinPitchNGModal(
+      ['Point ' + idx + ' = ' + pcVal.toFixed(3)],
+      specMin, specMax
+    );
+  }
+}
+
+// ── Enter key ย้ายไปช่อง pa ถัดไป ────────────────────────────────
+function _pitchKeydown(e, idx) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const nextEl = document.getElementById('pa' + (idx + 1));
+  if (nextEl) { nextEl.focus(); nextEl.select(); }
+}
+
+// ── Flare Spec ────────────────────────────────────────────────
+// Flare spec — dynamic ตาม fin_die (5 = PIPE5, 7 = PIPE7)
+let FLARE_LO = 8.00, FLARE_HI = 9.00;
+
+function updateFlareSpec() {
+  const dieEl = document.getElementById('fin_die');
+  const die   = dieEl ? parseInt(dieEl.value) || 0 : 0;
+  if (die === 5) {
+    FLARE_LO = 5.80; FLARE_HI = 6.80;
+  } else {
+    // default = PIPE 7
+    FLARE_LO = 8.00; FLARE_HI = 9.00;
+  }
+  // อัปเดต label ที่แสดง spec ที่ใช้งาน
+  const lbl = document.getElementById('flare_spec_active');
+  if (lbl) {
+    if (die === 5) {
+      lbl.textContent = 'SPEC (PIPE 5) : D1 = 5.80 – 6.80 mm';
+    } else {
+      lbl.textContent = 'SPEC (PIPE 7) : D1 = 8.00 – 9.00 mm';
+    }
+  }
+}
+
+function calcFlare() {
+  const raw  = [1,2,3,4].map(i => parseFloat(document.getElementById('fa'+i).value));
+  const vals = raw.filter(v => !isNaN(v));
+
+  if (vals.length === 0) {
+    document.getElementById('f8avg').value = '';
+    setRbox('f8result', '');
+    updateFinal();
+    return;
+  }
+
+  const avg = vals.reduce((a,b)=>a+b,0) / vals.length;
+  document.getElementById('f8avg').value = avg.toFixed(3);
+
+  updateFlareSpec();  // sync spec limits กับ fin_die ปัจจุบัน
+  const ok = vals.every(v => v >= FLARE_LO && v <= FLARE_HI);
+  setRbox('f8result', ok ? 'OK' : 'NG');
+  updateFinal();
+}
+
+// ── Q'ty Fin ──────────────────────────────────────────────────
+const QTY_TOL = 5;
+let _pendingQFin = '';   // col N = Q'ty Fin spec nominal จาก speclist
+
+function fillQtySection9() {
+  const spec = parseFloat(_pendingQFin) || 0;
+  if (!spec) return;
+  const minVal = spec - QTY_TOL;
+  const maxVal = spec + QTY_TOL;
+  const minEl  = document.getElementById('q9min');
+  const specEl = document.getElementById('q9spec');
+  const maxEl  = document.getElementById('q9max');
+  const lbl    = document.getElementById('q9spec_label');
+  if (minEl)  minEl.value  = minVal.toFixed(0);
+  if (specEl) specEl.value = spec.toFixed(0);
+  if (maxEl)  maxEl.value  = maxVal.toFixed(0);
+  if (lbl)    lbl.textContent = 'SPEC : ' + spec.toFixed(0) + ' (-5 , +5) pcs.';
+  // refresh result ถ้ามีค่าที่วัดอยู่แล้ว
+  calcQty();
+}
+
+function calcQty() {
+  const qty  = parseFloat(document.getElementById('qty_fin').value);
+  const spec = parseFloat(_pendingQFin) || 0;
+  if (isNaN(qty)) {
+    document.getElementById('qty_calc').value = '';
+    setRbox('q9result', '');
+    updateFinal();
+    return;
+  }
+  document.getElementById('qty_calc').value = qty.toFixed(0);
+  if (!spec) {
+    // ยังไม่มีข้อมูล spec จาก DB — แสดงค่าแต่ยังไม่ตัดสิน
+    setRbox('q9result', '');
+    updateFinal();
+    return;
+  }
+  const minVal = spec - QTY_TOL;
+  const maxVal = spec + QTY_TOL;
+  const ok = qty >= minVal && qty <= maxVal;
+  setRbox('q9result', ok ? 'OK' : 'NG');
+  updateFinal();
+}
+
+// ── Appearance (OK / NG) ──────────────────────────────────────
+const appear = { coil: null, flare: null, slit: null };
+
+function setAppear(key, val) {
+  appear[key] = val;
+  setRbox(key+'-result', val);
+
+  // highlight buttons
+  document.getElementById(key+'_ok').classList.toggle('selected', val==='OK');
+  document.getElementById(key+'_ng').classList.toggle('selected', val==='NG');
+
+  updateFinal();
+}
+
+// ── Final Result ──────────────────────────────────────────────
+function updateFinal() {
+  const checks = [
+    document.getElementById('p7result').textContent.trim(),
+    document.getElementById('f8result').textContent.trim(),
+    document.getElementById('q9result').textContent.trim(),
+    appear.coil, appear.flare, appear.slit
+  ].filter(v => v);
+
+  const el = document.getElementById('finalResult');
+  if (checks.length === 0) { el.textContent = ''; el.style.color = '#00FF00'; return; }
+
+  const hasNG = checks.some(v => v === 'NG');
+  el.textContent  = hasNG ? 'NG' : 'OK';
+  el.style.color  = hasNG ? '#FF4444' : '#00FF00';
+}
+
+// ── Scan display (Topics 1, 2, 3, 13) ─────────────────────
+const API = '/fp';
+const SCAN_CFG = {
+  mc_no:      { endpoint: 'machine', color: '#00FF00', tail: 4, nameId: 'name_mc'      },  // last 4 chars  e.g. I542GFP14 → FP14
+  checker:    { endpoint: 'checker', color: '#00FF00', tail: 5, nameId: 'name_checker' },  // last 5 chars  e.g. I542G23031 → 23031
+  tag_feeder: { endpoint: null,      color: '#00FFFF', parse: parseTagFeeder           },
+  scan13:     { endpoint: 'confirm', color: '#00FF00', tail: 5,  nameId: 'name_confirm' },
+};
+
+function setNameField(id, text, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = text;
+  el.style.color  = color || '#aaa';
+  el.style.borderColor = color === '#FF4444' ? '#660000' : color ? '#005500' : '#333';
+}
+
+function parseTagFeeder(raw) {
+  if (raw.length < 215) return null;
+  return {
+    line:       raw.substring(115, 117).trim(),   // Excel: =TRIM(MID(C16,116,2))
+    prod_month: raw.substring(9,11) + '/' + raw.substring(5,9),
+    seq:        String(parseInt(raw.substring(117,121), 10)),
+    lot:        String(parseInt(raw.substring(166,172), 10)),
+    attribute:  raw.substring(181,196).trim(),
+    item:       raw.substring(63,76).trim(),    // Item FG — wider to catch full 11-char code
+    desc1:      raw.substring(78,99).trim(),    // Description
+    model:      raw.substring(136,151).trim(),  // Model number
+  };
+}
+
+// ── Lock Steps 6–11: Unlock ONLY IF Mat_type OK AND Oil_type selected ──────────
+function _setOilLock(locked, reason) {
+  // reason: 'mat' | 'oil' | 'both' | ''
+  const matMsg  = '🔒 กรุณาตรวจสอบ Mat Type ก่อน\n<span style="font-size:12px;color:#FFCC80;font-weight:normal;">สแกน Tag Vendor ให้ถูกต้องก่อนดำเนินการต่อ</span>';
+  const oilMsg  = '🔒 กรุณาเลือก Oil Type ก่อน\n<span style="font-size:12px;color:#FFCC80;font-weight:normal;">ระบุ Oil Type (Step 5) ให้ครบก่อนดำเนินการต่อ</span>';
+  const bothMsg = '🔒 กรุณาตรวจสอบ Mat Type และเลือก Oil Type ก่อน\n<span style="font-size:12px;color:#FFCC80;font-weight:normal;">ต้องผ่านทั้ง Mat Type และ Oil Type ก่อนดำเนินการต่อ</span>';
+  const msg = reason === 'both' ? bothMsg : reason === 'mat' ? matMsg : oilMsg;
+
+  ['oil_lock_overlay_left','oil_lock_overlay_right'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = locked ? 'flex' : 'none';
+    const inner = el.querySelector('div');
+    if (inner && locked) inner.innerHTML = msg.replace('\\n','<br>');
+  });
+}
+
+function _checkOilTypeAndLock() {
+  const oilVal = ((document.getElementById('oil_type') || {}).value || '').trim();
+  const matOK  = !_pendingMatType || _matTypeOK;   // no spec = no check needed
+  if (!oilVal && !matOK) { _setOilLock(true, 'both'); }
+  else if (!matOK)       { _setOilLock(true, 'mat');  }
+  else if (!oilVal)      { _setOilLock(true, 'oil');  }
+  else                   { _setOilLock(false);         }
+}
+
+// ── Fin Pitch NG Modal ──────────────────────────────────────────────
+function showFinPitchNGModal(ngPoints, specMin, specMax) {
+  const overlay = document.getElementById('finPitchNGOverlay');
+  const detail  = document.getElementById('finPitchNGDetail');
+  if (!overlay || !detail) return;
+  detail.innerHTML =
+    '<b style="color:#fb923c;">SPEC :</b> ' + specMin.toFixed(3) + ' – ' + specMax.toFixed(3) + ' mm<br>' +
+    '<b style="color:#fb923c;">Point ที่ NG :</b> <span style="color:#ff5252;font-weight:800;">' +
+    ngPoints.join(', ') + '</span>';
+  overlay.style.display = 'flex';
+}
+
+function closeFinPitchNGModal() {
+  const overlay = document.getElementById('finPitchNGOverlay');
+  if (overlay) overlay.style.display = 'none';
+  if (_pitchNGField) {
+    const el = document.getElementById(_pitchNGField);
+    if (el) { el.focus(); el.select(); }
+    _pitchNGField = null;
+  }
+}
+
+// ── Machine Rules ──────────────────────────────────────────────────
+const MC_PIPE7         = ['FP06','FP07','FP14','FP17','FP18'];  // fin_die ต้องเป็น 7
+const MC_PIPE5         = ['FP20','FP21'];                        // fin_die ต้องเป็น 5
+const MC_OIL_AF3G_ONLY = ['FP14','FP17','FP20','FP21'];         // เลือกได้แค่ AF3G
+const MC_PITCH_OFFSET  = ['FP07','FP14','FP17','FP18','FP20','FP21']; // calculate = actual − 0.45
+
+function _getCurrentMC() {
+  const raw = (document.getElementById('mc_no') || {}).value || '';
+  return raw.trim() ? raw.trim().slice(-4).toUpperCase() : '';
+}
+
+// ── Lock / Unlock Step 4 (Tag Vendor) เมื่อ Die Pipe ไม่ถูกต้อง ──────
+function _setTagVendorDieLock(locked, msg) {
+  const tvEl   = document.getElementById('tag_vendor');
+  const dispEl = document.getElementById('disp_vendor');
+  if (tvEl) {
+    tvEl.disabled = locked;
+    tvEl.style.opacity = locked ? '0.4' : '1';
+    tvEl.style.cursor  = locked ? 'not-allowed' : '';
+  }
+  if (locked && dispEl) {
+    dispEl.textContent  = '🔒 ' + (msg || 'กรุณาสแกน Tag Feeder ให้ถูกต้องก่อน');
+    dispEl.style.color  = '#FF6666';
+  } else if (!locked && dispEl && dispEl.textContent.startsWith('🔒')) {
+    dispEl.textContent  = '';
+    dispEl.style.color  = '#555';
+  }
+}
+
+// ── Die Pipe Error Modal ────────────────────────────────────────────
+function showDiePipeErrorModal(mc, expectedDie, actualDie) {
+  const overlay = document.getElementById('diePipeErrorOverlay');
+  const detail  = document.getElementById('diePipeErrorDetail');
+  if (!overlay || !detail) return;
+  detail.innerHTML =
+    '<b style="color:#ff8a80;">เครื่องจักร :</b> ' + mc + '<br>' +
+    '<b style="color:#ff8a80;">Dia Pipe ที่กำหนด :</b> ' + expectedDie + '.00 mm<br>' +
+    '<b style="color:#ff8a80;">Dia Pipe ที่สแกนได้ :</b> <span style="color:#ff5252;font-weight:800;">' + actualDie + '.00 mm</span>';
+  overlay.style.display = 'flex';
+}
+
+function closeDiePipeErrorModal() {
+  const overlay = document.getElementById('diePipeErrorOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+// ── ตรวจสอบ Dia Pipe หลัง speclist โหลด fin_die ────────────────────
+function _checkDiePipeAfterLookup() {
+  const mc  = _getCurrentMC();
+  if (!mc) return;   // ยังไม่ได้สแกน MC
+
+  const isPipe7 = MC_PIPE7.includes(mc);
+  const isPipe5 = MC_PIPE5.includes(mc);
+  if (!isPipe7 && !isPipe5) {
+    _setTagVendorDieLock(false);   // เครื่องนี้ไม่มีข้อจำกัด die
+    return;
+  }
+
+  const dieRaw      = (document.getElementById('fin_die') || {}).value || '';
+  const die         = parseFloat(dieRaw) || 0;
+  const expectedDie = isPipe7 ? 7 : 5;
+
+  if (die === 0) return;   // ยังไม่ได้รับค่า — รอก่อน
+
+  if (die === expectedDie) {
+    _setTagVendorDieLock(false);
+    setSpecStatus('✓ Dia Pipe ' + expectedDie + '.00 — ถูกต้องสำหรับ ' + mc, '#00CC00');
+    // ปลดล็อกแล้ว — รอ 800ms ให้ scanner ส่งข้อมูลครบก่อน focus Tag Vendor
+    setTimeout(() => {
+      const tv = document.getElementById('tag_vendor');
+      if (tv && !tv.disabled) { tv.focus(); tv.select(); }
+    }, 800);
+  } else {
+    _setTagVendorDieLock(true, mc + ' ต้องใช้ Dia Pipe ' + expectedDie + '.00 เท่านั้น (ได้รับ ' + die + '.00)');
+    setSpecStatus('✗ เครื่อง ' + mc + ' ต้องใช้ Dia Pipe ' + expectedDie + '.00 เท่านั้น!', '#FF4444');
+    showDiePipeErrorModal(mc, expectedDie, die);   // แสดง popup แจ้งเตือนทันที
+  }
+}
+
+// ── จำกัด Oil Type ตามเครื่อง ───────────────────────────────────────
+function _applyMachineOilRule(mc) {
+  const oilSel = document.getElementById('oil_type');
+  if (!oilSel) return;
+  if (MC_OIL_AF3G_ONLY.includes(mc)) {
+    oilSel.innerHTML = '<option value=""></option><option value="AF3G">AF3G</option>';
+  } else {
+    oilSel.innerHTML = '<option value=""></option><option value="AF3G">AF3G</option><option value="K18C">K18C</option>';
+  }
+}
+
+// ── Mat Type Lock ──────────────────────────────────────────────────
+let _matTypeOK = false;   // true เมื่อ Tag Vendor scan ตรงกับ mat_type
+
+function _setMatTypeLock(locked) {
+  _matTypeOK = !locked;
+  _checkOilTypeAndLock();   // re-evaluate combined lock (Mat+Oil)
+}
+
+// ── Pending mat_type — แสดงเมื่อ Tag Vendor ถูกสแกน ────────────────
+let _pendingMatType = '';  // mat_type จาก speclist รอ validate กับ Tag Vendor
+let _pendingMatSpec = '';  // mat_type_spec (col C จาก Item RM) ใช้ match ทางอ้อม
+let _pendingSpec    = {};   // { fp_nom, fp_neg, fp_pos }
+
+function fillSpecSection7() {
+  // col Q = fp_nom (nominal), col P = fp_neg (absolute MIN), col R = fp_pos (absolute MAX)
+  // Pattern B: บาง item มี fp_nom=0 → fp_neg = nominal, fp_pos = diff+ (เช่น 0.03)
+  let nom    = parseFloat(_pendingSpec.fp_nom) || 0;
+  let minAbs = parseFloat(_pendingSpec.fp_neg) || 0;
+  let maxAbs = parseFloat(_pendingSpec.fp_pos) || 0;
+
+  if (!nom && minAbs) {
+    // Pattern B: fp_nom ว่าง/0 → ใช้ fp_neg เป็น nominal, fp_pos = diff+
+    nom    = minAbs;
+    maxAbs = Math.round((nom + maxAbs) * 10000) / 10000;
+    // minAbs = nom (diff- = 0.00)
+  }
+  if (!nom) return;
+
+  // อัปเดต PITCH constants ที่ calcPitch() ใช้ตรวจสอบ OK/NG
+  PITCH_NOMINAL = nom;
+  PITCH_LO      = Math.round((minAbs - nom) * 10000) / 10000;  // เช่น 0.00  (-ค่า)
+  PITCH_HI      = Math.round((maxAbs - nom) * 10000) / 10000;  // เช่น 0.03  (+ค่า)
+
+  // อัปเดต spec label
+  const lbl = document.getElementById('spec7_label');
+  if (lbl) {
+    const negStr = '-' + Math.abs(PITCH_LO).toFixed(2);   // "-0.00"
+    const posStr = '+' + Math.abs(PITCH_HI).toFixed(2);   // "+0.09"
+    lbl.textContent = 'SPEC : ' + nom.toFixed(3) + ' (' + negStr + ' , ' + posStr + ') mm';
+  }
+  // set p7min = SPEC − 0.00 = SPEC, p7max = SPEC + 0.03 ทันทีหลังโหลด spec
+  const specMin = Math.round((PITCH_NOMINAL + PITCH_LO) * 10000) / 10000;
+  const specMax = Math.round((PITCH_NOMINAL + PITCH_HI) * 10000) / 10000;
+  const minEl = document.getElementById('p7min');
+  const maxEl = document.getElementById('p7max');
+  if (minEl) minEl.value = specMin.toFixed(3);
+  if (maxEl) maxEl.value = specMax.toFixed(3);
+  // เรียก calcPitch เพื่อ refresh ผลการตรวจสอบด้วย spec ใหม่
+  if (typeof calcPitch === 'function') calcPitch();
+}
+
+// ── ตรวจจับ Vendor จาก format ของ Tag ──────────────────────────────
+function parseVendorTag(raw) {
+  if (!raw || !raw.trim()) return null;
+  if (raw.includes('|')) {
+    // Varo: I542GH131P870|42603296|VP06 / H26|... หรือ I542D... / O542G... ฯลฯ
+    const parts  = raw.split('|');
+    const first  = parts[0].trim().replace(/[\x00-\x1F\x7F]/g, '');  // ลบ control chars
+    // prefix pattern: [ตัวอักษร][542][ตัวอักษร] = 5 chars เสมอ
+    const matCode = /^[A-Za-z]542[A-Za-z]/i.test(first)
+                    ? first.substring(5).trim()
+                    : first.trim();
+    const packNo  = (parts[1] || '').trim();
+    return { vendor: 'Varo', matCode, packNo };
+  } else {
+    // UACJ: I542GD03260027760  →  Pack No = ตัวเลข 9 หลักท้าย
+    const digits = raw.replace(/\D/g, '');
+    const packNo = digits.slice(-9);
+    return { vendor: 'UACJ', matCode: null, packNo };
+  }
+}
+
+// ── ค้นหา mat_spec จาก Item RM สำหรับ code ที่สแกน (async) ──────────
+async function _lookupMatSpec(code) {
+  if (!code) return '';
+  try {
+    const res = await fetch('/fp/api/item_rm_lookup?q=' + encodeURIComponent(code));
+    if (!res.ok) return '';
+    const data = await res.json();
+    return (data.found && data.spec) ? data.spec.trim() : '';
+  } catch (e) { return ''; }
+}
+
+// ── ตรวจสอบ matCode ว่าตรงกับ spec ที่รอ (direct หรือ via Item RM) ──
+async function _checkMatMatch(matCode) {
+  const code = matCode.trim().toUpperCase();
+  const db   = _pendingMatType.toUpperCase();
+  // 1. ตรงตรง (H-code เหมือนกัน)
+  if (code === db) return true;
+  // 2. ตรวจทางอ้อมผ่าน Item RM col C (mat_spec)
+  if (_pendingMatSpec) {
+    const scannedSpec = await _lookupMatSpec(code);
+    if (scannedSpec && scannedSpec.toUpperCase() === _pendingMatSpec.toUpperCase()) return true;
+  }
+  return false;
+}
+
+async function onTagVendorScan() {
+  const raw      = (document.getElementById('tag_vendor') || {}).value || '';
+  const mtEl     = document.getElementById('mat_type');
+  const dispEl   = document.getElementById('disp_vendor');
+  const uacjWrap = document.getElementById('uacj_item_wrap');
+  const imatEl   = document.getElementById('scan_item_mat');
+
+  // ล้างค่าเมื่อยังไม่ได้สแกน
+  if (!raw.trim()) {
+    if (mtEl)     mtEl.value = '';
+    if (dispEl)   { dispEl.textContent = ''; }
+    if (uacjWrap) uacjWrap.style.display = 'none';
+    if (imatEl)   imatEl.value = '';
+    setSpecStatus('', '#888');
+    _setMatTypeLock(true);
+    return;
+  }
+
+  const parsed = parseVendorTag(raw);
+  if (!parsed) return;
+
+  if (parsed.vendor === 'Varo') {
+    // ── Varo ──────────────────────────────────────────────────────────
+    if (uacjWrap) uacjWrap.style.display = 'none';
+    if (dispEl) {
+      dispEl.textContent = 'Varo  |  Pack No: ' + parsed.packNo;
+      dispEl.style.color = '#00FFFF';
+    }
+    // ตรวจสอบ matCode กับ _pendingMatType จาก speclist
+    if (!_pendingMatType) {
+      setSpecStatus('⚠ กรุณาสแกน Tag Feeder ก่อน', '#FFAA00');
+      if (mtEl) mtEl.value = '';
+      return;
+    }
+    setSpecStatus('⏳ กำลังตรวจสอบ Mat Type...', '#FFAA00');
+    const matched = await _checkMatMatch(parsed.matCode);
+    if (matched) {
+      if (mtEl) mtEl.value = _pendingMatType;
+      fillSpecSection7();
+      setSpecStatus('✓ Mat Type ตรงกัน: ' + _pendingMatType, '#00CC00');
+      _setMatTypeLock(false);
+    } else {
+      if (mtEl) mtEl.value = '';
+      setSpecStatus('✗ Item Material ไม่ถูกต้อง  (Tag: ' + parsed.matCode + '  DB: ' + _pendingMatType + ')', '#FF4444');
+      _setMatTypeLock(true);
+    }
+
+  } else {
+    // ── UACJ ──────────────────────────────────────────────────────────
+    if (dispEl) {
+      dispEl.textContent = 'UACJ  |  Pack No: ' + parsed.packNo;
+      dispEl.style.color = '#00FF00';
+    }
+    if (mtEl) mtEl.value = '';  // รอสแกน Item Material
+    if (imatEl) imatEl.value = '';
+    if (uacjWrap) uacjWrap.style.display = 'block';
+    setSpecStatus('⏳ UACJ — กรุณาสแกน Item Material', '#FFAA00');
+    _setMatTypeLock(true);   // ยังล็อกอยู่ รอ onItemMatScan ตรวจสอบ
+  }
+}
+
+// ── เมื่อสแกน Item Raw Mat (UACJ) — ตัด 5 ตัวหน้าออก ──────────────
+let _itemMatTimer = null;  // debounce timer
+
+function onItemMatScan() {
+  const raw    = (document.getElementById('scan_item_mat') || {}).value || '';
+  const dispEl = document.getElementById('disp_item_mat');
+
+  // ล้าง display เมื่อยังไม่ได้สแกน
+  if (!raw.trim()) {
+    if (dispEl) { dispEl.textContent = ''; dispEl.style.color = '#555'; }
+    clearTimeout(_itemMatTimer);
+    return;
+  }
+
+  // ลบ control characters + trim (รองรับ scanner ที่เพิ่ม CR/LF/STX/ETX)
+  const full = raw.trim().replace(/[\x00-\x1F\x7F]/g, '');
+  // ตัด prefix 5 ตัวหน้า เฉพาะเมื่อ pattern ตรง [ตัวอักษร]542[ตัวอักษร]
+  const matCode = /^[A-Za-z]542[A-Za-z]/i.test(full)
+                  ? full.substring(5).trim()
+                  : full.trim();
+
+  // ── แสดงผลทันที (ไม่รอ debounce) ──
+  if (dispEl) {
+    dispEl.textContent = 'Raw: ' + full + '  →  ' + matCode.toUpperCase();
+    dispEl.style.color = '#FFFF00';
+  }
+
+  // ── Debounce comparison 400ms — รอให้ scanner ส่งครบก่อน compare ──
+  clearTimeout(_itemMatTimer);
+  _itemMatTimer = setTimeout(() => _doItemMatCheck(matCode), 400);
+}
+
+async function _doItemMatCheck(matCode) {
+  const dispEl = document.getElementById('disp_item_mat');
+  const mtEl   = document.getElementById('mat_type');
+
+  if (!_pendingMatType) {
+    setSpecStatus('⚠ กรุณาสแกน Tag Feeder ก่อน', '#FFAA00');
+    return;
+  }
+  setSpecStatus('⏳ กำลังตรวจสอบ Mat Type...', '#FFAA00');
+  const matched = await _checkMatMatch(matCode);
+  if (matched) {
+    if (mtEl) mtEl.value = _pendingMatType;
+    if (dispEl) dispEl.style.color = '#00FF00';
+    fillSpecSection7();
+    setSpecStatus('✓ Mat Type ตรงกัน: ' + matCode.toUpperCase() + ' → ' + _pendingMatType, '#00CC00');
+    _setMatTypeLock(false);
+  } else {
+    if (mtEl) mtEl.value = '';
+    if (dispEl) dispEl.style.color = '#FF4444';
+    setSpecStatus('✗ Item Raw Mat ไม่ถูกต้อง  (Scan: ' + matCode.toUpperCase() + '  Spec: ' + _pendingMatType + ')', '#FF4444');
+    _setMatTypeLock(true);
+  }
+}
+
+// ── Spec-lookup status display ───────────────────────────────────
+function setSpecStatus(msg, color) {
+  const el = document.getElementById('spec_status');
+  if (el) { el.textContent = msg; el.style.color = color || '#888'; }
+}
+
+// ── Persistent lookupSpeclist: retries every 5s for up to 10 min ─
+async function lookupSpeclist(itemFG) {
+  if (!itemFG) return;
+  const MAX_MS = 600000; // 10 minutes
+  const start  = Date.now();
+  setSpecStatus('\u23F3 Loading spec data...', '#FFAA00');
+  while (Date.now() - start < MAX_MS) {
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 10000); // 10s per attempt
+      const res  = await fetch(API + '/api/speclist?q=' + encodeURIComponent(itemFG),
+                               { signal: ctrl.signal });
+      clearTimeout(tid);
+      const data = await res.json();
+      if (data && data.loading) {
+        const sec = Math.round((Date.now() - start) / 1000);
+        setSpecStatus('\u23F3 Excel loading (' + sec + 's) — please wait...', '#FFAA00');
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
+      if (data && data.found && data.fields) {
+        // holes, fin_die, mat_size → แสดงทันที
+        ['holes','fin_die','mat_size'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el && data.fields[id] !== undefined) el.value = data.fields[id];
+        });
+        // อัปเดต Flare spec limits ตาม fin_die ที่เพิ่งได้รับ
+        if (typeof updateFlareSpec === 'function') updateFlareSpec();
+        // ตรวจสอบ Dia Pipe ว่าตรงกับเครื่องหรือไม่
+        _checkDiePipeAfterLookup();
+        // อัปเดต Q'ty Fin spec (Section 9)
+        if (typeof fillQtySection9 === 'function') fillQtySection9();
+        // mat_type → เก็บไว้ก่อน แสดงเฉพาะเมื่อ Tag Vendor ถูกสแกนแล้ว
+        _pendingMatType = data.fields.mat_type || '';
+        _pendingMatSpec = data.fields.mat_type_spec || '';   // col C จาก Item RM
+        _pendingSpec = {
+          fp_nom: data.fields.fp_nom || '',
+          fp_neg: data.fields.fp_neg || '',
+          fp_pos: data.fields.fp_pos || '',
+        };
+        _pendingQFin = data.fields.q_fin || '';
+        // คำนวณ spec limits (p7min/p7max) ทันทีหลังได้รับ spec — ไม่ต้องรอ Tag Vendor
+        if (typeof fillSpecSection7 === 'function') setTimeout(fillSpecSection7, 50);
+        const _tvNow = (document.getElementById('tag_vendor') || {}).value || '';
+        const _mtEl  = document.getElementById('mat_type');
+        if (_mtEl) _mtEl.value = _tvNow.trim() ? _pendingMatType : '';
+        setSpecStatus('\u2713 Spec data loaded', '#00CC00');
+        // ถ้า Tag Vendor สแกนไปก่อนแล้ว ให้ re-validate เพื่อ fillSpecSection7 ทำงานถูก
+        if (_tvNow.trim() && typeof onTagVendorScan === 'function') {
+          setTimeout(onTagVendorScan, 50);
+        }
+      } else {
+        setSpecStatus('\u26A0 Spec not found for: ' + itemFG, '#FF8800');
+        console.warn('[Speclist] Not found:', itemFG, data);
+      }
+      return;
+    } catch(e) {
+      console.warn('[Speclist] fetch error, retrying:', e.message);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+  setSpecStatus('\u2717 Spec lookup timed out — click Retry', '#FF4444');
+}
+
+// ── Persistent lookupHei: retries every 5s for up to 10 min ─────
+async function lookupHei(itemFG) {
+  if (!itemFG) return;
+  const MAX_MS = 600000;
+  const start  = Date.now();
+  while (Date.now() - start < MAX_MS) {
+    try {
+      const ctrl = new AbortController();
+      const tid  = setTimeout(() => ctrl.abort(), 10000);
+      const res  = await fetch(API + '/api/hei_item?q=' + encodeURIComponent(itemFG),
+                               { signal: ctrl.signal });
+      clearTimeout(tid);
+      const data = await res.json();
+      if (data && data.loading) {
+        await new Promise(r => setTimeout(r, 5000));
+        continue;
+      }
+      if (data && data.found && data.fields) {
+        const el = document.getElementById('al_item');
+        if (el && data.fields.al_item !== undefined) el.value = data.fields.al_item;
+      } else {
+        console.warn('[HEI] Not found:', itemFG, data);
+      }
+      return;
+    } catch(e) {
+      console.warn('[HEI] fetch error, retrying:', e.message);
+      await new Promise(r => setTimeout(r, 5000));
+    }
+  }
+}
+
+function lookupFromItem(itemFG) {
+  if (!itemFG) return;
+  lookupSpeclist(itemFG);
+  lookupHei(itemFG);
+}
+
+async function showScanData(inputId, dispId) {
+  const rawVal = document.getElementById(inputId).value.trim();
+  const el = document.getElementById(dispId);
+  if (!el) return;
+
+  const cfg = SCAN_CFG[inputId];
+
+  if (!rawVal) {
+    el.textContent = ' '; el.style.color = '#555'; el.style.borderColor = '#333';
+    if (cfg && cfg.nameId) setNameField(cfg.nameId, '', null);
+    return;
+  }
+
+  // Tag Feeder: parse → auto-fill form fields
+  if (cfg && cfg.parse) {
+    console.log('[Scan] rawLen=' + rawVal.length + '  first60: ' + rawVal.substring(0,60));
+    const parsed = cfg.parse(rawVal);
+    if (parsed) {
+      Object.entries(parsed).forEach(([id, val]) => {
+        const f = document.getElementById(id); if (f) f.value = val;
+      });
+      el.textContent = 'Line:' + parsed.line + '  Lot:' + parsed.lot
+                      + '  Seq:' + parsed.seq + '  Item:' + parsed.item;
+      el.style.color = '#00FFFF'; el.style.borderColor = '#007777';
+      console.log('[Scan] OK → item=' + parsed.item
+                  + ' desc1=' + parsed.desc1 + ' model=' + parsed.model);
+      lookupFromItem(parsed.item);
+      // Pre-lock Tag Vendor ทันทีสำหรับเครื่องที่มีข้อจำกัด Dia Pipe
+      // (จะปลดล็อกโดย _checkDiePipeAfterLookup() เมื่อ fin_die ถูก set และผ่านการตรวจสอบ)
+      const _preMC = _getCurrentMC();
+      if (MC_PIPE7.includes(_preMC) || MC_PIPE5.includes(_preMC)) {
+        _setTagVendorDieLock(true, '⏳ ' + _preMC + ' — กำลังตรวจสอบ Dia Pipe...');
+      } else {
+        // เครื่องไม่มีข้อจำกัด die — รอ 800ms ให้ scanner ส่งข้อมูลครบก่อน focus Tag Vendor
+        setTimeout(() => {
+          const tv = document.getElementById('tag_vendor');
+          if (tv && !tv.disabled) { tv.focus(); tv.select(); }
+        }, 800);
+      }
+    } else {
+      // Barcode too short or wrong format — show length so user can see why
+      el.textContent = '⚠ Parse failed — length: ' + rawVal.length
+                      + ' chars (need ≥ 215)';
+      el.style.color = '#FF4444'; el.style.borderColor = '#880000';
+      console.warn('[Scan] FAILED rawLen=' + rawVal.length
+                   + ' first80:', rawVal.substring(0,80));
+    }
+    return;
+  }
+
+  // Strip prefix: tail = last N chars (robust), trim = skip first N chars (legacy)
+  const val = (cfg && cfg.tail) ? rawVal.slice(-cfg.tail)
+            : (cfg && cfg.trim) ? rawVal.substring(cfg.trim)
+            : rawVal;
+  if (!cfg || !cfg.endpoint) {
+    el.textContent = val; el.style.color = cfg ? cfg.color : '#00FFFF'; return;
+  }
+
+  // Loading
+  el.textContent = '⏳ ' + val; el.style.color = '#FFFF00'; el.style.borderColor = '#888';
+  if (cfg.nameId) setNameField(cfg.nameId, '...', '#FFFF00');
+
+  try {
+    const res  = await fetch(API + '/api/' + cfg.endpoint + '?q=' + encodeURIComponent(val));
+    const data = await res.json();
+    if (data.found) {
+      const name = data.name || Object.values(data.data).filter(v => v).join('  |  ');
+      el.textContent = '✓ ' + val;
+      el.style.color = cfg.color; el.style.borderColor = '#007700';
+      if (cfg.nameId) setNameField(cfg.nameId, name, cfg.color);
+      // MC scanned → apply Oil rule + re-check die pipe (ถ้า fin_die มีค่าแล้ว)
+      if (inputId === 'mc_no') {
+        _applyMachineOilRule(val);
+        _checkDiePipeAfterLookup();
+      }
+    } else {
+      el.textContent = '✗ Not found: ' + val;
+      el.style.color = '#FF4444'; el.style.borderColor = '#AA0000';
+      if (cfg.nameId) setNameField(cfg.nameId, 'Not found', '#FF4444');
+    }
+  } catch {
+    el.textContent = '⚡ ' + val; el.style.color = '#FFFF00'; el.style.borderColor = '#666';
+    if (cfg.nameId) setNameField(cfg.nameId, 'Server offline', '#888');
+  }
+}
+
+// ── Helper ────────────────────────────────────────────────────
+function setRbox(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  el.style.color = val === 'OK' ? '#00FF00' : (val === 'NG' ? '#FF4444' : '#00FF00');
+}
+
+// ── Save HTML (auto-called after record) ─────────────────────────
+function _saveHTML(prefix) {
+  try {
+    const clone = document.documentElement.cloneNode(true);
+
+    // snapshot ค่า input/select
+    const srcInputs = document.querySelectorAll('input, textarea, select');
+    const dstInputs = clone.querySelectorAll('input, textarea, select');
+    srcInputs.forEach((el, i) => {
+      const dst = dstInputs[i];
+      if (!dst) return;
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        dst.checked = el.checked;
+      } else {
+        dst.setAttribute('value', el.value);
+      }
+      if (el.tagName === 'SELECT') {
+        Array.from(dst.options).forEach((opt, j) => {
+          opt.selected = Array.from(el.options)[j]?.selected || false;
+        });
+      }
+    });
+
+    // snapshot rbox (result) textContent
+    document.querySelectorAll('[id]').forEach(el => {
+      try {
+        const dst = clone.querySelector('#' + CSS.escape(el.id));
+        if (dst && el.textContent !== dst.textContent) dst.textContent = el.textContent;
+      } catch {}
+    });
+
+    const date = document.getElementById('rec_date')?.value || 'nodate';
+    const item = (document.getElementById('item')?.value || '').trim() || 'noitem';
+    const seq  = (document.getElementById('seq')?.value  || '').trim();
+    const mc   = (document.getElementById('name_mc')?.value || '').trim();
+    const filename = `FP_${prefix}_${date}_${mc ? mc+'_' : ''}${item}${seq ? '_S'+seq : ''}.html`;
+
+    const blob = new Blob(['<!DOCTYPE html>\n' + clone.outerHTML],
+                          { type: 'text/html;charset=utf-8' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    console.log('[_saveHTML] saved:', filename);
+  } catch(e) {
+    console.warn('[_saveHTML] error:', e);
+  }
+}
+
+// legacy alias
+function saveForm() { _saveHTML('Confirm'); }
+
+// ── Image Lightbox ────────────────────────────────────────────
+function zoomImg(src) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('img-lightbox').classList.add('active');
+}
+function closeLightbox() {
+  document.getElementById('img-lightbox').classList.remove('active');
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeLightbox();
+});
+
+// ── Toast notification ─────────────────────────────────────────
+function showToast(msg, color, dur) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent  = msg;
+  el.style.background = color || '#333';
+  el.style.display    = 'block';
+  clearTimeout(el._tid);
+  el._tid = setTimeout(() => { el.style.display = 'none'; }, dur || 3500);
+}
+
+// ── Record Form ─────────────────────────────────────────────────
+// mode = 'group'  → บันทึกแล้วล้างเฉพาะ Tag Feeder + Section 13, focus tag_feeder
+// mode = 'finish' → บันทึกแล้วล้างทั้งหมด, focus checker
+async function _doRecord(mode) {
+  // ── Validate: ถ้า Result เป็น NG ห้ามบันทึก ─────────────────
+  const _finalTxt = ((document.getElementById('finalResult') || {}).textContent || '').trim().toUpperCase();
+  if (_finalTxt === 'NG') {
+    // ระบุว่า item ไหน NG
+    const _ngItems = [];
+    const _p7 = ((document.getElementById('p7result') || {}).textContent || '').trim().toUpperCase();
+    const _f8 = ((document.getElementById('f8result') || {}).textContent || '').trim().toUpperCase();
+    const _q9 = ((document.getElementById('q9result') || {}).textContent || '').trim().toUpperCase();
+    if (_p7 === 'NG')           _ngItems.push('Fin Pitch (Step 7)');
+    if (_f8 === 'NG')           _ngItems.push('Fin Flare (Step 8)');
+    if (_q9 === 'NG')           _ngItems.push('Q\'ty Fin (Step 9)');
+    if (appear.coil  === 'NG')  _ngItems.push('Appearance Coil');
+    if (appear.flare === 'NG')  _ngItems.push('Appearance Flare');
+    if (appear.slit  === 'NG')  _ngItems.push('Appearance Slit');
+    showToast('🚫 ไม่สามารถบันทึกได้ — Result เป็น NG\n' + _ngItems.join(' / '), '#880000', 5000);
+    return;
+  }
+
+  // ── Validate: Mat Type ต้องผ่านการตรวจสอบก่อนบันทึก ────────────
+  if (_pendingMatType && !_matTypeOK) {
+    const _tvVal = ((document.getElementById('tag_vendor') || {}).value || '').trim();
+    const _vendorParsed = parseVendorTag(_tvVal);
+    const _isUACJ = _vendorParsed && _vendorParsed.vendor === 'UACJ';
+    const _hint   = _isUACJ ? ' (กรุณาสแกน Item Raw Mat ให้ถูกต้อง)' : ' (กรุณาสแกน Tag Vendor ให้ถูกต้อง)';
+    showToast('🚫 ไม่สามารถบันทึกได้ — Mat Type ไม่ถูกต้อง' + _hint, '#880000', 5000);
+    return;
+  }
+
+  // ── Validate: ต้อง Scan หัวข้อที่ 13 ก่อนบันทึก ──────────────
+  const scan13Val = ((document.getElementById('scan13') || {}).value || '').trim();
+  if (!scan13Val) {
+    showToast('⚠ กรุณา Scan หัวข้อที่ 12 (Leader Confirm) ก่อนบันทึก', '#AA4400');
+    const s13 = document.getElementById('scan13');
+    if (s13) {
+      s13.style.borderColor = '#FF4444';
+      s13.style.background  = '#FFF0F0';
+      s13.focus();
+      setTimeout(() => { s13.style.borderColor = ''; s13.style.background = 'white'; }, 3000);
+    }
+    return;
+  }
+
+  const gv = id => (document.getElementById(id) || {}).value || '';
+  const gt = id => ((document.getElementById(id) || {}).textContent || '').trim();
+  const vp = parseVendorTag(gv('tag_vendor'));
+
+  // Always stamp current date/time at the moment of saving
+  const _nowD = new Date();
+  const _dateEl = document.getElementById('rec_date');
+  const _timeEl = document.getElementById('rec_time');
+  if (_dateEl && !_dateEl.value) {
+    // ใช้ local date (ไม่ใช่ toISOString ซึ่งเป็น UTC)
+    const _y=_nowD.getFullYear(), _mo=String(_nowD.getMonth()+1).padStart(2,'0'), _dy=String(_nowD.getDate()).padStart(2,'0');
+    _dateEl.value = _y+'-'+_mo+'-'+_dy;
+  }
+  if (_timeEl) _timeEl.value = _nowD.toTimeString().slice(0,5);
+
+  const row = {
+    date:         gv('rec_date'),
+    time:         gv('rec_time'),
+    mc_no:        gv('name_mc'),
+    prod_month:   gv('prod_month'),
+    lot:          gv('lot'),
+    line:         gv('line'),
+    seq:          gv('seq'),
+    type:         gv('attribute'),
+    item:         gv('item'),
+    desc1:        gv('desc1'),
+    model:        gv('model'),
+    vendor:       vp ? vp.vendor  : '',
+    coil_no:      vp ? vp.packNo  : '',
+    pack_no:      vp ? vp.packNo  : '',
+    al_item:      gv('al_item'),
+    mat_type:     gv('mat_type'),
+    appear_coil:  appear.coil   || '',
+    appear_flare: appear.flare  || '',
+    appear_slit:  appear.slit   || '',
+    fp1:          gv('pa1'),  fp2: gv('pa2'),  fp3: gv('pa3'),  fp4: gv('pa4'),
+    fp_avg:       gv('p7avg'),
+    result_fp:    gt('p7result'),
+    ff1:          gv('fa1'),  ff2: gv('fa2'),  ff3: gv('fa3'),  ff4: gv('fa4'),
+    ff_avg:       gv('f8avg'),
+    result_ff:    gt('f8result'),
+    qty_fin:      gv('qty_fin'),
+    result_qty:   gt('q9result'),
+    result_appear: (appear.coil === 'NG' || appear.flare === 'NG' || appear.slit === 'NG')
+                   ? 'NG'
+                   : (appear.coil && appear.flare && appear.slit) ? 'OK' : '',
+    fin_die:      gv('fin_die'),
+    holes:        gv('holes'),
+    final:        gt('finalResult'),
+    checker:      gv('name_checker'),
+    confirmer:    gv('name_confirm'),
+    spec_pitch:   gv('p7spec'),
+    oil:          gv('oil_type'),
+    spec_thick:   gv('mat_size'),
+    compare_al:   gv('mat_type') ? 'OK' : 'NG',
+    sc1:'', sc2:'', sc3:'', sc4:'', sc_avg:'',
+    result_sc:    '',
+    sc_appear:    appear.slit || '',
+    order_prod:   gv('lot'),
+  };
+
+  const modeLabel = mode === 'group' ? 'Group Lot' : 'Finish Type';
+  showToast('⏳ กำลังบันทึก... (' + modeLabel + ')', '#555555');
+  try {
+    const res  = await fetch(API + '/api/record', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(row),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast('✓ บันทึกสำเร็จ [#' + data.row + '] ' + modeLabel +
+                ' | Final: ' + (row.final || '—'), '#006600');
+      _notifyDashboard();
+
+      // ล้างฟอร์มตาม mode
+      if (mode === 'group') {
+        _clearGroupLotFields();
+      } else {
+        _clearAllSilent();
+        setTimeout(() => {
+          const el = document.getElementById('checker');
+          if (el) { el.focus(); el.select(); }
+        }, 200);
+      }
+    } else {
+      showToast('✗ บันทึกไม่สำเร็จ: ' + (data.error || 'unknown'), '#AA0000');
+    }
+  } catch (e) {
+    showToast('✗ เชื่อมต่อ Server ไม่ได้: ' + e.message, '#AA0000');
+  }
+}
+
+async function recordGroupLot()  { await _doRecord('group');  }
+async function recordFinishType(){ await _doRecord('finish'); }
+
+// legacy alias (ใช้สำหรับ backward compat ถ้ามี)
+async function recordForm() { await _doRecord('finish'); }
+
+// ── Clear Tag Feeder ────────────────────────────────────────────
+function clearTagFeeder() {
+  const el = document.getElementById('tag_feeder');
+  if (el) { el.value = ''; el.focus(); el.select(); }
+  const disp = document.getElementById('disp_feeder');
+  if (disp) disp.innerHTML = '&nbsp;';
+  showScanData('tag_feeder', 'disp_feeder');
+  _setTagVendorDieLock(false);  // ปลดล็อกเมื่อล้าง Tag Feeder
+}
+
+// ── Clear Tag Vendor ────────────────────────────────────────────
+function clearTagVendor() {
+  const el = document.getElementById('tag_vendor');
+  if (el) { el.value = ''; el.focus(); el.select(); }
+  const disp = document.getElementById('disp_vendor');
+  if (disp) disp.innerHTML = '';
+  const mt = document.getElementById('mat_type');
+  if (mt) mt.value = '';
+  const sim = document.getElementById('scan_item_mat');
+  if (sim) sim.value = '';
+  const dispIM = document.getElementById('disp_item_mat');
+  if (dispIM) { dispIM.textContent = ''; dispIM.style.color = '#555'; }
+  const wrap = document.getElementById('uacj_item_wrap');
+  if (wrap) wrap.style.display = 'none';
+  _setMatTypeLock(true);
+}
+
+// ── Clear ONLY Tag Feeder + Section 13 (Group Lot mode) ────────
+function _clearGroupLotFields() {
+  // Tag Feeder
+  ['tag_feeder'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const df = document.getElementById('disp_feeder');
+  if (df) df.innerHTML = '&nbsp;';
+
+  // Section 13
+  const s13 = document.getElementById('scan13');
+  if (s13) s13.value = '';
+  const ds13 = document.getElementById('disp_scan13');
+  if (ds13) ds13.innerHTML = '&nbsp;';
+  const nc = document.getElementById('name_confirm');
+  if (nc) { nc.value = ''; nc.style.color = '#aaa'; nc.style.borderColor = '#333'; }
+
+  // อัปเดตเวลาใหม่
+  const now = new Date();
+  const te = document.getElementById('rec_time');
+  if (te) te.value = now.toTimeString().slice(0,5);
+
+  // Focus กลับ tag_feeder
+  setTimeout(() => {
+    const el = document.getElementById('tag_feeder');
+    if (el) { el.focus(); el.select(); }
+  }, 150);
+}
+
+// ── Clear All silently (no confirm dialog) ──────────────────────
+function _clearAllSilent() {
+  _setMatTypeLock(true);
+  _setOilLock(true);            // reset oil lock ด้วย
+  _pitchNGField = null;         // reset pitch NG field ref
+  _setTagVendorDieLock(false);
+  document.querySelectorAll('input:not([readonly])').forEach(el => el.value = '');
+  document.querySelectorAll('input[readonly]').forEach(el => el.value = '');
+  document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+  ['p7result','f8result','q9result','coil-result','flare-result','slit-result','finalResult']
+    .forEach(id => { const el=document.getElementById(id); if(el){el.textContent=''; el.style.color='#00FF00';} });
+  ['disp_mc','disp_checker','disp_feeder','disp_scan13','disp_vendor'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.innerHTML = '&nbsp;';
+  });
+  ['name_mc','name_checker','name_confirm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.style.color = '#aaa'; el.style.borderColor = '#333'; }
+  });
+  appear.coil = appear.flare = appear.slit = null;
+  ['coil','flare','slit'].forEach(k => {
+    const ok = document.getElementById(k+'_ok');
+    const ng = document.getElementById(k+'_ng');
+    if (ok) ok.classList.remove('selected');
+    if (ng) ng.classList.remove('selected');
+  });
+  // อัปเดตวันที่/เวลาใหม่
+  const now = new Date();
+  const de = document.getElementById('rec_date');
+  const te = document.getElementById('rec_time');
+  if (de) { const _y=now.getFullYear(),_mo=String(now.getMonth()+1).padStart(2,'0'),_dy=String(now.getDate()).padStart(2,'0'); de.value=_y+'-'+_mo+'-'+_dy; }
+  if (te) te.value = now.toTimeString().slice(0,5);
+}
+
+// ── Shared Dashboard — smart open (reuse existing window, no duplicate) ────────
+const _DASH_URL = 'http://10.235.117.215:3001/dashboard/firstlot';
+const _DASH_WIN = 'shared_dashboard';
+
+function openSharedDashboard() {
+  // ลอง reference window ที่มีชื่ออยู่แล้ว (ไม่ navigate)
+  const w = window.open('', _DASH_WIN);
+  if (w && !w.closed) {
+    try {
+      if (w.location.href && w.location.href !== 'about:blank') {
+        w.focus();   // มี dashboard เปิดอยู่แล้ว → focus เท่านั้น
+        return;
+      }
+    } catch(e) { /* cross-origin: เปิดใหม่เลย */ }
+  }
+  window.open(_DASH_URL, _DASH_WIN);
+}
+
+function openDashboard() { openSharedDashboard(); }
+
+// ── แจ้ง Dashboard ให้ refresh ทันที ───────────────────────────────
+function _notifyDashboard() {
+  try { const bc = new BroadcastChannel('dash_refresh'); bc.postMessage(1); bc.close(); } catch(e) {}
+  try { localStorage.setItem('dash_refresh', Date.now()); } catch(e) {}
+}
+// ── Clear All ─────────────────────────────────────────────────
+function clearAll() {
+  if (!confirm('ล้างข้อมูลทั้งหมด?')) return;
+  document.querySelectorAll('input:not([readonly])').forEach(el => el.value = '');
+  document.querySelectorAll('input[readonly]').forEach(el => el.value = '');
+  document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+  ['p7result','f8result','q9result','coil-result','flare-result','slit-result','finalResult']
+    .forEach(id => { const el=document.getElementById(id); if(el){el.textContent=''; el.style.color='#00FF00';} });
+  ['disp_mc','disp_checker','disp_feeder','disp_scan13'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.textContent = ' ';
+  });
+  ['name_mc','name_checker','name_confirm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; el.style.color = '#aaa'; el.style.borderColor = '#333'; }
+  });
+  appear.coil = appear.flare = appear.slit = null;
+  ['coil','flare','slit'].forEach(k => {
+    document.getElementById(k+'_ok').classList.remove('selected');
+    document.getElementById(k+'_ng').classList.remove('selected');
+  });
+  _setMatTypeLock(true);
+  _setOilLock(true);            // reset oil lock ด้วย
+  _pitchNGField = null;         // reset pitch NG field ref
+  _setTagVendorDieLock(false);
+  // re-apply oil rule ตามเครื่องปัจจุบัน
+  _applyMachineOilRule(_getCurrentMC());
+}
+
+// ── Enter-key navigation flow ────────────────────────────────
+const ENTER_FLOW_BASE = {
+  'checker':    'mc_no',
+  'mc_no':      'tag_feeder',
+  'tag_feeder': 'tag_vendor',
+  'pa1': 'pa2', 'pa2': 'pa3', 'pa3': 'pa4',
+  'pa4': 'fa1',
+  'fa1': 'fa2', 'fa2': 'fa3', 'fa3': 'fa4',
+  'fa4': 'qty_fin',
+  'qty_fin': 'scan13',
+};
+
+function getNextField(fromId) {
+  return ENTER_FLOW_BASE[fromId] || null;
+}
+
+function setupEnterFlow() {
+  const ids = Object.keys(ENTER_FLOW_BASE).concat(['tag_vendor']);
+  ids.forEach(fromId => {
+    const el = document.getElementById(fromId);
+    if (!el) return;
+    el.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+
+      // ── Tag Feeder: ต้องรอ barcode ครบ (≥215 ตัว) ก่อนไปช่องถัดไป ──
+      if (fromId === 'tag_feeder') {
+        const raw = (el.value || '').replace(/[\x00-\x1F\x7F]/g, '').trim();
+        if (raw.length < 215) {
+          // barcode ยังไม่ครบ — อย่าเพิ่งไปช่องถัดไป รอรับต่อ
+          el.style.borderColor = '#FF8800';   // แจ้งเตือนด้วยสีส้ม
+          setTimeout(() => { el.style.borderColor = ''; }, 800);
+          return;
+        }
+        // barcode ครบแล้ว — trigger parse ทันที (กรณี oninput ยังไม่ได้ fire)
+        showScanData('tag_feeder', 'disp_feeder');
+      }
+
+      const toId = getNextField(fromId);
+      if (!toId) return;
+      const next = document.getElementById(toId);
+      if (next) { next.focus(); if (next.select) next.select(); }
+    });
+  });
+}
+
+// ── Vendor dropdown: show/hide Scan Item Material ────────────
+
+
+// ── Auto set current date/time on load ───────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  // ใช้ local date ไม่ใช่ toISOString (UTC) เพื่อป้องกันวันที่ผิดช่วง 00:00-06:59 ICT
+  const _y=now.getFullYear(), _mo=String(now.getMonth()+1).padStart(2,'0'), _dy=String(now.getDate()).padStart(2,'0');
+  document.getElementById('rec_date').value = _y+'-'+_mo+'-'+_dy;
+  document.getElementById('rec_time').value =
+    now.toTimeString().slice(0,5);
+  setupEnterFlow();
+});
+</script>
+<div id="toast"></div>
+
+</body>
+</html>

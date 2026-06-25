@@ -1,0 +1,1770 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PROCESS EXPANDER — FIRST LOT CHECK</title>
+<style>
+:root {
+  --bg: #f0f4f8;
+  --col-l: #e8edf5;
+  --col-m: #fffde7;
+  --col-r: #e8f5e9;
+  --hdr-l: #0d47a1;
+  --hdr-m: #1565c0;
+  --hdr-r: #1b5e20;
+  --accent: #1976d2;
+  --ok: #2e7d32;
+  --danger: #c62828;
+  --border: #b0bec5;
+  --text: #212121;
+  --text-dim: #607080;
+  --mono: 'Consolas','Courier New',monospace;
+  --radius: 4px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-user-select: none; user-select: none;
+}
+input, select, textarea {
+  -webkit-user-select: auto !important;
+  user-select: auto !important;
+}
+
+/* ── TITLE BAR ── */
+#titleBar {
+  background: var(--hdr-l);
+  color: #fff;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 5px 0 4px;
+  flex-shrink: 0;
+}
+
+/* ── 3-COLUMN GRID ── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+#cols {
+  display: grid;
+  grid-template-columns: 22fr 52fr 26fr;
+  gap: 4px;
+  flex: 1;
+  overflow: hidden;
+  padding: 4px;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  border-radius: var(--radius);
+  padding: 6px;
+}
+#colLeft  { background: var(--col-l); }
+#colMid   { background: var(--col-m); }
+#colRight { background: var(--col-r); }
+
+/* ── COLUMN HEADERS ── */
+.col-hdr {
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .5px;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+#colLeft  .col-hdr { background: var(--hdr-l); }
+#colMid   .col-hdr { background: var(--hdr-m); }
+#colRight .col-hdr { background: var(--hdr-r); }
+
+/* ── SECTION HEADERS ── */
+.sec-hdr {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: #455a64;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin: 6px 0 4px;
+}
+
+/* ── FIELD ── */
+.field { margin-bottom: 5px; }
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.req { color: var(--danger); }
+.field input, .field select, .field textarea {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 15px;
+  background: #fff;
+  outline: none;
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field input[readonly] { background: #eceff1; color: #37474f; }
+
+/* ── SCAN FIELD ── */
+.scan-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.scan-row input { flex: 1; font-family: var(--mono); font-size: 14px; }
+.scan-status { font-size: 13px; min-height: 16px; margin-top: 2px; }
+
+/* ── PHOTO POPUP BUTTON ── */
+.photo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #90caf9;
+  border-radius: 10px;
+  cursor: pointer;
+  margin: 0 3px 4px 0;
+  user-select: none;
+}
+.photo-btn:hover { background: #bbdefb; }
+
+/* ── RESET BUTTON ── */
+#btnReset {
+  width: 100%;
+  padding: 7px;
+  background: #ef6c00;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+#btnReset:hover { background: #f57c00; }
+#btnReset:active { background: #e65100; }
+
+/* ── MEASUREMENT ROW ── */
+.meas-row {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.meas-row.cols3 { grid-template-columns: repeat(3, 1fr); }
+.meas-row.cols5 { grid-template-columns: repeat(5, 1fr); }
+.meas-row input {
+  width: 100%;
+  padding: 3px 4px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 15px;
+  font-family: var(--mono);
+  background: #fffde7;
+}
+.meas-row input:focus { border-color: var(--accent); outline: none; }
+.meas-lbl {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ── OK/NG RADIO ── */
+.okng-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0;
+}
+.okng-row label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.okng-row input[type=radio] { accent-color: var(--accent); }
+.ok-lbl { color: var(--ok); font-weight: 700; }
+.ng-lbl { color: var(--danger); font-weight: 700; }
+
+/* ── SPEC GRID ── */
+.spec-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+  margin: 4px 0;
+}
+.spec-cell {
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  border-radius: 3px;
+  padding: 3px 4px;
+  text-align: center;
+}
+.spec-cell .lbl { font-size: 12px; color: #1565c0; font-weight: 700; }
+.spec-cell .val { font-size: 14px; font-family: var(--mono); font-weight: 700; color: #0d47a1; }
+
+/* ── RESULT BADGE ── */
+.result-box {
+  text-align: center;
+  padding: 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 19px;
+  margin: 6px 0;
+  border: 2px solid transparent;
+}
+.result-ok  { background: #c8e6c9; color: var(--ok);    border-color: var(--ok); }
+.result-ng  { background: #ffcdd2; color: var(--danger); border-color: var(--danger); }
+.result-na  { background: #eceff1; color: var(--text-dim); border-color: var(--border); }
+
+/* ── COLOR MARK ── */
+.color-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+.color-btn {
+  padding: 3px 8px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: .7;
+  transition: opacity .15s, border-color .15s;
+}
+.color-btn.active { opacity: 1; border-color: #000; }
+.cb-white  { background: #fff;     color: #333; border-color: #ccc !important; }
+.cb-yellow { background: #ffeb3b; color: #333; }
+.cb-red    { background: #f44336; color: #fff; }
+.cb-blue   { background: #2196f3; color: #fff; }
+.cb-green  { background: #4caf50; color: #fff; }
+.cb-purple { background: #9c27b0; color: #fff; }
+.cb-black  { background: #212121; color: #fff; }
+.cb-orange { background: #ff9800; color: #fff; }
+
+/* ── RECORD BUTTON ── */
+#btnRecord {
+  width: 100%;
+  padding: 10px;
+  background: #0d47a1;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background .15s;
+}
+#btnRecord:hover { background: #1565c0; }
+#btnRecord:active { background: #0a3880; }
+
+/* ── STATUS ── */
+#statusOverall {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 5px;
+  border-radius: 4px;
+  margin: 5px 0;
+}
+
+/* ── TOAST ── */
+#toast {
+  position: fixed;
+  bottom: 16px; left: 50%;
+  transform: translateX(-50%);
+  background: #323232;
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 15px;
+  opacity: 0;
+  transition: opacity .3s;
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* ── MODAL POPUP ── */
+#imgModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.92);
+  z-index: 1000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: zoom-out;
+}
+#imgModal.open { display: flex; }
+#imgModal img {
+  max-width: 92vw;
+  max-height: 82vh;
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.6);
+  object-fit: contain;
+}
+#modalCaption {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-shadow: 0 1px 4px rgba(0,0,0,.8);
+}
+
+/* ── GUIDE PANEL (auto-show on field focus, draggable) ── */
+#guidePanel {
+  position: fixed;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  background: rgba(20,30,40,.95);
+  border-radius: 0 12px 12px 0;
+  padding: 10px;
+  z-index: 500;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 4px 0 24px rgba(0,0,0,.5);
+  max-width: 420px;
+  cursor: grab;
+  user-select: none;
+}
+#guidePanel.visible { display: flex; }
+#guidePanelImg {
+  max-width: 400px;
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+#guidePanelCaption {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+#guidePanelCollapse {
+  align-self: flex-end;
+  background: rgba(255,255,255,.15);
+  border: none; border-radius: 5px;
+  color: #fff; font-size: 12px;
+  padding: 2px 8px; cursor: pointer;
+  margin-bottom: 2px;
+}
+#guidePanelCollapse:hover { background: rgba(255,255,255,.3); }
+
+/* ── INLINE REFERENCE IMAGES (C / Hairpin / FIN) ── */
+.inline-img {
+  width: 100%;
+  max-height: 90px;
+  object-fit: contain;
+  border-radius: 4px;
+  cursor: zoom-in;
+  background: #263238;
+  display: block;
+  margin-bottom: 4px;
+}
+#modalClose {
+  position: fixed;
+  top: 14px; right: 18px;
+  color: #fff;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+  opacity: .8;
+}
+#modalClose:hover { opacity: 1; }
+
+/* ── WARP INPUTS ── */
+.warp-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin: 3px 0;
+}
+.warp-row input {
+  width: 100%;
+  padding: 3px 4px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 14px;
+  background: #fff;
+}
+
+/* ── D FLATNESS ── */
+.d-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.d-sub { font-size: 13px; font-weight: 700; color: #455a64; margin-bottom: 3px; }
+
+/* avg display */
+.avg-val {
+  text-align: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 16px;
+  padding: 2px;
+  border-radius: 3px;
+  margin-top: 2px;
+}
+.avg-ok  { color: var(--ok);    background: #c8e6c9; }
+.avg-ng  { color: var(--danger); background: #ffcdd2; }
+.avg-na  { color: #607080;       background: #eceff1; }
+
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-6px)}
+  40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="titleBar" style="position:relative">⚙ PROCESS EXPANDER — FIRST LOT CHECK &nbsp;<span id="dataStatus" style="font-size:10px;font-weight:400;opacity:.8">⏳ Loading...</span>
+    <span style="position:absolute;right:130px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:500;opacity:.7;letter-spacing:.4px;font-family:'Consolas','Courier New',monospace;color:#cde;border:1px solid rgba(255,255,255,.25);padding:2px 8px;border-radius:4px">Check Sheet CH-541-05-01 Rev.05</span>
+    <button onclick="openSharedDashboard()" style="float:right;font-size:12px;font-weight:600;color:#90caf9;background:rgba(255,255,255,.12);border:1px solid rgba(144,202,249,.4);padding:3px 12px;border-radius:5px;cursor:pointer;margin-top:1px">📊 Dashboard</button>
+  </div>
+
+  <div id="cols">
+
+    <!-- ═══════════════ LEFT COLUMN ═══════════════ -->
+    <div class="col" id="colLeft">
+      <div class="col-hdr">INPUT INFORMATION</div>
+
+      <!-- ID Card Scan -->
+      <div class="field">
+        <label>Scan ID Card <span class="req">*</span></label>
+        <div class="scan-row">
+          <input type="text" id="idCardScan" placeholder="🔍 Scan บัตร" autocomplete="off"
+            oninput="scanWith('idCardScan', lookupIDCard)" style="font-family:var(--mono);font-size:11px">
+        </div>
+        <div class="scan-status" id="idCardStatus"></div>
+      </div>
+
+      <div class="field">
+        <label>ชื่อผู้ตรวจ</label>
+        <input type="text" id="checker" readonly>
+      </div>
+      <input type="hidden" id="checkerID">
+
+      <!-- Machine / Line / Seq / Qty -->
+      <div class="sec-hdr">ข้อมูลงาน</div>
+
+      <div class="field">
+        <label>Scan เครื่องจักร <span class="req">*</span></label>
+        <div class="scan-row">
+          <input type="text" id="machineScan" placeholder="🔍 Scan บัตรเครื่อง" autocomplete="off"
+            oninput="scanWith('machineScan', lookupMachine)" style="font-family:var(--mono);font-size:11px">
+        </div>
+        <div class="scan-status" id="machineStatus"></div>
+      </div>
+      <div class="field">
+        <label>ชื่อเครื่องจักร</label>
+        <input type="text" id="machine" readonly>
+      </div>
+      <input type="hidden" id="machineCode">
+
+      <!-- FG Tag Scan -->
+      <div class="sec-hdr">FG TAG</div>
+      <div class="field">
+        <label>Scan FG TAG <span class="req">*</span></label>
+        <div class="scan-row">
+          <input type="text" id="itemFG" placeholder="🔍 Scan TAG" autocomplete="off"
+            oninput="scanWith('itemFG', updateSpecFromFG)" style="font-family:var(--mono);font-size:10px">
+        </div>
+        <div class="scan-status" id="fgStatus"></div>
+      </div>
+
+      <!-- SP1/SP2/SP3 SCAN -->
+      <div class="sec-hdr">Side Plate Scan</div>
+      <div id="spWrap1" style="display:none">
+        <div class="field">
+          <label>Scan SP1 <span class="req">*</span> <span id="spReq1" style="font-size:9px;color:var(--text-dim)"></span></label>
+          <div class="scan-row">
+            <input type="text" id="sp1" placeholder="🔍 Scan SP1" autocomplete="off"
+              oninput="scanWith('sp1', ()=>lookupSP(1))" style="font-family:var(--mono);font-size:10px">
+          </div>
+          <div class="scan-status" id="sp1Status"></div>
+        </div>
+      </div>
+      <div id="spWrap2" style="display:none">
+        <div class="field">
+          <label>Scan SP2 <span class="req">*</span> <span id="spReq2" style="font-size:9px;color:var(--text-dim)"></span></label>
+          <div class="scan-row">
+            <input type="text" id="sp2" placeholder="🔍 Scan SP2" autocomplete="off"
+              oninput="scanWith('sp2', ()=>lookupSP(2))" style="font-family:var(--mono);font-size:10px">
+          </div>
+          <div class="scan-status" id="sp2Status"></div>
+        </div>
+      </div>
+      <div id="spWrap3" style="display:none">
+        <div class="field">
+          <label>Scan SP3 <span class="req">*</span> <span id="spReq3" style="font-size:9px;color:var(--text-dim)"></span></label>
+          <div class="scan-row">
+            <input type="text" id="sp3" placeholder="🔍 Scan SP3" autocomplete="off"
+              oninput="scanWith('sp3', ()=>lookupSP(3))" style="font-family:var(--mono);font-size:10px">
+          </div>
+          <div class="scan-status" id="sp3Status"></div>
+        </div>
+      </div>
+      <div id="spNone" style="font-size:10px;color:var(--text-dim);padding:3px 0">— สแกน FG TAG ก่อน —</div>
+
+      <!-- Color Mark -->
+      <div class="sec-hdr">Mark Color</div>
+      <div class="color-btns" id="colorBtns">
+        <button class="color-btn cb-green"  data-color="G"  onclick="toggleColor('G')" >เขียว</button>
+        <button class="color-btn cb-blue"   data-color="B"  onclick="toggleColor('B')" >ฟ้า</button>
+        <button class="color-btn cb-red"    data-color="R"  onclick="toggleColor('R')" >แดง</button>
+        <button class="color-btn cb-white"  data-color="W"  onclick="toggleColor('W')" >ขาว</button>
+        <button class="color-btn cb-purple" data-color="P"  onclick="toggleColor('P')" >ม่วง</button>
+        <button class="color-btn cb-black"  data-color="BK" onclick="toggleColor('BK')">ดำ</button>
+        <button class="color-btn cb-yellow" data-color="Y"  onclick="toggleColor('Y')" >เหลือง</button>
+        <button class="color-btn cb-orange" data-color="O"  onclick="toggleColor('O')" >ส้ม</button>
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:2px">เลือกได้หลายสี (กดซ้ำเพื่อยกเลิก)</div>
+      <div id="colorResult" style="margin-top:5px;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;text-align:center;background:#eceff1;color:#607080">— รอ Scan FG TAG —</div>
+      <input type="hidden" id="markColor" value="">
+
+      <!-- Remark -->
+      <input type="hidden" id="remark" value="">
+      <div class="sec-hdr">Process Control</div>
+      <button onclick="openPCModal()" style="width:100%;padding:10px;background:#1565c0;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px;margin-bottom:4px">
+        📋 ดู Process Control
+      </button>
+      <div id="pcStatus" style="font-size:11px;color:var(--text-dim);text-align:center;min-height:16px"></div>
+
+    </div><!-- /colLeft -->
+
+
+    <!-- ═══════════════ MIDDLE COLUMN ═══════════════ -->
+    <div class="col" id="colMid">
+      <div class="col-hdr">VISUAL CHECK</div>
+
+      <!-- ── CHECK EL ── -->
+      <div class="sec-hdr">Check EL (mm.) : ตรวจสอบความยาว
+        <button class="photo-btn" onclick="zoomSrc('/expander/firstlot/images/image1.png','วัด EL ด้วยเทปวัด')">📷 ดูวิธีวัด</button>
+      </div>
+      <div class="meas-row cols3">
+        <input type="number" step="0.1" id="EL1" placeholder="1" oninput="calcAvg('EL')">
+        <input type="number" step="0.1" id="EL2" placeholder="2" oninput="calcAvg('EL')">
+        <input type="number" step="0.1" id="EL3" placeholder="3" oninput="calcAvg('EL')">
+      </div>
+      <div class="meas-lbl">EL 1 — 3</div>
+      <div class="avg-val avg-na" id="avgEL">AVG: —</div>
+
+      <!-- ── CHECK A ── -->
+      <div class="sec-hdr">Check A (mm.) : ตรวจสอบความสูงโค้ง
+        <button class="photo-btn" onclick="zoomSrc('/expander/firstlot/images/image2.png','วัด A ความสูงโค้ง')">📷 ดูวิธีวัด</button>
+      </div>
+      <div class="meas-row cols3">
+        <input type="number" step="0.1" id="A1" placeholder="1" oninput="calcAvg('A')">
+        <input type="number" step="0.1" id="A2" placeholder="2" oninput="calcAvg('A')">
+        <input type="number" step="0.1" id="A3" placeholder="3" oninput="calcAvg('A')">
+      </div>
+      <div class="meas-lbl">A 1 — 3</div>
+      <div class="avg-val avg-na" id="avgA">AVG: —</div>
+
+      <!-- ── CHECK B ── -->
+      <div class="sec-hdr">Check B (mm.) : ตรวจสอบคอ
+        <button class="photo-btn" onclick="zoomSrc('/expander/firstlot/images/image3.png','วัด B ความสูงคอ')">📷 ดูวิธีวัด</button>
+      </div>
+      <div class="meas-row cols3">
+        <input type="number" step="0.1" id="B1" placeholder="1" oninput="calcAvg('B')">
+        <input type="number" step="0.1" id="B2" placeholder="2" oninput="calcAvg('B')">
+        <input type="number" step="0.1" id="B3" placeholder="3" oninput="calcAvg('B')">
+      </div>
+      <div class="meas-lbl">B 1 — 3</div>
+      <div class="avg-val avg-na" id="avgB">AVG: —</div>
+
+      <!-- ── CHECK C WARPING ── -->
+      <div class="sec-hdr">Check C (mm.) : ตรวจสอบความโก่ง 2 ด้าน &lt;1.5 mm.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:4px 0">
+        <img src="/expander/firstlot/images/image4.png" alt="C ด้านหน้า" class="inline-img" onclick="zoomSrc('/expander/firstlot/images/image4.png','C ด้านหน้า')">
+        <img src="/expander/firstlot/images/image5.png" alt="C ด้านข้าง" class="inline-img" onclick="zoomSrc('/expander/firstlot/images/image5.png','C ด้านข้าง')">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+        <div>
+          <div class="d-sub">C1 — ตรวจจุดที่ 1</div>
+          <div class="okng-row">
+            <label><input type="radio" name="warpC1" value="OK" onchange="calcOverall()"> <span class="ok-lbl">OK</span></label>
+            <label><input type="radio" name="warpC1" value="NG" onchange="calcOverall()"> <span class="ng-lbl">NG</span></label>
+          </div>
+        </div>
+        <div>
+          <div class="d-sub">C2 — ตรวจจุดที่ 2</div>
+          <div class="okng-row">
+            <label><input type="radio" name="warpC2" value="OK" onchange="calcOverall()"> <span class="ok-lbl">OK</span></label>
+            <label><input type="radio" name="warpC2" value="NG" onchange="calcOverall()"> <span class="ng-lbl">NG</span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CHECK D FLATNESS ── -->
+      <div class="sec-hdr">Check D Flatness : อัตราการแบน &lt; 20%
+        <button class="photo-btn" onclick="zoomSrc('/expander/firstlot/images/image6.png','วัด D Vernier')">📷 Vernier</button>
+        <button class="photo-btn" onclick="zoomSrc('/expander/firstlot/images/image7.png','วัด D มุมด้านข้าง')">📷 มุม</button>
+      </div>
+      <div class="d-grid">
+        <div>
+          <div class="d-sub">D1 (ตำแหน่ง 1)</div>
+          <div class="meas-row cols3">
+            <input type="number" step="0.01" id="D1a" placeholder="a" oninput="calcD(1)">
+            <input type="number" step="0.01" id="D1b" placeholder="b" oninput="calcD(1)">
+            <input type="number" step="0.01" id="D1c" placeholder="c" oninput="calcD(1)">
+          </div>
+          <div class="avg-val avg-na" id="avgD1">AVG D1: —</div>
+        </div>
+        <div>
+          <div class="d-sub">D2 (ตำแหน่ง 2)</div>
+          <div class="meas-row cols3">
+            <input type="number" step="0.01" id="D2a" placeholder="a" oninput="calcD(2)">
+            <input type="number" step="0.01" id="D2b" placeholder="b" oninput="calcD(2)">
+            <input type="number" step="0.01" id="D2c" placeholder="c" oninput="calcD(2)">
+          </div>
+          <div class="avg-val avg-na" id="avgD2">AVG D2: —</div>
+        </div>
+      </div>
+
+      <!-- ── APPEARANCE ── -->
+      <div class="sec-hdr">Appearance</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <!-- Hairpin -->
+        <div>
+          <div class="d-sub">Hairpin Appearance</div>
+          <img src="/expander/firstlot/images/image8.png" alt="Hairpin" class="inline-img" onclick="zoomSrc('/expander/firstlot/images/image8.png','ตรวจสภาพ Hairpin')">
+          <div class="okng-row">
+            <label><input type="radio" name="apHairpin" value="OK" onchange="calcOverall()"> <span class="ok-lbl">OK</span></label>
+            <label><input type="radio" name="apHairpin" value="NG" onchange="calcOverall()"> <span class="ng-lbl">NG</span></label>
+          </div>
+        </div>
+        <!-- FIN -->
+        <div>
+          <div class="d-sub">FIN Appearance</div>
+          <img src="/expander/firstlot/images/image9.png" alt="FIN" class="inline-img" onclick="zoomSrc('/expander/firstlot/images/image9.png','ตรวจสภาพ FIN')">
+          <div class="okng-row">
+            <label><input type="radio" name="apFIN" value="OK" onchange="calcOverall()"> <span class="ok-lbl">OK</span></label>
+            <label><input type="radio" name="apFIN" value="NG" onchange="calcOverall()"> <span class="ng-lbl">NG</span></label>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /colMid -->
+
+
+    <!-- ═══════════════ RIGHT COLUMN ═══════════════ -->
+    <div class="col" id="colRight">
+      <div class="col-hdr">SPEC FROM MASTER</div>
+
+      <!-- Line / Seq / Lot -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:4px">
+        <div class="field">
+          <label>Line</label>
+          <input type="text" id="line" readonly style="background:#eceff1">
+        </div>
+        <div class="field">
+          <label>Seq</label>
+          <input type="text" id="seq" readonly style="background:#eceff1">
+        </div>
+        <div class="field">
+          <label>Lot</label>
+          <input type="text" id="qty" readonly style="background:#eceff1">
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:-5px;margin-bottom:6px">↑ ดึงจาก FG TAG อัตโนมัติ</div>
+
+      <!-- Item Info -->
+      <div class="sec-hdr" style="font-weight:800">Item Info</div>
+      <div class="field">
+        <label>Item FG</label>
+        <input type="text" id="dispFG" readonly>
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <input type="text" id="dispDesc" readonly>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div class="field">
+          <label>Type</label>
+          <input type="text" id="dispType" readonly>
+        </div>
+        <div class="field">
+          <label>Pipe</label>
+          <input type="text" id="dispPipe" readonly>
+        </div>
+      </div>
+
+      <!-- Spec Grid -->
+      <div class="sec-hdr" style="font-weight:800">Specification</div>
+      <div class="spec-grid" id="specGrid">
+        <div class="spec-cell"><div class="lbl">EL</div><div class="val" id="sEL">—</div></div>
+        <div class="spec-cell"><div class="lbl">A</div><div class="val" id="sA">—</div></div>
+        <div class="spec-cell"><div class="lbl">B</div><div class="val" id="sB">—</div></div>
+        <div class="spec-cell"><div class="lbl">SpecA</div><div class="val" id="sSpecA">—</div></div>
+        <div class="spec-cell"><div class="lbl">SpecB</div><div class="val" id="sSpecB">—</div></div>
+      </div>
+
+      <!-- Pitch / Hairpin / FIN Press -->
+      <div class="sec-hdr" style="font-weight:800">ชิ้นส่วน</div>
+      <div class="field">
+        <label>Pitch Item</label>
+        <input type="text" id="pitch" readonly>
+      </div>
+      <div class="field">
+        <label>Hairpin Item</label>
+        <input type="text" id="hairpinItem" readonly>
+      </div>
+      <div class="field">
+        <label>FIN Press Item</label>
+        <input type="text" id="finItem" readonly>
+      </div>
+
+      <!-- Flatness Result -->
+      <div class="sec-hdr" style="font-weight:800">ผล Flatness (D1–D2)</div>
+      <div class="avg-val avg-na" id="flatResult">—</div>
+
+      <!-- Confirm Checker -->
+      <div class="sec-hdr" style="font-weight:800">Confirm Checker</div>
+      <div class="field">
+        <label>Scan ID Confirm (GL/FM) <span class="req">*</span></label>
+        <div class="scan-row">
+          <input type="text" id="confirmCheckerScan" placeholder="🔍 Scan บัตร" autocomplete="off"
+            oninput="scanWith('confirmCheckerScan', lookupConfirmChecker)" style="font-family:var(--mono);font-size:11px">
+        </div>
+        <div class="scan-status" id="confirmCheckerStatus"></div>
+      </div>
+      <div class="field">
+        <label>ชื่อ Confirm Checker</label>
+        <input type="text" id="confirmChecker" readonly>
+      </div>
+
+      <!-- Status -->
+      <div class="sec-hdr" style="font-weight:800">ผลการตรวจ</div>
+      <div id="statusOverall" class="result-box result-na">—</div>
+
+      <!-- OK Point Counter -->
+      <div id="okCounter" style="display:none"></div>
+
+      <!-- Record Button -->
+      <button id="btnRecord" onclick="saveRecord()">💾 RECORD</button>
+
+      <!-- Reset Button -->
+      <button id="btnReset" onclick="confirmReset()">🔄 RESET ล้างข้อมูล</button>
+
+      <!-- Record Count -->
+      <div style="text-align:center;font-size:10px;color:var(--text-dim);margin-top:6px">
+        Records saved: <span id="recCount">0</span>
+      </div>
+    </div><!-- /colRight -->
+
+  </div><!-- /cols -->
+</div><!-- /app -->
+
+<!-- Guide Panel (auto-show on measurement field focus) -->
+<div id="guidePanel">
+  <button id="guidePanelCollapse" onclick="collapseGuide()">▼ พับรูป</button>
+  <img id="guidePanelImg" src="" alt="" onclick="zoomSrc(this.src, document.getElementById('guidePanelCaption').textContent)">
+  <div id="guidePanelCaption"></div>
+</div>
+
+<!-- Process Control Modal -->
+<div id="pcModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:900;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+  <div style="background:#1a2332;border-radius:12px;padding:16px;max-width:90vw;max-height:90vh;overflow:auto;text-align:center">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span id="pcTitle" style="color:#90caf9;font-size:15px;font-weight:700"></span>
+      <button onclick="closePCModal()" style="background:#c62828;color:#fff;border:none;border-radius:6px;padding:4px 14px;font-size:13px;cursor:pointer;margin-left:20px">✕ ปิด</button>
+    </div>
+    <div id="pcImgWrap">
+      <img id="pcImg" src="" alt="" style="max-width:80vw;max-height:75vh;border-radius:8px;object-fit:contain">
+      <div id="pcNotFound" style="display:none;color:#ef9a9a;font-size:14px;padding:40px 20px">
+        ⚠ ไม่พบไฟล์ Process Control สำหรับ Item นี้<br>
+        <span id="pcFilename" style="font-size:11px;opacity:.7"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Popup Modal -->
+<div id="imgModal" onclick="closeZoom()">
+  <span id="modalClose">✕</span>
+  <img id="modalImg" src="" alt="">
+  <div id="modalCaption"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// DATA STORE
+// ═══════════════════════════════════════════════════════
+let EMPLOYEES = {}, MACHINES = {}, CHECKERS = {}, masterData = {}, COLORS = {};
+let records = [];
+let _markColors = new Set();
+
+// ── Scan debounce + 4-second re-scan lock ───────────────
+// Each barcode field gets its own settle timer and lock timestamp.
+// SCAN_SETTLE  : wait until barcode scanner finishes typing (ms)
+// SCAN_LOCK_MS : block re-scan after a successful read (ms)
+const _scanTimer   = {};          // fieldId → pending settle-timer handle
+const _scanLockUntil = {};        // fieldId → timestamp (ms) when lock expires
+const SCAN_SETTLE  = 150;         // ms of silence → scan considered complete
+const SCAN_LOCK_MS = 4000;        // ms to block the same field after success
+
+function scanWith(fieldId, fn) {
+  clearTimeout(_scanTimer[fieldId]);
+  _scanTimer[fieldId] = setTimeout(() => {
+    const now = Date.now();
+    if (_scanLockUntil[fieldId] && now < _scanLockUntil[fieldId]) {
+      // Still inside the 4-second cool-down → reject & flash red
+      const el = document.getElementById(fieldId);
+      if (el) {
+        const was = el.style.outline;
+        el.style.outline = '2px solid #e53935';
+        setTimeout(() => { el.style.outline = was; }, 500);
+      }
+      return;
+    }
+    fn();                                          // run the real handler
+    _scanLockUntil[fieldId] = Date.now() + SCAN_LOCK_MS; // set 4 s lock
+  }, SCAN_SETTLE);
+}
+
+// Call this after a RESET so all locks are cleared immediately
+function clearScanLocks() {
+  Object.keys(_scanTimer).forEach(k => clearTimeout(_scanTimer[k]));
+  Object.keys(_scanLockUntil).forEach(k => delete _scanLockUntil[k]);
+}
+
+async function loadData() {
+  try {
+    const [emp, mch, chk, itm, clr] = await Promise.all([
+      fetch('/expander/firstlot/data/employees.json').then(r => r.json()),
+      fetch('/expander/firstlot/data/machines.json').then(r => r.json()),
+      fetch('/expander/firstlot/data/checkers.json').then(r => r.json()),
+      fetch('/expander/firstlot/data/items.json').then(r => r.json()),
+      fetch('/expander/firstlot/data/colors.json').then(r => r.json()),
+    ]);
+    EMPLOYEES = emp;
+    MACHINES  = mch;
+    CHECKERS  = chk;
+    COLORS    = clr;
+
+    Object.entries(itm).forEach(([fg, d]) => {
+      masterData[fg.toUpperCase()] = {
+        EL:      d.el,
+        A:       d.pipe === '7' ? 14.5 : 11.5,
+        B:       d.pipe === '7' ? 13.0 : 9.5,
+        specA:   d.specA  || (d.pipe === '7' ? '14~15' : '11~12'),
+        specB:   d.specB  || (d.pipe === '7' ? '12~14' : '9~10'),
+        specC:   d.specC  || '',
+        specD:   d.specD  || '<20%',
+        pitch:   d.pitch  || '',
+        hairpin: d.hairpinItem || '',
+        fin:     d.finItem     || '',
+        type:    d.type        || '',
+        desc:    d.desc        || '',
+        pipe:    parseFloat(d.pipe) || 5,
+        sp1Item: d.sp1Item || 'NA',
+        sp2Item: d.sp2Item || 'NA',
+        sp3Item: d.sp3Item || 'NA',
+      };
+    });
+    const st = document.getElementById('dataStatus');
+    st.textContent = '✓ ' + Object.keys(EMPLOYEES).length + ' emp | '
+      + Object.keys(masterData).length + ' items | '
+      + Object.keys(MACHINES).length + ' MC';
+    st.style.color = '#a5d6a7';
+  } catch(e) {
+    console.warn('loadData failed:', e);
+    const st = document.getElementById('dataStatus');
+    st.textContent = '✗ โหลดข้อมูลไม่สำเร็จ: ' + e.message;
+    st.style.color = '#ef9a9a';
+  }
+}
+loadData();
+
+// ═══════════════════════════════════════════════════════
+// HELPER
+// ═══════════════════════════════════════════════════════
+function fgFromRaw(raw) {
+  const r = raw.trim();
+  // Barcode: MID(val,65,11) = substring(64,75)
+  if (r.length >= 75) return r.substring(64, 75).trim().toUpperCase();
+  return r.toUpperCase();
+}
+
+function resolveEmployee(raw) {
+  const r = raw.trim();
+  if (!r) return null;
+  // Try barcode format first: MID(val,6,5) = substring(5,10)
+  if (r.length >= 10) {
+    const id = r.substring(5, 10);
+    if (EMPLOYEES[id]) return { id, name: EMPLOYEES[id] };
+  }
+  // Try last 5 chars
+  const tail = r.slice(-5);
+  if (EMPLOYEES[tail]) return { id: tail, name: EMPLOYEES[tail] };
+  // Try direct key
+  if (EMPLOYEES[r]) return { id: r, name: EMPLOYEES[r] };
+  return null;
+}
+
+function resolveMachine(raw) {
+  const r = raw.trim();
+  if (!r) return null;
+  // Barcode: MID(val,6,4) = substring(5,9)
+  if (r.length >= 9) {
+    const code = r.substring(5, 9);
+    if (MACHINES[code]) return { code, name: MACHINES[code] };
+  }
+  // Try last 4 chars
+  const tail4 = r.slice(-4);
+  if (MACHINES[tail4]) return { code: tail4, name: MACHINES[tail4] };
+  // Try direct key (user typed EX04 directly)
+  if (MACHINES[r.toUpperCase()]) return { code: r.toUpperCase(), name: MACHINES[r.toUpperCase()] };
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════
+// ID CARD LOOKUP
+// ═══════════════════════════════════════════════════════
+function lookupIDCard() {
+  const raw  = document.getElementById('idCardScan').value;
+  const stEl = document.getElementById('idCardStatus');
+  if (!raw.trim()) { stEl.textContent = ''; return; }
+  const result = resolveEmployee(raw);
+  if (result) {
+    document.getElementById('checker').value   = result.name;
+    document.getElementById('checkerID').value = result.id;
+    stEl.style.color = 'var(--ok)';
+    stEl.textContent = '✓ ' + result.name;
+  } else {
+    document.getElementById('checker').value   = '';
+    document.getElementById('checkerID').value = '';
+    stEl.style.color = 'var(--danger)';
+    stEl.textContent = '✗ ไม่พบรหัส [' + raw.trim().substring(5,10) + ']';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MACHINE LOOKUP
+// ═══════════════════════════════════════════════════════
+function lookupMachine() {
+  const raw  = document.getElementById('machineScan').value;
+  const stEl = document.getElementById('machineStatus');
+  if (!raw.trim()) { stEl.textContent = ''; return; }
+  const result = resolveMachine(raw);
+  if (result) {
+    document.getElementById('machine').value     = result.name;
+    document.getElementById('machineCode').value = result.code;
+    stEl.style.color = 'var(--ok)';
+    stEl.textContent = '✓ ' + result.code + ' — ' + result.name;
+  } else {
+    document.getElementById('machine').value     = '';
+    document.getElementById('machineCode').value = '';
+    stEl.style.color = 'var(--danger)';
+    stEl.textContent = '✗ ไม่พบเครื่อง [' + raw.trim() + ']';
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// FG TAG — spec + Line/Seq/Lot extraction
+//   LINE = MID(val,116,2) = substring(115,117)
+//   SEQ  = MID(val,118,4) = substring(117,121)
+//   LOT  = MID(val,167,6) = substring(166,172)
+// ═══════════════════════════════════════════════════════
+function updateSpecFromFG() {
+  const raw  = document.getElementById('itemFG').value.trim();
+  const stEl = document.getElementById('fgStatus');
+  const v    = fgFromRaw(raw);
+  const m    = masterData[v];
+
+  document.getElementById('dispFG').value = v;
+
+  // Auto-fill Line / Seq / Lot from barcode positions (only for full barcodes)
+  if (raw.length >= 121) {
+    const line = raw.substring(115, 117).trim();
+    const seq  = raw.substring(117, 121).trim().replace(/^0+/, '') || '0';
+    if (line) document.getElementById('line').value = line;
+    if (seq)  document.getElementById('seq').value  = seq;
+  }
+  if (raw.length >= 172) {
+    const lot = raw.substring(166, 172).trim().replace(/^0+/, '') || '';
+    if (lot) document.getElementById('qty').value = lot;
+  }
+
+  if (m) {
+    document.getElementById('dispDesc').value     = m.desc;
+    document.getElementById('dispType').value     = m.type;
+    document.getElementById('dispPipe').value     = m.pipe ? m.pipe + '"' : '';
+    document.getElementById('sEL').textContent    = m.EL    !== undefined ? m.EL : '—';
+    document.getElementById('sA').textContent     = m.A     || '—';
+    document.getElementById('sB').textContent     = m.B     || '—';
+    document.getElementById('sSpecA').textContent = m.specA || '—';
+    document.getElementById('sSpecB').textContent = m.specB || '—';
+    document.getElementById('pitch').value        = m.pitch  || '';
+    document.getElementById('hairpinItem').value  = m.hairpin || '';
+    document.getElementById('finItem').value      = m.fin    || '';
+    stEl.style.color = 'var(--ok)';
+    stEl.textContent = '✓ ' + (m.type || v) + (m.desc ? ' — ' + m.desc : '');
+    showSPFields(m.sp1Item, m.sp2Item, m.sp3Item);
+    colorCheckMark();
+    calcOverall();
+  } else if (v) {
+    stEl.style.color = 'var(--danger)';
+    stEl.textContent = '✗ ไม่พบ [' + v + '] (items: ' + Object.keys(masterData).length + ')';
+    clearSpec();
+    colorCheckMark();
+  }
+}
+
+function clearSpec() {
+  ['dispDesc','dispType','dispPipe','pitch','hairpinItem','finItem']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  ['sEL','sA','sB','sSpecA','sSpecB']
+    .forEach(id => { document.getElementById(id).textContent = '—'; });
+  showSPFields('NA','NA','NA');
+}
+
+// ─── SP FIELDS SHOW/HIDE ─────────────────────────────────
+function showSPFields(sp1, sp2, sp3) {
+  const items = [sp1, sp2, sp3];
+  let anyRequired = false;
+  items.forEach((code, i) => {
+    const n    = i + 1;
+    const wrap = document.getElementById('spWrap' + n);
+    const req  = document.getElementById('spReq' + n);
+    const inp  = document.getElementById('sp' + n);
+    const st   = document.getElementById('sp' + n + 'Status');
+    const isNA = !code || code.toUpperCase() === 'NA';
+    wrap.style.display = isNA ? 'none' : 'block';
+    if (!isNA) {
+      req.textContent = '(' + code + ')';
+      inp.value = '';
+      st.textContent = '';
+      anyRequired = true;
+    }
+  });
+  document.getElementById('spNone').style.display = anyRequired ? 'none' : 'block';
+  rebuildTabOrder();
+}
+
+// ─── SP ITEM FROM BARCODE: TEXTSPLIT(val,"|")[10] (0-based) ──
+function spItemFromBarcode(raw) {
+  const parts = raw.split('|');
+  // ดึง item code: ถ้ามี pipe ≥11 ส่วน → ใช้ตำแหน่ง [10], ไม่งั้นใช้ raw
+  let code = parts.length > 10 ? parts[10].trim().toUpperCase() : raw.trim().toUpperCase();
+  // SP item จริงต้องลงท้าย -F เสมอ → เติมให้อัตโนมัติถ้ายังไม่มี
+  if (code && code !== 'NA' && !code.endsWith('-F')) {
+    code = code + '-F';
+  }
+  return code;
+}
+
+// ─── SP LOOKUP & VALIDATE ────────────────────────────────
+function lookupSP(n) {
+  const raw  = document.getElementById('sp' + n).value;
+  const stEl = document.getElementById('sp' + n + 'Status');
+  if (!raw.trim()) { stEl.textContent = ''; calcOverall(); return; }
+
+  const scanned = spItemFromBarcode(raw);
+  const fg      = fgFromRaw(document.getElementById('itemFG').value.trim());
+  const m       = masterData[fg];
+
+  if (!m) { stEl.textContent = '— รอ Scan FG —'; calcOverall(); return; }
+
+  const expected = (m['sp' + n + 'Item'] || 'NA');
+
+  // นับจำนวน SP slot ที่เปิดอยู่ (visible)
+  const visibleSP = [1,2,3].filter(i =>
+    document.getElementById('spWrap' + i).style.display !== 'none'
+  );
+  const spCount = visibleSP.length;
+
+  if (spCount >= 2) {
+    // ─── กรณี 2 หรือ 3 SP: สแกน item ไหนก็ได้ใน pool (ห้ามซ้ำ) ───
+    const poolKeys = spCount === 2
+      ? [m.sp1Item, m.sp2Item]
+      : [m.sp1Item, m.sp2Item, m.sp3Item];
+    const pool = poolKeys
+      .filter(x => x && x !== 'NA')
+      .map(x => x.trim().toUpperCase());
+
+    // Strict qty: ห้ามสแกน SP ตัวเดียวกันซ้ำในอีกช่อง
+    const isDup = visibleSP.some(i => {
+      if (i === n) return false;
+      const other = document.getElementById('sp'+i).value.trim();
+      return other && spItemFromBarcode(other) === scanned;
+    });
+
+    if (pool.length === 0 || expected === 'NA') {
+      stEl.style.color = 'var(--danger)';
+      stEl.textContent = '✗ Item นี้ไม่ต้องใช้ SP' + n;
+    } else if (!pool.includes(scanned)) {
+      stEl.style.color = 'var(--danger)';
+      stEl.textContent = '✗ WRONG ITEM (ต้องการ: ' + pool.join(' หรือ ') + ')';
+    } else if (isDup) {
+      stEl.style.color = 'var(--danger)';
+      stEl.textContent = '✗ ซ้ำ — สแกน SP ตัวเดียวกัน';
+    } else {
+      stEl.style.color = 'var(--ok)';
+      stEl.textContent = '✓ OK — ' + scanned;
+    }
+
+  } else {
+    // ─── กรณี 1 SP: ตรวจตรงตำแหน่ง ───
+    if (expected === 'NA') {
+      stEl.style.color = 'var(--danger)';
+      stEl.textContent = '✗ Item นี้ไม่ต้องใช้ SP' + n;
+    } else if (scanned === expected.toUpperCase()) {
+      stEl.style.color = 'var(--ok)';
+      stEl.textContent = '✓ OK — ' + scanned;
+    } else {
+      stEl.style.color = 'var(--danger)';
+      stEl.textContent = '✗ WRONG ITEM (ต้องการ: ' + expected + ')';
+    }
+  }
+  calcOverall();
+}
+
+// ─── TAB ORDER REBUILD (based on visible SP fields) ──────
+function rebuildTabOrder() {
+  const spFields = [];
+  [1,2,3].forEach(n => {
+    if (document.getElementById('spWrap'+n).style.display !== 'none')
+      spFields.push('sp'+n);
+  });
+  window._dynamicTabOrder = [
+    'idCardScan', 'machineScan', 'itemFG',
+    ...spFields,
+    'EL1','EL2','EL3',
+    'A1','A2','A3',
+    'B1','B2','B3',
+    'D1a','D1b','D1c','D2a','D2b','D2c',
+    'confirmCheckerScan','remark'
+  ];
+}
+
+// ═══════════════════════════════════════════════════════
+// CONFIRM CHECKER LOOKUP
+// ═══════════════════════════════════════════════════════
+function lookupConfirmChecker() {
+  const raw  = document.getElementById('confirmCheckerScan').value;
+  const stEl = document.getElementById('confirmCheckerStatus');
+  if (!raw.trim()) { stEl.textContent = ''; document.getElementById('confirmChecker').value = ''; calcOverall(); return; }
+  const id    = raw.trim().substring(5, 10);
+  const entry = CHECKERS[id] || CHECKERS[raw.trim().slice(-5)];
+  if (entry) {
+    document.getElementById('confirmChecker').value = entry.name || entry;
+    stEl.style.color = 'var(--ok)';
+    stEl.textContent = '✓ ' + (entry.name || entry) + (entry.role ? ' (' + entry.role + ')' : '');
+  } else {
+    document.getElementById('confirmChecker').value = '';
+    stEl.style.color = 'var(--danger)';
+    stEl.textContent = '✗ ไม่พบ [' + id + ']';
+  }
+  calcOverall();
+}
+
+// ═══════════════════════════════════════════════════════
+// COLOR MARK CHECK
+//   DB: COLORS[fg] = array of required codes e.g. ['G','B']
+//   Logic: selection must exactly match required set
+// ═══════════════════════════════════════════════════════
+const ALL_COLOR_CODES = ['G','B','R','W','P','BK','Y','O'];
+
+function toggleColor(c) {
+  if (_markColors.has(c)) _markColors.delete(c);
+  else _markColors.add(c);
+  document.getElementById('markColor').value = [..._markColors].join(',');
+  document.querySelectorAll('.color-btn').forEach(b =>
+    b.classList.toggle('active', _markColors.has(b.getAttribute('data-color')))
+  );
+  colorCheckMark();
+  calcOverall();
+}
+
+function colorCheckMark() {
+  const raw = document.getElementById('itemFG').value.trim();
+  const v   = fgFromRaw(raw);
+  const el  = document.getElementById('colorResult');
+
+  if (!v || !(v in COLORS)) {
+    el.style.cssText = 'background:#eceff1;color:#607080;margin-top:5px;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;text-align:center';
+    el.textContent = '— รอ Scan FG TAG —';
+    return;
+  }
+
+  const required = new Set(COLORS[v]);
+
+  // Exact match: every required color is selected AND no extra colors selected
+  let allMatch = true;
+  for (const c of ALL_COLOR_CODES) {
+    if (required.has(c) !== _markColors.has(c)) { allMatch = false; break; }
+  }
+
+  if (required.size === 0 && _markColors.size === 0) {
+    el.style.cssText = 'background:#e3f2fd;color:#1565c0;margin-top:5px;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;text-align:center';
+    el.textContent = 'ไม่ระบุ Mark Color';
+  } else if (allMatch) {
+    el.style.cssText = 'background:#c8e6c9;color:#2e7d32;margin-top:5px;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;text-align:center';
+    el.textContent = '✓ Mark Color OK';
+  } else {
+    const reqNames = [...required].join(', ') || 'ไม่มี';
+    el.style.cssText = 'background:#ffcdd2;color:#c62828;margin-top:5px;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;text-align:center';
+    el.textContent = '✗ NG — ต้องการ: ' + reqNames;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// MEASUREMENTS
+// ═══════════════════════════════════════════════════════
+function avg(ids) {
+  const vals = ids.map(id => parseFloat(document.getElementById(id).value)).filter(n => !isNaN(n));
+  return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : null;
+}
+
+function calcAvg(dim) {
+  const a  = avg(['1','2','3'].map(i => dim + i));
+  const el = document.getElementById('avg' + dim);
+  if (a === null) { el.className = 'avg-val avg-na'; el.textContent = 'AVG: —'; return; }
+
+  const v = fgFromRaw(document.getElementById('itemFG').value.trim());
+  const m = masterData[v];
+  let ok  = true;
+  if (m) {
+    if (dim === 'EL') {
+      const spec = parseFloat(m.EL);
+      if (!isNaN(spec)) ok = Math.abs(a - spec) <= 1.0;
+    } else if (dim === 'A') {
+      const [lo, hi] = parseSpecRange(m.specA);
+      if (lo !== null) ok = a >= lo && a <= hi;
+    } else if (dim === 'B') {
+      const [lo, hi] = parseSpecRange(m.specB);
+      if (lo !== null) ok = a >= lo && a <= hi;
+    }
+  }
+  el.className  = 'avg-val ' + (ok ? 'avg-ok' : 'avg-ng');
+  el.textContent = 'AVG: ' + a.toFixed(2) + (ok ? ' ✓' : ' ✗');
+  calcOverall();
+}
+
+function parseSpecRange(spec) {
+  if (!spec) return [null, null];
+  const m = String(spec).match(/([\d.]+)\s*[~\-]\s*([\d.]+)/);
+  return m ? [parseFloat(m[1]), parseFloat(m[2])] : [null, null];
+}
+
+function calcD(n) {
+  const a  = avg(['D'+n+'a','D'+n+'b','D'+n+'c']);
+  const el = document.getElementById('avgD'+n);
+  if (a === null) { el.className='avg-val avg-na'; el.textContent='AVG D'+n+': —'; calcOverall(); return; }
+  el.className  = 'avg-val avg-na';
+  el.textContent = 'AVG D'+n+': ' + a.toFixed(3);
+  updateFlatResult();
+  calcOverall();
+}
+
+function getPipeOD() {
+  const v = fgFromRaw(document.getElementById('itemFG').value.trim());
+  const m = masterData[v];
+  return m ? (m.pipe || 5) : 5;
+}
+
+function getSpecDLimit() {
+  const v = fgFromRaw(document.getElementById('itemFG').value.trim());
+  const m = masterData[v];
+  if (!m || !m.specD) return 20;
+  const match = String(m.specD).match(/([\d.]+)/);
+  return match ? parseFloat(match[1]) : 20;
+}
+
+function updateFlatResult() {
+  const d1   = avg(['D1a','D1b','D1c']);
+  const d2   = avg(['D2a','D2b','D2c']);
+  const fl   = document.getElementById('flatResult');
+  if (d1 === null || d2 === null) { fl.className='avg-val avg-na'; fl.textContent='—'; return; }
+
+  // Formula: ((D1 - D2) / pipeOD) * 100  [%]
+  const pipeOD = getPipeOD();
+  const pct    = ((d1 - d2) / pipeOD) * 100;
+  const absPct = Math.abs(pct);
+  const limit  = getSpecDLimit();
+  const ok     = absPct <= limit;
+
+  fl.className  = 'avg-val ' + (ok ? 'avg-ok' : 'avg-ng');
+  fl.textContent = 'D%: ' + pct.toFixed(1) + '% (limit ≤' + limit + '%) ' + (ok ? '✓ OK' : '✗ NG');
+  // ไม่เรียก calcOverall() ที่นี่ — calcD() จะเรียกต่อเอง เพื่อกันวนซ้ำ
+}
+
+// ── POINT CHECK (content/correctness) — no quantity threshold ──
+//   PASS = every applicable point is COMPLETE and CORRECT + Confirm Checker.
+//     ng         → a filled point is wrong/out-of-spec  → FAIL
+//     incomplete → a required point is not yet filled    → "ตรวจไม่ครบ"
+//     entered    → at least one meaningful field touched → else "รอตรวจ"
+function calcOverall() {
+  updateFlatResult();
+  let ng = false, incomplete = false, entered = false;
+
+  const fgRaw = document.getElementById('itemFG').value.trim();
+  const fgV   = fgFromRaw(fgRaw);
+  const m     = masterData[fgV];
+
+  // 1) ID Card  2) Machine  3) FG TAG — required scans (content valid)
+  if (document.getElementById('checkerID').value.trim())   entered = true; else incomplete = true;
+  if (document.getElementById('machineCode').value.trim()) entered = true; else incomplete = true;
+  if (fgRaw) { entered = true; if (!m) ng = true; } else incomplete = true;
+
+  // 6) EL, A, B — require all 3 values AND average within spec
+  ['EL','A','B'].forEach(dim => {
+    const vals = ['1','2','3'].map(i => parseFloat(document.getElementById(dim+i).value)).filter(x => !isNaN(x));
+    const el   = document.getElementById('avg'+dim);
+    if (vals.length) entered = true;
+    if (vals.length < 3)                    incomplete = true;
+    else if (el.className.includes('avg-ng')) ng = true;
+  });
+
+  // 6) D1, D2 — require all 3 values each   8) Flatness within spec
+  let dComplete = true;
+  [1,2].forEach(n => {
+    const vals = ['a','b','c'].map(s => parseFloat(document.getElementById('D'+n+s).value)).filter(x => !isNaN(x));
+    if (vals.length) entered = true;
+    if (vals.length < 3) { incomplete = true; dComplete = false; }
+  });
+  const fl = document.getElementById('flatResult');
+  if (!dComplete || fl.className.includes('avg-na')) incomplete = true;
+  else if (fl.className.includes('avg-ng'))          ng = true;
+
+  // 7) C1, C2, Hairpin, FIN — must be OK
+  ['warpC1','warpC2','apHairpin','apFIN'].forEach(nm => {
+    const r = document.querySelector('input[name="'+nm+'"]:checked');
+    if (!r) incomplete = true;
+    else { entered = true; if (r.value !== 'OK') ng = true; }
+  });
+
+  // 4) SIDE PLATE — strict: # of valid scans MUST exactly equal expected qty
+  if (m) {
+    const expQty = [1,2,3].filter(n => {
+      const c = m['sp'+n+'Item'];
+      return c && c.toUpperCase() !== 'NA';
+    }).length;
+    if (expQty > 0) {
+      let valid = 0;
+      [1,2,3].forEach(n => {
+        if (document.getElementById('spWrap'+n).style.display === 'none') return;
+        const inp = document.getElementById('sp'+n);
+        const stt = document.getElementById('sp'+n+'Status');
+        if (inp.value.trim()) entered = true;
+        if (stt.textContent.startsWith('✓'))      valid++;
+        else if (stt.textContent.startsWith('✗')) ng = true;   // wrong / duplicate scan
+      });
+      if (valid !== expQty && !ng) incomplete = true;          // missing scan(s)
+    }
+  }
+
+  // 5) Mark Color — no color required ⇒ OK; required ⇒ exact match
+  if (m && fgV in COLORS) {
+    const req = new Set(COLORS[fgV]);
+    if (req.size > 0) {
+      let match = true;
+      for (const c of ALL_COLOR_CODES)
+        if (req.has(c) !== _markColors.has(c)) { match = false; break; }
+      if (match)                       entered = true;
+      else if (_markColors.size === 0) incomplete = true;
+      else                             ng = true;
+    }
+  }
+
+  // 9) Confirm Checker
+  const ccOk = !!document.getElementById('confirmChecker').value.trim();
+
+  const st = document.getElementById('statusOverall');
+  if (!entered)        { st.className='result-box result-na'; st.textContent='— รอตรวจ —'; }
+  else if (ng)         { st.className='result-box result-ng'; st.textContent='✗ FAIL'; }
+  else if (incomplete) { st.className='result-box result-na'; st.textContent='⏳ ตรวจไม่ครบ'; }
+  else if (!ccOk)      { st.className='result-box result-na'; st.textContent='⚠ รอ Scan Confirm Checker'; }
+  else                 { st.className='result-box result-ok'; st.textContent='✓ PASS'; }
+}
+
+// ═══════════════════════════════════════════════════════
+// GUIDE PANEL — auto-show on measurement field focus
+// ═══════════════════════════════════════════════════════
+const FIELD_GUIDE = {
+  'EL1': ['/expander/firstlot/images/image1.png','วัด EL ด้วยเทปวัด'],
+  'EL2': ['/expander/firstlot/images/image1.png','วัด EL ด้วยเทปวัด'],
+  'EL3': ['/expander/firstlot/images/image1.png','วัด EL ด้วยเทปวัด'],
+  'A1':  ['/expander/firstlot/images/image2.png','วัด A ความสูงโค้ง'],
+  'A2':  ['/expander/firstlot/images/image2.png','วัด A ความสูงโค้ง'],
+  'A3':  ['/expander/firstlot/images/image2.png','วัด A ความสูงโค้ง'],
+  'B1':  ['/expander/firstlot/images/image3.png','วัด B ความสูงคอ'],
+  'B2':  ['/expander/firstlot/images/image3.png','วัด B ความสูงคอ'],
+  'B3':  ['/expander/firstlot/images/image3.png','วัด B ความสูงคอ'],
+  'D1a': ['/expander/firstlot/images/image7.png','วัด D มุมด้านข้าง'],
+  'D1b': ['/expander/firstlot/images/image7.png','วัด D มุมด้านข้าง'],
+  'D1c': ['/expander/firstlot/images/image7.png','วัด D มุมด้านข้าง'],
+  'D2a': ['/expander/firstlot/images/image6.png','วัด D Vernier'],
+  'D2b': ['/expander/firstlot/images/image6.png','วัด D Vernier'],
+  'D2c': ['/expander/firstlot/images/image6.png','วัด D Vernier'],
+};
+
+document.addEventListener('focusin', function(e) {
+  const guide = FIELD_GUIDE[e.target.id];
+  const panel = document.getElementById('guidePanel');
+  if (guide) {
+    document.getElementById('guidePanelImg').src = guide[0];
+    document.getElementById('guidePanelCaption').textContent = guide[1];
+    panel.classList.add('visible');
+  } else {
+    panel.classList.remove('visible');
+  }
+});
+
+// Drag to move guide panel
+(function() {
+  const panel = document.getElementById('guidePanel');
+  let dragging = false, startX, startY, startLeft, startTop;
+
+  panel.addEventListener('mousedown', function(e) {
+    if (e.target === document.getElementById('guidePanelImg')) return;
+    dragging = true;
+    const rect = panel.getBoundingClientRect();
+    panel.style.right    = 'auto';
+    panel.style.transform = 'none';
+    panel.style.left = rect.left + 'px';
+    panel.style.top  = rect.top  + 'px';
+    startX = e.clientX; startY = e.clientY;
+    startLeft = rect.left; startTop = rect.top;
+    panel.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    panel.style.left = (startLeft + e.clientX - startX) + 'px';
+    panel.style.top  = (startTop  + e.clientY - startY) + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (dragging) { dragging = false; panel.style.cursor = 'grab'; }
+  });
+})();
+
+// ═══════════════════════════════════════════════════════
+// GUIDE PANEL — collapse button
+// ═══════════════════════════════════════════════════════
+function collapseGuide() {
+  document.getElementById('guidePanel').classList.remove('visible');
+}
+
+// ═══════════════════════════════════════════════════════
+// PROCESS CONTROL MODAL
+// ═══════════════════════════════════════════════════════
+function openPCModal() {
+  const raw = document.getElementById('itemFG').value.trim();
+  if (!raw) {
+    document.getElementById('pcStatus').textContent = '⚠ กรุณา Scan FG TAG ก่อน';
+    return;
+  }
+  // ใช้ fgFromRaw() เดียวกับระบบ — ตัด Item Code จาก barcode
+  const itemCode = fgFromRaw(raw);
+  const filename = itemCode + '-EXP.jpg';
+  const url = '/expander/firstlot/process-control/' + filename;
+
+  document.getElementById('pcTitle').textContent = 'Process Control : ' + itemCode;
+  document.getElementById('pcFilename').textContent = filename;
+  document.getElementById('pcStatus').textContent = '📋 ' + itemCode + '-EXP.jpg';
+
+  const img = document.getElementById('pcImg');
+  const notFound = document.getElementById('pcNotFound');
+  img.style.display = 'none';
+  notFound.style.display = 'none';
+
+  img.onload  = function() { img.style.display = 'block'; notFound.style.display = 'none'; };
+  img.onerror = function() {
+    img.style.display = 'none';
+    notFound.style.display = 'block';
+    // ลอง uppercase extension
+    if (!img.src.includes('.JPG')) {
+      img.src = '/expander/firstlot/process-control/' + itemCode + '-EXP.JPG';
+    }
+  };
+  img.src = url;
+
+  document.getElementById('pcModal').style.display = 'flex';
+}
+
+function closePCModal() {
+  document.getElementById('pcModal').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closePCModal(); closeZoom(); }
+});
+
+// ═══════════════════════════════════════════════════════
+// IMAGE POPUP MODAL
+// ═══════════════════════════════════════════════════════
+function zoomSrc(src, caption) {
+  document.getElementById('modalImg').src = src;
+  document.getElementById('modalCaption').textContent = caption || '';
+  document.getElementById('imgModal').classList.add('open');
+}
+function closeZoom() {
+  document.getElementById('imgModal').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════
+// RESET
+// ═══════════════════════════════════════════════════════
+function confirmReset() {
+  if (!confirm('ล้างข้อมูลทั้งหมดในฟอร์ม?')) return;
+  resetForm();
+}
+
+// ═══════════════════════════════════════════════════════
+// ENTER KEY NAV
+// ═══════════════════════════════════════════════════════
+// TAB_ORDER is dynamic — rebuilt by rebuildTabOrder() whenever SP fields change
+function advanceToNext(id) {
+  const order = window._dynamicTabOrder || [];
+  const idx   = order.indexOf(id);
+  if (idx < 0) return;
+  for (let i = idx+1; i < order.length; i++) {
+    const n = document.getElementById(order[i]);
+    if (n && !n.disabled && !n.readOnly && n.offsetParent !== null) {
+      n.focus(); if (typeof n.select === 'function') n.select(); break;
+    }
+  }
+}
+rebuildTabOrder(); // initial build
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  const el = document.activeElement;
+  if (!el) return;
+  if (el.tagName.toLowerCase() === 'textarea') return;
+  if (el.tagName.toLowerCase() === 'input') {
+    e.preventDefault(); e.stopPropagation();
+    advanceToNext(el.id);
+  }
+}, true);
+
+// ═══════════════════════════════════════════════════════
+// SAVE RECORD
+// ═══════════════════════════════════════════════════════
+function g(id) { return (document.getElementById(id)||{}).value || ''; }
+function gRadio(n) { const e=document.querySelector('input[name="'+n+'"]:checked'); return e?e.value:''; }
+
+// ── Color code → Thai name map ──────────────────────────────────────────────
+const COLOR_THAI = { G:'เขียว', B:'ฟ้า', R:'แดง', W:'ขาว', P:'ม่วง', BK:'ดำ', Y:'เหลือง', O:'ส้ม' };
+function markColorThai() {
+  return [..._markColors].map(c => COLOR_THAI[c] || c).join(', ');
+}
+
+function saveRecord() {
+  if (!g('checkerID'))     { showToast('กรุณา Scan ID Card ก่อน'); return; }
+  if (!g('machineCode'))   { showToast('กรุณา Scan เครื่องจักร'); return; }
+  if (!g('itemFG'))        {
+    showToast('❌ ไม่สามารถบันทึกข้อมูลได้ เนื่องจาก ข้อมูลไม่ครบถ้วน');
+    return;
+  }
+  document.getElementById('colorResult').style.outline = '';
+  if (!g('confirmChecker').trim()) { showToast('❌ กรุณา Scan ID Confirm Checker ให้ถูกต้องก่อนบันทึก'); return; }
+
+  // Block save if status is not PASS
+  const statusEl  = document.getElementById('statusOverall');
+  const statusTxt = statusEl.textContent.trim();
+  if (!statusTxt.includes('PASS')) {
+    showToast('❌ บันทึกไม่ได้ — ' + statusTxt);
+    statusEl.style.animation = 'none';
+    setTimeout(() => { statusEl.style.animation = 'shake .3s'; }, 10);
+    return;
+  }
+
+  // Validate required SP fields are all OK
+  const spErrors = [1,2,3].filter(n => {
+    const wrap = document.getElementById('spWrap'+n);
+    if (!wrap || wrap.style.display === 'none') return false;
+    const st = document.getElementById('sp'+n+'Status');
+    return !st || !st.textContent.startsWith('✓');
+  });
+  if (spErrors.length) {
+    showToast('❌ กรุณาสแกน SP' + spErrors.join('/SP') + ' ให้ครบและถูกต้อง');
+    return;
+  }
+
+  const now = new Date();
+  // Use explicit parts to avoid Thai Buddhist Era year on Thai-locale Windows
+  const _ry = now.getFullYear(), _rm = String(now.getMonth()+1).padStart(2,'0'), _rd = String(now.getDate()).padStart(2,'0');
+  const _dateStr = (_ry >= 2500 ? _ry - 543 : _ry) + '-' + _rm + '-' + _rd;
+  const flatEl = document.getElementById('flatResult');
+  const rec  = {
+    date:  _dateStr,
+    time:  now.toLocaleTimeString('th-TH'),
+    checker:        g('checker'),
+    checkerID:      g('checkerID'),
+    confirmChecker: g('confirmChecker'),
+    machine:        g('machineCode') + ' — ' + g('machine'),
+    line:           g('line'),
+    seq:            g('seq'),
+    qty:            g('qty'),
+    itemFG:         fgFromRaw(g('itemFG')),
+    type:           g('dispType'),
+    sp1: spItemFromBarcode(g('sp1')),
+    sp2: spItemFromBarcode(g('sp2')),
+    sp3: spItemFromBarcode(g('sp3')),
+    valEL: [g('EL1'),g('EL2'),g('EL3')].filter(Boolean).join(','),
+    valA:  [g('A1'), g('A2'), g('A3')].filter(Boolean).join(','),
+    valB:  [g('B1'), g('B2'), g('B3')].filter(Boolean).join(','),
+    valC:  gRadio('warpC1') + ',' + gRadio('warpC2'),
+    valD:  [g('D1a'),g('D1b'),g('D1c'),g('D2a'),g('D2b'),g('D2c')].filter(Boolean).join(','),
+    flatPct:    flatEl ? flatEl.textContent.trim() : '',
+    apHairpin:  gRadio('apHairpin'),
+    apFIN:      gRadio('apFIN'),
+    pitch:      g('pitch'),
+    hairpin:    g('hairpinItem'),
+    fin:        g('finItem'),
+    warpC1:     gRadio('warpC1'),
+    warpC2:     gRadio('warpC2'),
+    markColor:  markColorThai(),
+    markStatus: document.getElementById('colorResult').textContent.trim(),
+    remark:     g('remark'),
+    status:     statusTxt,
+  };
+
+  records.push(rec);
+  document.getElementById('recCount').textContent = records.length;
+
+  fetch('/expander/firstlot/api/record', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(rec) })
+    .then(r=>r.json())
+    .then(d => { showToast(d.ok ? 'บันทึกแล้ว #'+d.id : 'Error: '+d.error); if (d.ok) _notifyDashboard(); })
+    .catch(()  => showToast('บันทึก (offline) แล้ว'));
+
+  resetForm();
+}
+
+function resetForm() {
+  // Clear ALL input fields — nothing is preserved
+  ['idCardScan','checker','checkerID',
+   'machineScan','machine','machineCode',
+   'itemFG','sp1','sp2','sp3',
+   'EL1','EL2','EL3','A1','A2','A3','B1','B2','B3',
+   'D1a','D1b','D1c','D2a','D2b','D2c',
+   'confirmCheckerScan','remark','confirmChecker',
+   'dispFG','dispDesc','dispType','dispPipe','pitch','hairpinItem','finItem',
+   'line','seq','qty'
+  ].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+
+  // Clear all status labels
+  ['idCardStatus','machineStatus','fgStatus','confirmCheckerStatus'].forEach(id => {
+    const el=document.getElementById(id); if(el) el.textContent='';
+  });
+
+  // Clear SP status labels
+  [1,2,3].forEach(n => {
+    const st = document.getElementById('sp'+n+'Status');
+    if (st) st.textContent = '';
+  });
+  showSPFields('NA','NA','NA');
+
+  document.querySelectorAll('input[type=radio]').forEach(r => r.checked=false);
+  ['avgEL','avgA','avgB'].forEach(id => {
+    const el=document.getElementById(id); el.className='avg-val avg-na'; el.textContent='AVG: —';
+  });
+  ['avgD1','avgD2'].forEach(id => {
+    const el=document.getElementById(id); el.className='avg-val avg-na';
+    el.textContent=id.replace('avg','AVG ')+': —';
+  });
+  const fl=document.getElementById('flatResult');
+  fl.className='avg-val avg-na'; fl.textContent='—';
+
+  ['sEL','sA','sB','sSpecA','sSpecB'].forEach(id=>{ document.getElementById(id).textContent='—'; });
+
+  _markColors = new Set();
+  clearScanLocks();                               // lift all 4-second scan locks
+  document.getElementById('markColor').value = '';
+  document.querySelectorAll('.color-btn').forEach(b=>b.classList.remove('active'));
+  const cr=document.getElementById('colorResult');
+  cr.style.cssText='background:#eceff1;color:#607080;margin-top:5px;font-size:12px;font-weight:700;padding:4px 8px;border-radius:4px;text-align:center';
+  cr.textContent='— รอ Scan FG TAG —';
+
+  // Reset status + OK counter to initial state
+  const st=document.getElementById('statusOverall');
+  st.className='result-box result-na'; st.textContent='— รอตรวจ —';
+  const ctr=document.getElementById('okCounter');
+  if(ctr){ ctr.textContent=''; }
+
+  // Reset Process Control
+  document.getElementById('pcStatus').textContent = '';
+  document.getElementById('pcModal').style.display = 'none';
+  const pcImg = document.getElementById('pcImg');
+  pcImg.src = ''; pcImg.style.display = 'none';
+  document.getElementById('pcNotFound').style.display = 'none';
+
+  document.getElementById('idCardScan').focus();
+}
+
+// ═══════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════
+// ── Shared Dashboard — focus existing window, open if not yet ─
+const _DASH_URL = 'http://10.235.117.215:3001/dashboard/firstlot';
+const _DASH_WIN = 'shared_dashboard';
+function openSharedDashboard() {
+  const w = window.open('', _DASH_WIN);
+  if (w && !w.closed) {
+    try {
+      if (w.location.href && w.location.href !== 'about:blank') { w.focus(); return; }
+    } catch(e) {}
+  }
+  window.open(_DASH_URL, _DASH_WIN);
+}
+
+function _notifyDashboard() {
+  try { const bc = new BroadcastChannel('dash_refresh'); bc.postMessage(1); bc.close(); } catch(e) {}
+  try { localStorage.setItem('dash_refresh', Date.now()); } catch(e) {}
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.opacity='1';
+  setTimeout(()=>{ t.style.opacity='0'; }, 3000);
+}
+</script>
+</body>
+</html>
