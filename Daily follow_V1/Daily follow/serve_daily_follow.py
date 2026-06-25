@@ -547,9 +547,15 @@ Next
         pass
 
 
-def _newest_export(since: float) -> Path | None:
+def _newest_export(since: float, dirs: list[Path] | None = None) -> Path | None:
+    # When the caller knows exactly where SAP just saved the export (e.g. the
+    # ZPP0022 order folder), search only that folder. Otherwise the globally
+    # newest file across EXPORT_DIRS could be from a *different* transaction
+    # (e.g. a ZPP0059 stock export), which then gets handed back as the wrong
+    # file and rejected downstream by the header check.
+    search_dirs = dirs if dirs is not None else EXPORT_DIRS
     best, best_mtime = None, since - 2
-    for d in EXPORT_DIRS:
+    for d in search_dirs:
         try:
             if not d.is_dir():
                 continue
@@ -684,9 +690,18 @@ def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
         msg = (proc.stderr or proc.stdout or "").strip()
         raise RuntimeError(_friendly_sap_error(msg))
 
+    # Prefer the folder SAP was told to save into, so we never pick up a newer
+    # file produced by a different transaction (e.g. a ZPP0059 stock export
+    # landing in its own folder while we're running ZPP0022). Only fall back to
+    # scanning every EXPORT_DIRS if nothing showed up there (SAP may have used a
+    # default save location like C:\TEMP when the network drive was unwritable).
+    target_dir = Path(export_dir_win)
     export = None
     for _ in range(20):
-        export = _newest_export(started)
+        if target_dir.is_dir():
+            export = _newest_export(started, dirs=[target_dir])
+        if not export:
+            export = _newest_export(started)
         if export:
             break
         time.sleep(0.5)
