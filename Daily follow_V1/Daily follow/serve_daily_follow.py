@@ -147,7 +147,13 @@ START_TRANSACTION = "ZPP0059"
 START_TRANSACTION_0022 = "ZPP0022"
 PROGRESS_0022_FILE     = ROOT / "ZPP0022.xlsx"   # latest export, served to the page
 ZPP0022_TABLE          = "zpp0022_raw"
-SAP_EXPORT_DIR_0022    = str(Path(r"J:\7.541_HEI\Database follow\ZPP0022"))
+
+# AS/400 network-share base folder that SAP exports into. The mapped DRIVE
+# LETTER differs per PC (some map it as J:, the shop-floor PC maps it as Y:).
+# Override per machine with the SAP_EXPORT_BASE environment variable, e.g.
+#     set SAP_EXPORT_BASE=J:\7.541_HEI\Database follow
+SAP_EXPORT_BASE        = os.environ.get("SAP_EXPORT_BASE", r"Y:\7.541_HEI\Database follow")
+SAP_EXPORT_DIR_0022    = str(Path(SAP_EXPORT_BASE) / "ZPP0022")
 
 # --- OT program bridge -------------------------------------------------------
 # The OT recording app (Flask) runs on the same PC. We proxy its working-hours
@@ -165,8 +171,11 @@ CLOSE_EXCEL_AFTER = True
 # Folders watched for the file SAP exports (searched in order, newest file wins).
 HOME = Path(os.path.expanduser("~"))
 EXPORT_DIRS = [
-    Path(r"J:\7.541_HEI\Database follow\ZPP0059"),  # shared drive (primary)
-    Path(r"J:\7.541_HEI\Database follow\ZPP0022"),  # ZPP0022 order export
+    Path(SAP_EXPORT_BASE) / "ZPP0059",              # network share (primary)
+    Path(SAP_EXPORT_BASE) / "ZPP0022",              # ZPP0022 order export
+    # Also scan the J: variant in case a PC maps the same share as J:.
+    Path(r"J:\7.541_HEI\Database follow\ZPP0059"),
+    Path(r"J:\7.541_HEI\Database follow\ZPP0022"),
     Path(r"C:\TEMP"),                               # SAP default save dir
     ROOT,
     HOME / "Documents" / "SAP" / "SAP GUI",
@@ -176,7 +185,7 @@ EXPORT_DIRS = [
 ]
 # Target directory for SAP to save the export file into.
 # Must match one of the EXPORT_DIRS entries above.
-SAP_EXPORT_DIR = str(Path(r"J:\7.541_HEI\Database follow\ZPP0059"))
+SAP_EXPORT_DIR = str(Path(SAP_EXPORT_BASE) / "ZPP0059")
 
 # Business key columns — a row is considered duplicate when ALL of these match.
 # If any column is missing from the export, falls back to SHA-256 of the whole row.
