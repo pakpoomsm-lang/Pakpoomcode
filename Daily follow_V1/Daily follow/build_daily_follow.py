@@ -1,4 +1,5 @@
 import json
+import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime, time
 from html import escape
@@ -267,39 +268,133 @@ def assign_speed(rows):
             r["speed"] = ""
 
 
+# Logical column name -> (header text in the ZPP0022 export, legacy fixed index).
+# The legacy index is only used as a fallback when the header is missing, so old
+# exports keep working even if SAP drops/renames a column.
+COLUMN_HEADERS = {
+    "line": ("Line", 0),
+    "seq": ("Sequence", 1),
+    "month": ("Production Month", 2),
+    "assyMaterial": ("Assy Material", 3),
+    "assyMaterialDesc": ("Assy Material Description", 4),
+    "orderQty": ("Order Quantity", 5),
+    "material": ("Material", 6),
+    "description": ("Description", 7),
+    "status": ("Status", 8),
+    "prodDate": ("Assy unit start date", 9),
+    "prodTime": ("Assy unit start time", 10),
+    "productionOrder": ("Production Order", 11),
+    "assyOrderQty": ("Assy Order Quantity", 12),
+    "assyOrder": ("Assy Order", 13),
+    "remarkFeeder": ("Remark Order Feeder", 23),
+    "remarkAssy": ("Remark Order Assy", 24),
+    "assyStatus": ("Assy Status", 26),
+    "metal": ("METAL", 27),
+    "paint2": ("PAINT2", 28),
+    "pipe1": ("PIPE1", 29),
+    "pipe2": ("PIPE2", 30),
+    "hex1out": ("HEX1OUT", 31),
+    "hex1in": ("HEX1IN", 32),
+    "hex2": ("HEX2", 33),
+    "dirOrder": ("DIR.ORDER", 39),
+    "dirGr": ("DIR.GR", 40),
+    "dirRemark": ("DIR.REMARK", 41),
+    "invRmk": ("INV.RMK", 44),
+    "feederFinishTime": ("feeder finish time", 45),
+    "lineRemark": ("Line Remark", 50),
+    "schedFinishDate": ("Scheduled Finish Date", 51),
+    "feederFinishDate": ("feeder finish date", 52),
+    "schedFinishTime": ("Scheduled Finish Time", 53),
+}
+
+# Columns we cannot safely guess if the header is absent. If any of these is
+# missing we stop instead of silently reading the wrong column (e.g. a reduced
+# SAP layout where "Status" has shifted to a different position).
+REQUIRED_COLUMNS = ("line", "status", "material", "month", "seq")
+
+
+def resolve_columns(header_row):
+    """Map each logical column to its index using the export's header row.
+
+    Falls back to the legacy fixed index when a header is not found, so that
+    older exports keep working. Raises if a REQUIRED column cannot be located.
+    """
+    lookup = {}
+    for i, value in enumerate(header_row):
+        if value is None:
+            continue
+        key = str(value).strip().lower()
+        # First occurrence wins (the export has two "Description" columns).
+        lookup.setdefault(key, i)
+
+    cols, missing = {}, []
+    for key, (name, fallback) in COLUMN_HEADERS.items():
+        idx = lookup.get(name.strip().lower())
+        if idx is None:
+            idx = fallback
+            missing.append(name)
+        cols[key] = idx
+
+    missing_required = [
+        COLUMN_HEADERS[k][0] for k in REQUIRED_COLUMNS if COLUMN_HEADERS[k][0] in missing
+    ]
+    if missing_required:
+        raise ValueError(
+            "Export is missing required column(s): "
+            + ", ".join(missing_required)
+            + ". This does not look like a ZPP0022 order export."
+        )
+    if missing:
+        print(
+            "[warn] columns located by position (header not found): "
+            + ", ".join(missing),
+            file=sys.stderr,
+        )
+    return cols
+
+
 def build_rows():
     routing = load_routing()
     prog_mat, prog_lot = load_progress()
     wb = openpyxl.load_workbook(EXPORT_FILE, read_only=True, data_only=True)
     ws = wb.active
     rows = ws.iter_rows(values_only=True)
-    next(rows)
+    col = resolve_columns(next(rows))
     out = []
     for row in rows:
-        line = text(row[0])
+        line = text(row[col["line"]])
         if not line:
             continue
 
-        item = text(row[6])
+        item = text(row[col["material"]])
         route = routing.get(item, {})
-        prod_dt = parse_dt(row[9], row[10])
-        finish_dt = parse_dt(row[51] or row[52], row[53] or row[45])
+        prod_dt = parse_dt(row[col["prodDate"]], row[col["prodTime"]])
+        finish_dt = parse_dt(
+            row[col["schedFinishDate"]] or row[col["feederFinishDate"]],
+            row[col["schedFinishTime"]] or row[col["feederFinishTime"]],
+        )
         lead = ""
         if prod_dt and finish_dt:
             lead = round((prod_dt - finish_dt).total_seconds() / 3600, 2)
 
-        assy_qty = number(row[12])
-        status = text(row[8])
-        code = text(row[3])
-        model = text(row[4])
-        month = month_display(row[2])
-        assy_order_no = text(row[13])
-        head = f"{line}|{month}|{seq_key(row[1])}"
+        assy_qty = number(row[col["assyOrderQty"]])
+        status = text(row[col["status"]])
+        code = text(row[col["assyMaterial"]])
+        model = text(row[col["assyMaterialDesc"]])
+        month = month_display(row[col["month"]])
+        assy_order_no = text(row[col["assyOrder"]])
+        head = f"{line}|{month}|{seq_key(row[col['seq']])}"
         matp = prog_mat.get(f"{head}|{item}", {})
         hp_val = prog_lot.get(f"{head}|{assy_order_no}", "")
         fin = final_qty(route.get("attribute2"), matp)
         remark = " ".join(
-            part for part in [text(row[23]), text(row[24]), text(row[50])] if part
+            part
+            for part in [
+                text(row[col["remarkFeeder"]]),
+                text(row[col["remarkAssy"]]),
+                text(row[col["lineRemark"]]),
+            ]
+            if part
         )
 
         out.append(
@@ -310,20 +405,20 @@ def build_rows():
                 "code": code,
                 "model": model,
                 "finished": "",
-                "orderQty": number(row[5]),
+                "orderQty": number(row[col["orderQty"]]),
                 "item": item,
-                "description": route.get("description") or text(row[7]),
+                "description": route.get("description") or text(row[col["description"]]),
                 "attribute": route.get("attribute2") or "",
                 "attribute1": route.get("attribute1") or "",
-                "productionOrder": text(row[11]),
+                "productionOrder": text(row[col["productionOrder"]]),
                 "speed": "",  # filled by assign_speed() after all rows are built
-                "prodDate": excel_date(row[9]),
-                "prodTime": excel_time(row[10]),
+                "prodDate": excel_date(row[col["prodDate"]]),
+                "prodTime": excel_time(row[col["prodTime"]]),
                 "prodSort": prod_dt.isoformat() if prod_dt else "",
                 "assyOrder": assy_qty,
                 "assyOrderNo": assy_order_no,
                 "status": status,
-                "assyStatus": text(row[26]),
+                "assyStatus": text(row[col["assyStatus"]]),
                 "remark": remark,
                 "hp": hp_val,
                 "fp": matp.get("fp", ""),
@@ -335,19 +430,19 @@ def build_rows():
                 "stockFg": fin,
                 "subcooler": fin,
                 "lead": lead,
-                "leadRemark": text(row[41]) or text(row[44]),
+                "leadRemark": text(row[col["dirRemark"]]) or text(row[col["invRmk"]]),
                 "ts": route.get("ts") or "",
                 "operation": route.get("operation") or "",
                 "sourceReady": {
-                    "metal": norm(row[27]),
-                    "paint2": norm(row[28]),
-                    "pipe1": norm(row[29]),
-                    "pipe2": norm(row[30]),
-                    "hex1out": norm(row[31]),
-                    "hex1in": norm(row[32]),
-                    "hex2": norm(row[33]),
-                    "dirOrder": norm(row[39]),
-                    "dirGr": norm(row[40]),
+                    "metal": norm(row[col["metal"]]),
+                    "paint2": norm(row[col["paint2"]]),
+                    "pipe1": norm(row[col["pipe1"]]),
+                    "pipe2": norm(row[col["pipe2"]]),
+                    "hex1out": norm(row[col["hex1out"]]),
+                    "hex1in": norm(row[col["hex1in"]]),
+                    "hex2": norm(row[col["hex2"]]),
+                    "dirOrder": norm(row[col["dirOrder"]]),
+                    "dirGr": norm(row[col["dirGr"]]),
                 },
             }
         )
@@ -2668,47 +2763,85 @@ def render_html(rows):
       if (a.endsWith('-CT')) return matp.cutting ?? '';
       return '';
     }}
-    function rowFromExport(values) {{
-      const line = cleanText(values[0]);
+    // Logical column name -> header text in the ZPP0022 export. Columns are
+    // located by header name (not fixed position) so a reordered SAP layout
+    // still maps correctly. Keep in sync with COLUMN_HEADERS in build_daily_follow.py.
+    const COLUMN_HEADERS = {{
+      line: 'Line', seq: 'Sequence', month: 'Production Month',
+      assyMaterial: 'Assy Material', assyMaterialDesc: 'Assy Material Description',
+      orderQty: 'Order Quantity', material: 'Material', description: 'Description',
+      status: 'Status', prodDate: 'Assy unit start date', prodTime: 'Assy unit start time',
+      productionOrder: 'Production Order', assyOrderQty: 'Assy Order Quantity',
+      assyOrder: 'Assy Order', remarkFeeder: 'Remark Order Feeder',
+      remarkAssy: 'Remark Order Assy', lineRemark: 'Line Remark', assyStatus: 'Assy Status',
+      dirRemark: 'DIR.REMARK', invRmk: 'INV.RMK', feederFinishTime: 'feeder finish time',
+      schedFinishDate: 'Scheduled Finish Date', feederFinishDate: 'feeder finish date',
+      schedFinishTime: 'Scheduled Finish Time'
+    }};
+    const REQUIRED_COLUMNS = ['line', 'status', 'material', 'month', 'seq'];
+    function resolveColumns(header) {{
+      const lookup = {{}};
+      header.forEach((value, i) => {{
+        const key = String(value == null ? '' : value).trim().toLowerCase();
+        if (key && !(key in lookup)) lookup[key] = i;  // first "Description" wins
+      }});
+      const cols = {{}}, missing = [];
+      for (const [key, name] of Object.entries(COLUMN_HEADERS)) {{
+        const idx = lookup[name.trim().toLowerCase()];
+        if (idx === undefined) {{ cols[key] = -1; missing.push(name); }}
+        else cols[key] = idx;
+      }}
+      const missingRequired = REQUIRED_COLUMNS
+        .filter(k => cols[k] === -1).map(k => COLUMN_HEADERS[k]);
+      if (missingRequired.length) {{
+        if (lookup['order'] !== undefined && lookup['activity'] !== undefined)
+          throw new Error('Wrong file: this is the ZPP0059 / stock export (starts with Order, Activity). Use the green ZPP0059 button instead. Update Progress needs the ZPP0022 order export.');
+        throw new Error('Wrong file for Update Progress. Could not find column(s): ' + missingRequired.join(', ') + '. This does not look like a ZPP0022 order export.');
+      }}
+      return cols;
+    }}
+    function rowFromExport(values, col) {{
+      const at = key => {{ const i = col[key]; return i === -1 ? '' : values[i]; }};
+      const line = cleanText(at('line'));
       if (!line) return null;
-      const item = cleanText(values[6]);
+      const item = cleanText(at('material'));
       const route = DATA.routing[item] || {{}};
-      const prodDt = parseDateTime(values[9], values[10]);
-      const finishDt = parseDateTime(values[51] || values[52], values[53] || values[45]);
+      const prodDt = parseDateTime(at('prodDate'), at('prodTime'));
+      const finishDt = parseDateTime(at('schedFinishDate') || at('feederFinishDate'), at('schedFinishTime') || at('feederFinishTime'));
       const lead = prodDt && finishDt ? Math.round(((prodDt - finishDt) / 3600000) * 100) / 100 : '';
-      const assyQty = cleanNumber(values[12]);
-      const status = cleanText(values[8]);
-      const code = cleanText(values[3]);
-      const model = cleanText(values[4]);
+      const assyQty = cleanNumber(at('assyOrderQty'));
+      const status = cleanText(at('status'));
+      const code = cleanText(at('assyMaterial'));
+      const model = cleanText(at('assyMaterialDesc'));
       const speed = DATA.speedByModel[`${{line}}|${{code}}|${{model}}`] ?? DATA.speedByLine[line] ?? '';
-      const month = monthDisplay(values[2]);
-      const assyOrderNo = cleanText(values[13]);
-      const head = `${{line}}|${{month}}|${{cleanNumber(values[1])}}`;
+      const month = monthDisplay(at('month'));
+      const assyOrderNo = cleanText(at('assyOrder'));
+      const head = `${{line}}|${{month}}|${{cleanNumber(at('seq'))}}`;
       const matp = (DATA.progressMat && DATA.progressMat[`${{head}}|${{item}}`]) || {{}};
       const hpVal = DATA.progressLot ? DATA.progressLot[`${{head}}|${{assyOrderNo}}`] : undefined;
       const fin = finalQty(route.attribute2, matp);
       return {{
         line,
-        seq: cleanNumber(values[1]),
+        seq: cleanNumber(at('seq')),
         month,
         code,
         model,
         finished: '',
-        orderQty: cleanNumber(values[5]),
+        orderQty: cleanNumber(at('orderQty')),
         item,
-        description: route.description || cleanText(values[7]),
+        description: route.description || cleanText(at('description')),
         attribute: route.attribute2 || '',
         attribute1: route.attribute1 || '',
-        productionOrder: cleanText(values[11]),
+        productionOrder: cleanText(at('productionOrder')),
         speed,
-        prodDate: normalizeDate(values[9]),
-        prodTime: normalizeTime(values[10]),
+        prodDate: normalizeDate(at('prodDate')),
+        prodTime: normalizeTime(at('prodTime')),
         prodSort: prodDt ? prodDt.toISOString() : '',
         assyOrder: assyQty,
         assyOrderNo,
         status,
-        assyStatus: cleanText(values[26]),
-        remark: [cleanText(values[23]), cleanText(values[24]), cleanText(values[50])].filter(Boolean).join(' '),
+        assyStatus: cleanText(at('assyStatus')),
+        remark: [cleanText(at('remarkFeeder')), cleanText(at('remarkAssy')), cleanText(at('lineRemark'))].filter(Boolean).join(' '),
         hp: hpVal === undefined ? '' : hpVal,
         fp: matp.fp ?? '',
         exp: '',
@@ -2719,7 +2852,7 @@ def render_html(rows):
         stockFg: fin,
         subcooler: fin,
         lead,
-        leadRemark: cleanText(values[41]) || cleanText(values[44]),
+        leadRemark: cleanText(at('dirRemark')) || cleanText(at('invRmk')),
         ts: route.ts || '',
         operation: route.operation || ''
       }};
@@ -2729,16 +2862,8 @@ def render_html(rows):
       const shared = readSharedStrings(files);
       const rows = worksheetRows(files, firstWorksheetPath(files), shared);
       if (!rows.length) throw new Error('No rows found in file.');
-      const header = rows[0].map(cleanText);
-      const expected = ['Line','Sequence','Production Month','Assy Material','Assy Material Description','Order Quantity','Material'];
-      const ok = expected.every((name, idx) => header[idx] === name);
-      if (!ok) {{
-        const got = header.slice(0, 4).filter(Boolean).join(', ') || '(empty)';
-        if (header[0] === 'Order' && header[1] === 'Activity')
-          throw new Error('Wrong file: this is the ZPP0059 / stock export (starts with Order, Activity). Use the green ZPP0059 button instead. Update Progress needs the order export that starts with Line, Sequence, Production Month.');
-        throw new Error(`Wrong file for Update Progress. Expected columns starting Line, Sequence, Production Month - but this file starts with: ${{got}}`);
-      }}
-      return rows.slice(1).map(rowFromExport).filter(Boolean).sort((a,b) =>
+      const col = resolveColumns(rows[0].map(cleanText));
+      return rows.slice(1).map(r => rowFromExport(r, col)).filter(Boolean).sort((a,b) =>
         [a.line, a.prodSort || '9999', a.seq, a.assyOrderNo, a.productionOrder, a.item].join('|')
           .localeCompare([b.line, b.prodSort || '9999', b.seq, b.assyOrderNo, b.productionOrder, b.item].join('|'), 'th', {{numeric:true}})
       );
