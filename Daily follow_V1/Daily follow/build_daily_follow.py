@@ -307,10 +307,14 @@ COLUMN_HEADERS = {
     "schedFinishTime": ("Scheduled Finish Time", 53),
 }
 
-# Columns we cannot safely guess if the header is absent. If any of these is
-# missing we stop instead of silently reading the wrong column (e.g. a reduced
-# SAP layout where "Status" has shifted to a different position).
-REQUIRED_COLUMNS = ("line", "status", "material", "month", "seq")
+# Columns that a valid ZPP0022 order export must contain. If any is missing we
+# stop instead of silently importing partial/wrong data. This also rejects the
+# stripped SAP layout (starts with "Production Order", ~18 columns) which lacks
+# Assy Material / Assy Order / Assy unit start date etc. that the dashboard needs.
+REQUIRED_COLUMNS = (
+    "line", "status", "material", "month", "seq",
+    "assyMaterial", "assyMaterialDesc", "prodDate", "assyOrder", "assyStatus",
+)
 
 
 def resolve_columns(header_row):
@@ -2778,7 +2782,8 @@ def render_html(rows):
       schedFinishDate: 'Scheduled Finish Date', feederFinishDate: 'feeder finish date',
       schedFinishTime: 'Scheduled Finish Time'
     }};
-    const REQUIRED_COLUMNS = ['line', 'status', 'material', 'month', 'seq'];
+    const REQUIRED_COLUMNS = ['line', 'status', 'material', 'month', 'seq',
+      'assyMaterial', 'assyMaterialDesc', 'prodDate', 'assyOrder', 'assyStatus'];
     function resolveColumns(header) {{
       const lookup = {{}};
       header.forEach((value, i) => {{
@@ -2796,6 +2801,8 @@ def render_html(rows):
       if (missingRequired.length) {{
         if (lookup['order'] !== undefined && lookup['activity'] !== undefined)
           throw new Error('Wrong file: this is the ZPP0059 / stock export (starts with Order, Activity). Use the green ZPP0059 button instead. Update Progress needs the ZPP0022 order export.');
+        if (lookup['assy material'] === undefined && lookup['cycle time'] !== undefined)
+          throw new Error('Wrong ZPP0022 layout: this is the short export (missing ' + missingRequired.join(', ') + '). Re-run ZPP0022 in SAP with the FULL layout that starts with the "Line" column and includes Assy Material / Assy Order / Assy Status.');
         throw new Error('Wrong file for Update Progress. Could not find column(s): ' + missingRequired.join(', ') + '. This does not look like a ZPP0022 order export.');
       }}
       return cols;
