@@ -104,10 +104,31 @@ session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").setFocus
 session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").caretPosition = 3
 session.findById("wnd[0]").sendVKey 8
 session.findById("wnd[0]").sendVKey 33
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").setCurrentCell 10,"TEXT"
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").firstVisibleRow = 3
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").selectedRows = "10"
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").clickCurrentCell
+' Choose the FULL layout "/PP ASSY ALL" by name instead of by row position.
+' Row numbers shift whenever SAP layouts are added/removed (the recording
+' happened to land on row 10 = "/TPP&PAINT", the short layout). We scan the
+' layout list, match the technical name first, then the description, and only
+' fall back to a fixed row if neither is found.
+Dim lShell, lRow, lFound, lName, lText
+Set lShell = session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell")
+lFound = -1
+On Error Resume Next
+For lRow = 0 To lShell.RowCount - 1
+   lName = ""
+   lText = ""
+   lName = Trim(lShell.GetCellValue(lRow, "VARIANT"))
+   lText = Trim(lShell.GetCellValue(lRow, "TEXT"))
+   If lName = "/PP ASSY ALL" Or lText = "PP ASSY ALL LINE (Defalt)" Then
+      lFound = lRow
+      Exit For
+   End If
+Next
+On Error GoTo 0
+If lFound = -1 Then lFound = 2
+lShell.setCurrentCell lFound,"TEXT"
+lShell.firstVisibleRow = lFound
+lShell.selectedRows = CStr(lFound)
+lShell.clickCurrentCell
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").setCurrentCell 5,"PSMNG"
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectedRows = "5"
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").contextMenu
