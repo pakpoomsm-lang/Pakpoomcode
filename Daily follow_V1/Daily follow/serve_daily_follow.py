@@ -179,9 +179,31 @@ SAP_EXPORT_DIR_0022    = str(Path(SAP_EXPORT_BASE) / "ZPP0022")
 # --- First-lot check sheets --------------------------------------------------
 # The first-lot inspection app stores each process in its own SQLite file under
 # Server_firstlot. We read them (read-only) to show, per row, whether every
-# process check sheet has been confirmed OK. Override the folder per machine
-# with the FIRSTLOT_DIR environment variable.
-FIRSTLOT_DIR = Path(os.environ.get("FIRSTLOT_DIR", str(ROOT.parent.parent / "Server_firstlot")))
+# process check sheet has been confirmed OK.
+#
+# Resolution order:
+#   1. FIRSTLOT_DIR env variable — set this in Start_Daily_Follow.bat per machine.
+#   2. Candidate list below — searched in order; first folder that contains at
+#      least one expected DB wins. Covers drive-letter differences across PCs.
+_FIRSTLOT_CANDIDATES = [
+    Path(os.environ.get("FIRSTLOT_DIR", "")),               # env override (blank → skip)
+    Path(r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"),
+    Path(r"Y:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"),
+    Path(r"J:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"),
+    ROOT.parent.parent / "Server_firstlot",                 # dev: repo sibling folder
+]
+_PROBE_DB = "cutting_records.db"   # existence check — all 4 DBs live in the same folder
+
+
+def _resolve_firstlot_dir():
+    for p in _FIRSTLOT_CANDIDATES:
+        if p and p.is_dir() and (p / _PROBE_DB).exists():
+            return p
+    # Fall back to env/default even if DB not found; error will surface at query time.
+    return _FIRSTLOT_CANDIDATES[0] if os.environ.get("FIRSTLOT_DIR") else _FIRSTLOT_CANDIDATES[-1]
+
+
+FIRSTLOT_DIR = _resolve_firstlot_dir()
 
 # (process, db file, table, line col, seq col, month col or None, result col, ts col)
 CHECKSHEET_SOURCES = [
