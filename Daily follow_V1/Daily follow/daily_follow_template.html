@@ -1405,13 +1405,31 @@
       ['cutting', 'Cutting'], ['fp', 'FP'], ['hp', 'H/P'], ['hp_insert', 'HP insert'],
     ];
     let checkSheets = null;  // {byKey, byLineSeq} once loaded
+    let csLastJson = '';     // JSON snapshot for change detection
+    let csPollTimer = null;
+    const CS_POLL_MS = 10000;
+
     async function loadChecksheets() {
       try {
         const resp = await fetch('/api/checksheets', { cache: 'no-store' });
         if (!resp.ok) return;
-        checkSheets = await resp.json();
-        if (typeof render === 'function') render();   // show the column once loaded
+        const text = await resp.text();
+        if (text === csLastJson) return;   // no change — skip render
+        csLastJson = text;
+        checkSheets = JSON.parse(text);
+        if (typeof render === 'function') render();
       } catch (e) { /* server not running -> column stays blank, page still works */ }
+    }
+
+    function scheduleCsPoll() {
+      if (csPollTimer) clearTimeout(csPollTimer);
+      csPollTimer = setTimeout(csPollTick, CS_POLL_MS);
+    }
+    async function csPollTick() {
+      // Pause while tab is hidden or user is editing a cell.
+      const editing = document.activeElement && document.activeElement.isContentEditable;
+      if (!document.hidden && !editing) await loadChecksheets();
+      scheduleCsPoll();
     }
     // For one row, roll up its check-sheet state across CHECK_PROCS.
     function csStatus(row) {
@@ -2181,7 +2199,7 @@
       if (csClose) csClose.addEventListener('click', () => { csOverlay.hidden = true; });
       if (csOverlay) csOverlay.addEventListener('click', (e) => { if (e.target === csOverlay) csOverlay.hidden = true; });
       recompute(true);
-      loadChecksheets();   // fills the Check Sheet column once the server responds
+      loadChecksheets().then(() => scheduleCsPoll());  // initial load then poll every 10s
     }
     function searchText(row) {
       return [row.line,row.seq,row.month,row.code,row.model,row.item,row.description,row.attribute,row.productionOrder,row.assyOrderNo,row.status,row.remark,row.leadRemark].join(' ').toLowerCase();
