@@ -1785,11 +1785,19 @@
       if (!v) return '';
       return Math.round(v * 10) / 10;
     }
+    function computeActualTs(row) {
+      // Only show Actual TS when FG has a value.
+      const fg = valueOf(row, 'fg');
+      if (fg === '' || fg === null || fg === undefined || !num(fg)) return '';
+      const ats = valueOf(row, 'actualTs');
+      if (ats === '' || ats === null || ats === undefined) return '';
+      return ats;
+    }
     function computeActualUnitRate(row) {
       if (isHairPin(row) || assyOk(row)) return '';
-      const ats = valueOf(row, 'actualTs');
+      const ats = computeActualTs(row);
+      if (ats === '') return '';
       const stock = valueOf(row, 'stockFg');
-      if (ats === '' || ats === null || ats === undefined) return '';
       if (stock === '' || stock === null || stock === undefined) return '';
       const v = (num(ats) / 0.5916) * num(stock);
       if (!v) return '';
@@ -2331,7 +2339,7 @@
       return true;
     }
     function sortRows(rows) {
-      const computed = { prodSort: r => r.prodSort, lead: computeLead, unitRate: computeUnitRate, actualUnitRate: computeActualUnitRate };
+      const computed = { prodSort: r => r.prodSort, lead: computeLead, unitRate: computeUnitRate, actualTs: computeActualTs, actualUnitRate: computeActualUnitRate };
       const getv = computed[sortKey];
       return rows.sort((a,b) => {
         let av = getv ? getv(a) : valueOf(a, sortKey);
@@ -2643,9 +2651,8 @@
       header.forEach((h, i) => { if (!(h in ix)) ix[h] = i; });
       const need = ['Production Line','Production Month','Sequence','Material','Assembly Order','Operation Short Text','Posted Quantity'];
       for (const name of need) { if (ix[name] === undefined) throw new Error('Missing column: ' + name); }
-      const hasCt = ix['CT Value'] !== undefined;
       const opField = { Insert: 'fp', Brazing: 'auto', Cutting: 'cutting' };
-      const mat = {}; const lot = {}; const matCt = {};
+      const mat = {}; const lot = {};
       for (let r = 1; r < rows.length; r++) {
         const row = rows[r];
         const line = cleanText(row[ix['Production Line']]);
@@ -2658,30 +2665,16 @@
           const k = `${head}|${cleanText(row[ix['Assembly Order']])}`;
           lot[k] = (lot[k] || 0) + qty;
         } else if (opField[op]) {
-          const f = opField[op];
           const k = `${head}|${cleanText(row[ix['Material']])}`;
           if (!mat[k]) mat[k] = {};
+          const f = opField[op];
           mat[k][f] = (mat[k][f] || 0) + qty;
-          // Accumulate CT seconds for FG operations.
-          if ((f === 'auto' || f === 'cutting') && hasCt && qty > 0) {
-            const ctVal = Number(row[ix['CT Value']]);
-            if (Number.isFinite(ctVal)) {
-              if (!matCt[k]) matCt[k] = {};
-              if (!matCt[k][f]) matCt[k][f] = { ct: 0, qty: 0 };
-              matCt[k][f].ct += ctVal * qty;
-              matCt[k][f].qty += qty;
-            }
-          }
         }
       }
       const rnd = v => Number.isInteger(v) ? v : Math.round(v * 100) / 100;
       for (const k in lot) lot[k] = rnd(lot[k]);
       for (const k in mat) for (const f in mat[k]) mat[k][f] = rnd(mat[k][f]);
-      for (const k in matCt) for (const f in matCt[k]) {
-        matCt[k][f].ct = Math.round(matCt[k][f].ct * 100) / 100;
-        matCt[k][f].qty = rnd(matCt[k][f].qty);
-      }
-      return { mat, lot, matCt };
+      return { mat, lot };
     }
     function applyProgressToRows() {
       for (const row of currentRows) {
@@ -2696,12 +2689,6 @@
         row.fg = fin;
         row.stockFg = fin;
         row.subcooler = fin;
-        // Compute actualTs from CT data for the FG operation.
-        const ctData = ((DATA.progressMatCt || {})[`${head}|${row.item}`]) || {};
-        const a = String(row.attribute || '').trim().toUpperCase();
-        const ctField = a.endsWith('-BZ') ? 'auto' : a.endsWith('-CT') ? 'cutting' : null;
-        const d = ctField ? (ctData[ctField] || {}) : {};
-        row.actualTs = d.qty ? Math.round(d.ct / d.qty / 3600 * 10000) / 10000 : '';
       }
     }
     // --- Persist the working table + progress overlay across refreshes -------
@@ -2723,7 +2710,6 @@
             rows: currentRows,
             mat: DATA.progressMat || {},
             lot: DATA.progressLot || {},
-            matCt: DATA.progressMatCt || {},
           }),
         });
       } catch (e) {
@@ -2764,7 +2750,6 @@
       if (state.mat || state.lot) {
         DATA.progressMat = state.mat || {};
         DATA.progressLot = state.lot || {};
-        DATA.progressMatCt = state.matCt || {};
         restored = true;
       }
       if (restored) {
@@ -2785,7 +2770,6 @@
         const agg = aggregateProgress(rows);
         DATA.progressMat = agg.mat;
         DATA.progressLot = agg.lot;
-        DATA.progressMatCt = agg.matCt || {};
         applyProgressToRows();
         progressCleared = false;
         localStorage.removeItem('dailyFollowProgCleared');
@@ -2956,7 +2940,6 @@
         }
         DATA.progressMat = res.mat || {};
         DATA.progressLot = res.lot || {};
-        DATA.progressMatCt = res.matCt || {};
         applyProgressToRows();
         progressCleared = false;
         localStorage.removeItem('dailyFollowProgCleared');
@@ -3339,6 +3322,8 @@
         }
         let value;
         if (field === 'unitRate') { value = computeUnitRate(row); td.dataset.field = 'unitRate'; }
+        else if (field === 'actualTs') { value = computeActualTs(row); td.dataset.field = 'actualTs'; }
+        else if (field === 'actualUnitRate') { value = computeActualUnitRate(row); td.dataset.field = 'actualUnitRate'; }
         else if (field === 'lead') { value = leadVal; td.dataset.field = 'lead'; }
         else if (field === 'scLead') { value = computeScLead(row); td.dataset.field = 'scLead'; }
         else value = valueOf(row, field);
