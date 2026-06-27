@@ -3351,9 +3351,14 @@
     // Actual Productivity readout: production on actProdDate for the active shift.
     function updateActualReadout() {
       const shift = activeSimShift;                       // A / B (shared with simulator)
-      // Default morning_shift to 'A' so switching A/B always toggles D/N even when OT is unreachable.
-      const morning = (actOt && actOt.morning_shift) || 'A';
-      const byKey = actProd[(shift === morning) ? 'D' : 'N'] || {};
+      // The A/B↔D/N split needs OT's morning_shift. When OT is connected we show
+      // that shift only; when OT is unreachable we can't map A/B to D/N, so show
+      // the whole day's production (D+N) instead of guessing and hiding half of it.
+      const morning = actOt && actOt.morning_shift;
+      const wholeDay = !morning;
+      const byKey = wholeDay
+        ? Object.assign({}, actProd.N || {}, actProd.D || {})
+        : (actProd[(shift === morning) ? 'D' : 'N'] || {});
       let rate = 0, n = 0, pcs = 0;
       for (const row of filtered) {
         if (isHairPin(row)) continue;
@@ -3369,7 +3374,7 @@
       }
       const wh = (actOt && actOt.shifts && actOt.shifts[shift]) ? num(actOt.shifts[shift].hours) : 0;
       if (els.actRateBadge) els.actRateBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
-      if (els.actRateSub) els.actRateSub.textContent = n.toLocaleString() + ' rows · ' + pcs.toLocaleString() + ' pcs';
+      if (els.actRateSub) els.actRateSub.textContent = n.toLocaleString() + ' rows · ' + pcs.toLocaleString() + ' pcs' + (wholeDay ? ' · ทั้งวัน' : '');
       if (els.actWorkBadge) els.actWorkBadge.textContent = (Math.round(wh * 100) / 100).toLocaleString();
       const prodVal = rate > 0 ? wh / rate : 0;
       if (els.actProdBadge) {
