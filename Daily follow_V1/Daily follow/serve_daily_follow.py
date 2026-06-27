@@ -226,19 +226,31 @@ def _cs_month(value):
         return ""
 
 
+def _ts_month(value):
+    """ISO timestamp 'YYYY-MM-DDT...' -> 'M.YYYY' (used for cutting which has no prod_month)."""
+    raw = str(value or "").strip()[:7]   # 'YYYY-MM'
+    if len(raw) < 7 or raw[4] != "-":
+        return ""
+    try:
+        return f"{int(raw[5:7])}.{raw[:4]}"
+    except ValueError:
+        return ""
+
+
 def load_checksheets():
     """Read first-lot check sheets, keep the latest OK/NG per (key, process).
 
-    Returns two maps the page joins onto its rows:
-      by_key["LINE|month|seq"] = {process: "OK"/"NG"}   (month-aware sheets)
-      by_ls["LINE|seq"]        = {"cutting": "OK"/"NG"}  (cutting has no month)
+    Returns by_key["LINE|month|seq"] = {process: "OK"/"NG"} for all processes.
+    cutting_records has no prod_month column, so we derive the month from saved_at
+    to prevent records from one month matching orders in another month.
     """
-    by_key, by_ls = {}, {}
+    by_key = {}
     for proc, fname, table, lcol, scol, mcol, rcol, tcol in CHECKSHEET_SOURCES:
         db = FIRSTLOT_DIR / fname
         if not db.is_file() or db.stat().st_size == 0:
             continue
-        cols = f"{lcol}, {scol}, {rcol}, {tcol}" + (f", {mcol}" if mcol else "")
+        # Always fetch saved_at/created_at as the last column for month fallback.
+        cols = f"{lcol}, {scol}, {rcol}, {mcol}, {tcol}" if mcol else f"{lcol}, {scol}, {rcol}, {tcol}"
         try:
             conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
             # Oldest first so a later record overwrites (latest result wins).
@@ -250,15 +262,15 @@ def load_checksheets():
                 if not line or not seq or res not in ("OK", "NG"):
                     continue
                 if mcol:
-                    month = _cs_month(r[4])
-                    if month:
-                        by_key.setdefault(f"{line}|{month}|{seq}", {})[proc] = res
+                    month = _cs_month(r[3])   # r[3] = prod_month, r[4] = ts
                 else:
-                    by_ls.setdefault(f"{line}|{seq}", {})[proc] = res
+                    month = _ts_month(r[3])   # r[3] = saved_at (no prod_month col)
+                if month:
+                    by_key.setdefault(f"{line}|{month}|{seq}", {})[proc] = res
             conn.close()
         except sqlite3.Error:
             continue  # skip a missing/locked/corrupt DB rather than break the page
-    return by_key, by_ls
+    return by_key
 
 
 # --- Part incoming (HEI Smart Stock Management) ------------------------------
@@ -1153,8 +1165,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "api/checksheets":
             try:
-                by_key, by_ls = load_checksheets()
-                self._send(200, json.dumps({"byKey": by_key, "byLineSeq": by_ls}))
+                by_key = load_checksheets()
+                self._send(200, json.dumps({"byKey": by_key}))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return

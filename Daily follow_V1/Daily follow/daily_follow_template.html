@@ -1455,11 +1455,7 @@
       const seq = seqKey(row.seq);
       const month = String(row.month || '').trim();
       if (!line || !seq) return null;
-      const procs = Object.assign(
-        {},
-        (checkSheets.byKey || {})[`${line}|${month}|${seq}`] || {},
-        (checkSheets.byLineSeq || {})[`${line}|${seq}`] || {},
-      );
+      const procs = (checkSheets.byKey || {})[`${line}|${month}|${seq}`] || {};
       let have = 0, ng = false;
       const missing = [];
       const detail = [];
