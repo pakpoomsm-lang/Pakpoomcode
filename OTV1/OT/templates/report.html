@@ -1,0 +1,640 @@
+{% extends "base.html" %}
+{% block title %}รายงาน | OT Control{% endblock %}
+
+{% block extra_css %}
+<style>
+.attendance-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 600px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+.attendance-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 100%;
+    font-size: 0.82rem;
+}
+.attendance-table thead th {
+    position: sticky;
+    top: 0;
+    background: #343a40;
+    color: #fff;
+    z-index: 3;
+    white-space: nowrap;
+    padding: 8px 6px;
+    text-align: center;
+    border-bottom: 2px solid #495057;
+}
+.attendance-table thead th.col-emp {
+    left: 0;
+    z-index: 4;
+    min-width: 200px;
+    text-align: left;
+    padding-left: 12px;
+}
+.attendance-table tbody td {
+    padding: 6px 4px;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+    border-right: 1px solid #f0f0f0;
+    white-space: nowrap;
+}
+.attendance-table tbody td.col-emp {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    z-index: 1;
+    text-align: left;
+    padding-left: 12px;
+    min-width: 200px;
+    border-right: 2px solid #dee2e6;
+}
+.attendance-table tbody tr:hover td {
+    background: #f8f9fa;
+}
+.attendance-table tbody tr:hover td.col-emp {
+    background: #f8f9fa;
+}
+.attendance-table .col-date {
+    min-width: 52px;
+}
+.cell-work  { color: #198754; font-weight: 700; font-size: 1rem; }
+.cell-leave { color: #dc3545; font-weight: 700; font-size: 1rem; }
+.cell-ot    {
+    background: #cfe2ff;
+    color: #0a58ca;
+    font-size: 0.65rem;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 2px 3px;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cell-none  { color: #adb5bd; }
+.cell-work-ot { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.day-header-day { font-size: 0.75rem; opacity: 0.75; }
+.day-header-date { font-size: 0.85rem; font-weight: 600; }
+.day-weekend  { background: #495057 !important; }
+.day-holiday  { background: #6f3800 !important; }
+.day-workday  { background: #0a6640 !important; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; }
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.holiday-list { max-height: 260px; overflow-y: auto; }
+.holiday-item { display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+.holiday-item:hover { background: #fff8f0; }
+.workday-item:hover { background: #f0fff4; }
+.holiday-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 99px;
+    background: #fff3cd; color: #664d03; border: 1px solid #ffc107; }
+.workday-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 99px;
+    background: #d1e7dd; color: #0a3622; border: 1px solid #75b798; }
+.calendar-tab-content { border: 1px solid #dee2e6; border-top: none;
+    border-radius: 0 0 8px 8px; padding: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Reporting</p>
+        <h1>รายงานการมาทำงาน</h1>
+        <p class="hero-copy">แสดงประวัติการมาทำงาน ลางาน และทำ OT ของพนักงานเป็นรายวัน</p>
+    </div>
+    <div class="hero-actions">
+        <button class="btn btn-outline-secondary" onclick="openHolidayModal()">
+            <i class="bi bi-calendar-event"></i> จัดการปฏิทิน
+        </button>
+        <button class="btn btn-success" onclick="exportGrid()" id="exportBtn" disabled>
+            <i class="bi bi-file-earmark-excel"></i> Export Excel
+        </button>
+    </div>
+</section>
+
+<section class="control-panel">
+    <div class="section-title">
+        <i class="bi bi-search"></i>
+        <div><h2>ค้นหารายงาน</h2><p>เลือกช่วงวันที่ไม่เกิน 31 วัน</p></div>
+    </div>
+    <div class="row g-3 align-items-end">
+        <div class="col-lg-2 col-md-4">
+            <label class="form-label">จากวันที่</label>
+            <input type="date" class="form-control" id="fromDate">
+        </div>
+        <div class="col-lg-2 col-md-4">
+            <label class="form-label">ถึงวันที่</label>
+            <input type="date" class="form-control" id="toDate">
+        </div>
+        <div class="col-lg-2 col-md-4">
+            <label class="form-label">Shift</label>
+            <select class="form-select" id="shiftFilter">
+                <option value="All">ทั้งหมด</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="D">D</option>
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-4">
+            <label class="form-label">GL</label>
+            <select class="form-select" id="glFilter">
+                <option value="All">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-4">
+            <label class="form-label">Process</label>
+            <select class="form-select" id="processFilter">
+                <option value="All">ทั้งหมด</option>
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-4">
+            <button class="btn btn-primary w-100" onclick="searchAttendance()">
+                <i class="bi bi-search"></i> ค้นหา
+            </button>
+        </div>
+    </div>
+    <div id="dateWarning" class="alert alert-warning mt-3 d-none">
+        <i class="bi bi-exclamation-triangle"></i> ช่วงวันที่ต้องไม่เกิน 31 วัน
+    </div>
+</section>
+
+<section class="data-panel">
+    <div class="data-panel-header">
+        <div class="section-title">
+            <i class="bi bi-table"></i>
+            <div><h2>ตารางการมาทำงาน</h2><p id="tableCaption">เลือกช่วงวันที่แล้วกดค้นหา</p></div>
+        </div>
+        <div class="legend">
+            <div class="legend-item"><span class="cell-work">✓</span> มาทำงาน</div>
+            <div class="legend-item"><span class="cell-leave">✗</span> ลางาน (แสดงเวลา)</div>
+            <div class="legend-item"><span class="cell-ot">OT</span> ทำ OT (แสดงจุดงาน)</div>
+            <div class="legend-item"><span class="cell-none">-</span> ไม่มีข้อมูล</div>
+            <div class="legend-item"><span style="display:inline-block;width:14px;height:14px;background:#0a6640;border-radius:3px"></span> วันทำงานพิเศษ</div>
+            <div class="legend-item"><span style="display:inline-block;width:14px;height:14px;background:#6f3800;border-radius:3px"></span> วันหยุดพิเศษ</div>
+            <div class="legend-item" style="font-size:0.75rem;color:#6c757d"><i class="bi bi-info-circle"></i> Hover เพื่อดูรายละเอียด</div>
+        </div>
+    </div>
+    <div class="attendance-table-wrap">
+        <table class="attendance-table" id="attendanceTable">
+            <thead id="tableHead">
+                <tr><th class="col-emp">พนักงาน</th></tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td class="col-emp empty-cell" style="min-width:200px">
+                    <i class="bi bi-info-circle"></i> เลือกช่วงวันที่แล้วกดค้นหา
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- Calendar Management Modal -->
+<div class="modal fade" id="holidayModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h6 class="modal-title"><i class="bi bi-calendar-event"></i> จัดการปฏิทินการทำงาน</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Info + Year filter -->
+                <div class="d-flex justify-content-between align-items-start mb-3 gap-3">
+                    <div class="alert alert-info py-2 mb-0 flex-grow-1" style="font-size:0.83rem">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>ค่าเริ่มต้น:</strong> จันทร์–ศุกร์ = วันทำงาน (OT 2.2 ชม.) · เสาร์–อาทิตย์ = วันหยุด (OT 10.32 ชม.)
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                        <label class="form-label mb-0 text-nowrap">ปี:</label>
+                        <select class="form-select form-select-sm" id="holidayYearFilter" style="width:auto" onchange="loadHolidayList()">
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <ul class="nav nav-tabs" id="calendarTypeTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="holiday-type-tab" data-bs-toggle="tab"
+                                data-bs-target="#holidayPane" type="button" role="tab">
+                            <i class="bi bi-calendar-x text-danger"></i> วันหยุดพิเศษ
+                            <span class="badge bg-danger ms-1" id="holidayCount">0</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="workday-type-tab" data-bs-toggle="tab"
+                                data-bs-target="#workdayPane" type="button" role="tab">
+                            <i class="bi bi-calendar-check text-success"></i> วันทำงานพิเศษ
+                            <span class="badge bg-success ms-1" id="workdayCount">0</span>
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content calendar-tab-content">
+                    <!-- Holiday Tab -->
+                    <div class="tab-pane fade show active" id="holidayPane" role="tabpanel">
+                        <div class="alert alert-warning py-2 mb-3" style="font-size:0.82rem">
+                            <i class="bi bi-exclamation-circle"></i>
+                            วันธรรมดา (จ–ศ) ที่กำหนดเป็นวันหยุด → คำนวณ OT อัตรา <strong>10.32 ชม.</strong>
+                        </div>
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">วันที่</label>
+                                <input type="date" class="form-control" id="newHolidayDate">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">ชื่อวันหยุด</label>
+                                <input type="text" class="form-control" id="newHolidayDesc" placeholder="เช่น วันหยุดสงกรานต์">
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-warning w-100" onclick="addCalendarEntry('holiday')">
+                                    <i class="bi bi-plus"></i> เพิ่ม
+                                </button>
+                            </div>
+                        </div>
+                        <div class="holiday-list border rounded" id="holidayList">
+                            <div class="text-center text-muted py-3">กำลังโหลด...</div>
+                        </div>
+                    </div>
+
+                    <!-- Workday Tab -->
+                    <div class="tab-pane fade" id="workdayPane" role="tabpanel">
+                        <div class="alert alert-success py-2 mb-3" style="font-size:0.82rem">
+                            <i class="bi bi-info-circle"></i>
+                            วันเสาร์–อาทิตย์ ที่กำหนดเป็นวันทำงาน → คำนวณ OT อัตรา <strong>2.2 ชม.</strong>
+                        </div>
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">วันที่</label>
+                                <input type="date" class="form-control" id="newWorkdayDate">
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label">ชื่อกิจกรรม</label>
+                                <input type="text" class="form-control" id="newWorkdayDesc" placeholder="เช่น วันทำงานชดเชย">
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-success w-100" onclick="addCalendarEntry('workday')">
+                                    <i class="bi bi-plus"></i> เพิ่ม
+                                </button>
+                            </div>
+                        </div>
+                        <div class="holiday-list border rounded" id="workdayList">
+                            <div class="text-center text-muted py-3">กำลังโหลด...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let gridData = null;
+let holidaySet = new Set();  // วันหยุดพิเศษ (weekday → holiday rate)
+let workdaySet = new Set();  // วันทำงานพิเศษ (weekend → workday rate)
+const DAYS_TH = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const OT_WEEKDAY = 2.2;
+const OT_WEEKEND = 10.32;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('fromDate').valueAsDate = firstDay;
+    document.getElementById('toDate').valueAsDate = today;
+    loadFilters();
+
+    document.getElementById('fromDate').addEventListener('change', checkDateRange);
+    document.getElementById('toDate').addEventListener('change', checkDateRange);
+    document.getElementById('shiftFilter').addEventListener('change', function() {
+        loadGLByShift();
+    });
+});
+
+function checkDateRange() {
+    const from = document.getElementById('fromDate').value;
+    const to   = document.getElementById('toDate').value;
+    if (!from || !to) return;
+    const days = (new Date(to) - new Date(from)) / 86400000;
+    const warn = document.getElementById('dateWarning');
+    if (days > 30) {
+        warn.classList.remove('d-none');
+    } else {
+        warn.classList.add('d-none');
+    }
+}
+
+function loadFilters() {
+    fetch('/api/workplaces').then(r => r.json()).then(data => {
+        const sel = document.getElementById('processFilter');
+        sel.innerHTML = '<option value="All">ทั้งหมด</option>';
+        data.forEach(w => {
+            const o = document.createElement('option');
+            o.value = o.textContent = w;
+            sel.appendChild(o);
+        });
+    });
+    loadGLByShift();
+}
+
+function loadGLByShift() {
+    const shift = document.getElementById('shiftFilter').value;
+    fetch(`/api/supervisors?shift=${shift}`).then(r => r.json()).then(data => {
+        const sel = document.getElementById('glFilter');
+        sel.innerHTML = '<option value="All">ทั้งหมด</option>';
+        data.forEach(s => {
+            const o = document.createElement('option');
+            o.value = o.textContent = s;
+            sel.appendChild(o);
+        });
+    });
+}
+
+// ─── Calendar Management ──────────────────────────────────────
+function openHolidayModal() {
+    const yearSel = document.getElementById('holidayYearFilter');
+    const cur = new Date().getFullYear();
+    yearSel.innerHTML = '';
+    for (let y = cur - 1; y <= cur + 2; y++) {
+        const o = document.createElement('option');
+        o.value = y; o.textContent = y + 543; // พ.ศ.
+        if (y === cur) o.selected = true;
+        yearSel.appendChild(o);
+    }
+    loadHolidayList();
+    new bootstrap.Modal(document.getElementById('holidayModal')).show();
+}
+
+function loadHolidayList() {
+    const year = document.getElementById('holidayYearFilter').value;
+    fetch(`/api/holidays?year=${year}`)
+        .then(r => r.json())
+        .then(data => {
+            const holidays = data.filter(h => (h.type || 'holiday') === 'holiday');
+            const workdays = data.filter(h => h.type === 'workday');
+
+            // Update badges
+            document.getElementById('holidayCount').textContent = holidays.length;
+            document.getElementById('workdayCount').textContent = workdays.length;
+
+            // Render holiday list
+            const hList = document.getElementById('holidayList');
+            if (holidays.length === 0) {
+                hList.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox"></i> ยังไม่มีวันหยุดพิเศษ</div>';
+            } else {
+                hList.innerHTML = holidays.map(h => renderCalendarItem(h, 'holiday')).join('');
+            }
+
+            // Render workday list
+            const wList = document.getElementById('workdayList');
+            if (workdays.length === 0) {
+                wList.innerHTML = '<div class="text-center text-muted py-3"><i class="bi bi-inbox"></i> ยังไม่มีวันทำงานพิเศษ</div>';
+            } else {
+                wList.innerHTML = workdays.map(h => renderCalendarItem(h, 'workday')).join('');
+            }
+        });
+}
+
+function renderCalendarItem(h, type) {
+    const d = new Date(h.date + 'T00:00:00');
+    const dow = DAYS_TH[d.getDay()];
+    const dateStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()+543}`;
+    const badgeClass = type === 'holiday' ? 'holiday-badge' : 'workday-badge';
+    const itemClass  = type === 'holiday' ? 'holiday-item' : 'holiday-item workday-item';
+    const btnClass   = type === 'holiday' ? 'btn-outline-danger' : 'btn-outline-success';
+    return `<div class="${itemClass}">
+        <div>
+            <span class="${badgeClass} me-2">${dow} ${dateStr}</span>
+            <span>${h.description || '-'}</span>
+        </div>
+        <button class="btn ${btnClass} btn-sm" onclick="deleteCalendarEntry('${h.date}')">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>`;
+}
+
+function addCalendarEntry(type) {
+    const dateId = type === 'holiday' ? 'newHolidayDate' : 'newWorkdayDate';
+    const descId = type === 'holiday' ? 'newHolidayDesc' : 'newWorkdayDesc';
+    const date = document.getElementById(dateId).value;
+    const desc = document.getElementById(descId).value.trim() ||
+                 (type === 'holiday' ? 'วันหยุดพิเศษ' : 'วันทำงานพิเศษ');
+    if (!date) { alert('กรุณาเลือกวันที่'); return; }
+    fetch('/api/holidays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, description: desc, type })
+    }).then(r => r.json()).then(res => {
+        if (res.success) {
+            document.getElementById(dateId).value = '';
+            document.getElementById(descId).value = '';
+            loadHolidayList();
+        } else alert(res.message);
+    });
+}
+
+function deleteCalendarEntry(date) {
+    if (!confirm(`ลบรายการ ${date} ออกจากระบบ?`)) return;
+    fetch(`/api/holidays/${date}`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(res => { if (res.success) loadHolidayList(); });
+}
+
+/**
+ * คืนค่า true ถ้าวันนั้นควรคิด OT อัตราวันหยุด (10.32 ชม.)
+ * - workdaySet มีความสำคัญสูงสุด: override weekend → workday rate
+ * - holidaySet: weekday กำหนดเป็นวันหยุด → holiday rate
+ * - เสาร์/อาทิตย์ปกติ → holiday rate
+ */
+function isHoliday(dateStr) {
+    if (workdaySet.has(dateStr)) return false;  // weekend override → workday rate
+    const dow = new Date(dateStr + 'T00:00:00').getDay();
+    return dow === 0 || dow === 6 || holidaySet.has(dateStr);
+}
+// ─────────────────────────────────────────────────────────────
+
+function searchAttendance() {
+    const from    = document.getElementById('fromDate').value;
+    const to      = document.getElementById('toDate').value;
+    const shift   = document.getElementById('shiftFilter').value;
+    const gl      = document.getElementById('glFilter').value;
+    const process = document.getElementById('processFilter').value;
+
+    if (!from || !to) { alert('กรุณาเลือกช่วงวันที่'); return; }
+
+    const days = (new Date(to) - new Date(from)) / 86400000;
+    if (days > 30) { alert('ช่วงวันที่ต้องไม่เกิน 31 วัน'); return; }
+    if (days < 0)  { alert('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด'); return; }
+
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '<tr><td class="col-emp empty-cell"><i class="bi bi-arrow-repeat"></i> กำลังโหลด...</td></tr>';
+
+    // โหลด holidays และ attendance พร้อมกัน
+    Promise.all([
+        fetch(`/api/attendance/range?from_date=${from}&to_date=${to}&shift=${shift}&gl=${gl}&process=${process}`).then(r => r.json()),
+        fetch(`/api/holidays?from_date=${from}&to_date=${to}`).then(r => r.json())
+    ]).then(([data, holidays]) => {
+        if (!data.success) { alert(data.message); return; }
+        // แยก holidaySet กับ workdaySet
+        holidaySet = new Set(holidays.filter(h => (h.type || 'holiday') === 'holiday').map(h => h.date));
+        workdaySet = new Set(holidays.filter(h => h.type === 'workday').map(h => h.date));
+        gridData = data;
+        renderGrid(data);
+        document.getElementById('exportBtn').disabled = data.employees.length === 0;
+    }).catch(() => alert('เกิดข้อผิดพลาดในการโหลดข้อมูล'));
+}
+
+function renderGrid(data) {
+    const { dates, employees } = data;
+
+    // Build header
+    const thead = document.getElementById('tableHead');
+    let headerHtml = '<tr><th class="col-emp">พนักงาน / Process</th>';
+    dates.forEach(d => {
+        const dt = new Date(d + 'T00:00:00');
+        const dow = dt.getDay();
+        const isWeekend = (dow === 0 || dow === 6);
+        const isSpecialHoliday = holidaySet.has(d);
+        const isSpecialWorkday = workdaySet.has(d);
+
+        let thClass = 'col-date';
+        let emoji, tooltip;
+        if (isSpecialWorkday) {
+            thClass += ' day-workday';
+            emoji   = '🏭';
+            tooltip = ` title="วันทำงานพิเศษ"`;
+        } else if (isSpecialHoliday) {
+            thClass += ' day-holiday';
+            emoji   = '🎌';
+            tooltip = ` title="วันหยุดพิเศษ"`;
+        } else if (isWeekend) {
+            thClass += ' day-weekend';
+            emoji   = DAYS_TH[dow];
+            tooltip = '';
+        } else {
+            emoji   = DAYS_TH[dow];
+            tooltip = '';
+        }
+
+        headerHtml += `<th class="${thClass}"${tooltip}>
+            <div class="day-header-day">${emoji}</div>
+            <div class="day-header-date">${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}</div>
+        </th>`;
+    });
+    headerHtml += `
+        <th class="col-summary" style="background:#1a7a3c;min-width:52px">มา<br><small>วัน</small></th>
+        <th class="col-summary" style="background:#a0400a;min-width:52px">ลา<br><small>วัน</small></th>
+        <th class="col-summary" style="background:#0a3d8f;min-width:52px">OT<br><small>วัน</small></th>
+        <th class="col-summary" style="background:#5a2d82;min-width:64px">ชั่วโมง<br><small>OT</small></th>
+    </tr>`;
+    thead.innerHTML = headerHtml;
+
+    // Build body
+    const tbody = document.getElementById('tableBody');
+    if (employees.length === 0) {
+        tbody.innerHTML = `<tr><td class="col-emp empty-cell" colspan="${dates.length + 4}">
+            <i class="bi bi-inbox"></i> ไม่พบพนักงานตามเงื่อนไขที่เลือก
+        </td></tr>`;
+        document.getElementById('tableCaption').textContent = 'ไม่พบข้อมูล';
+        return;
+    }
+
+    let bodyHtml = '';
+    employees.forEach(emp => {
+        let workCount = 0, leaveCount = 0, otCount = 0, otHours = 0;
+        bodyHtml += `<tr>
+            <td class="col-emp">
+                <div><strong>${emp.name}</strong></div>
+                <div style="font-size:0.75rem;color:#6c757d">${emp.emp_id} · ${emp.workplace || '-'} · Shift ${emp.shift}</div>
+            </td>`;
+        dates.forEach(d => {
+            const record = emp.records[d] || { types: [], workplace_substitute: null, leave_period: null, leave_time: null };
+            const types = record.types;
+            if (types.includes('work'))  workCount++;
+            if (types.includes('leave')) leaveCount++;
+            if (types.includes('ot')) {
+                otCount++;
+                otHours += isHoliday(d) ? OT_WEEKEND : OT_WEEKDAY;
+            }
+            bodyHtml += `<td>${cellContent(record)}</td>`;
+        });
+        const otHrsDisplay = otHours > 0
+            ? `<span title="${otCount} วัน × อัตรา OT">${otHours.toFixed(2)}</span>`
+            : '-';
+        bodyHtml += `
+            <td style="font-weight:700;color:#198754;background:#f0faf4">${workCount || '-'}</td>
+            <td style="font-weight:700;color:#dc3545;background:#fff5f5">${leaveCount || '-'}</td>
+            <td style="font-weight:700;color:#0a58ca;background:#f0f5ff">${otCount || '-'}</td>
+            <td style="font-weight:700;color:#6f42c1;background:#f8f0ff">${otHrsDisplay}</td>
+        </tr>`;
+    });
+    tbody.innerHTML = bodyHtml;
+
+    const from = dates[0].split('-').reverse().join('/');
+    const to   = dates[dates.length-1].split('-').reverse().join('/');
+    document.getElementById('tableCaption').textContent =
+        `${from} – ${to} · ${employees.length} คน · ${dates.length} วัน`;
+}
+
+function cellContent(record) {
+    const types = record.types || [];
+    const hasWork  = types.includes('work');
+    const hasLeave = types.includes('leave');
+    const hasOT    = types.includes('ot');
+
+    // Show leave with time
+    if (hasLeave) {
+        const leaveTime = record.leave_time || '';
+        const leavePeriod = record.leave_period || '';
+        let displayText = '✗';
+        let titleText = 'ลางาน';
+
+        if (leavePeriod && leaveTime) {
+            displayText = `✗\n${leaveTime}`;
+            titleText = `ลางาน: ${leavePeriod} (${leaveTime})`;
+        } else if (leavePeriod) {
+            titleText = `ลางาน: ${leavePeriod}`;
+        }
+
+        return `<span class="cell-leave" title="${titleText}" style="cursor: help; white-space: pre-line; font-size: 0.7rem; line-height: 1.2;">${displayText}</span>`;
+    }
+
+    // Show work and OT with workplace
+    if (hasWork && hasOT) {
+        const otPlace = record.workplace_substitute || '';
+        const otTitle = otPlace ? `ทำ OT ที่: ${otPlace}` : 'ทำ OT';
+        const otDisplay = otPlace || 'OT';
+        return `<div class="cell-work-ot">
+            <span class="cell-work" title="มาทำงาน">✓</span>
+            <span class="cell-ot" title="${otTitle}" style="cursor: help;">${otDisplay}</span>
+        </div>`;
+    }
+
+    if (hasWork)  return `<span class="cell-work" title="มาทำงาน">✓</span>`;
+
+    // Show OT only with workplace
+    if (hasOT) {
+        const otPlace = record.workplace_substitute || '';
+        const otTitle = otPlace ? `ทำ OT ที่: ${otPlace}` : 'ทำ OT';
+        const otDisplay = otPlace || 'OT';
+        return `<span class="cell-ot" title="${otTitle}" style="cursor: help;">${otDisplay}</span>`;
+    }
+
+    return `<span class="cell-none">-</span>`;
+}
+
+function exportGrid() {
+    const from    = document.getElementById('fromDate').value;
+    const to      = document.getElementById('toDate').value;
+    const shift   = document.getElementById('shiftFilter').value;
+    const gl      = document.getElementById('glFilter').value;
+    const process = document.getElementById('processFilter').value;
+    window.location.href = `/api/attendance/range/export?from_date=${from}&to_date=${to}&shift=${shift}&gl=${gl}&process=${process}`;
+}
+</script>
+{% endblock %}

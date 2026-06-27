@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cutting Machine and Insulation Check Sheet - CH-541-11-12-01</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Arial, sans-serif;
+  background: #c8c8c8;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+}
+
+/* ─── SHEET ─── */
+.sheet-wrapper { width: 1340px; background: #fff; border: 2px solid #000; }
+
+/* ─── HEADER ─── */
+.header { background: #1a1a1a; color: #fff; display: flex; align-items: stretch; }
+.header-title { flex: 1; padding: 10px 16px; }
+.header-title h1 { font-size: 26px; font-weight: 900; letter-spacing: 1px; line-height: 1.1; }
+.header-title p { font-size: 13px; color: #ccc; margin-top: 2px; }
+.header-right {
+  display: flex; flex-direction: column; align-items: flex-end;
+  justify-content: center; gap: 4px; padding: 10px 20px;
+  border-left: 3px solid #555; min-width: 290px;
+}
+.header-sheetno { background: #fff; color: #000; padding: 4px 12px; font-size: 15px; font-weight: bold; border-radius: 3px; }
+.header-dash-link { font-size: 12px; color: #90caf9; text-decoration: none; background: rgba(255,255,255,.1); padding: 3px 10px; border-radius: 4px; }
+.header-dash-link:hover { background: rgba(255,255,255,.2); }
+
+/* ─── BODY GRID — 2 cols × 2 auto rows ─── */
+.body-grid { display: grid; grid-template-columns: 560px 1fr; border-top: 2px solid #000; }
+/* 2×2 grid cells — rows determined automatically by content */
+.scan-panel     { border-right: 2px solid #000; }           /* row 1, col 1 */
+.spec-panel     { border-bottom: 2px solid #000; }          /* row 1, col 2 — border aligns with scan-section border */
+.check-panel    { border-right: 2px solid #000; }           /* row 2, col 1 */
+.controls-panel { /* row 2, col 2 — no extra borders needed */ }
+
+/* ─── DATE BAR ─── */
+.date-bar { display: grid; grid-template-columns: 90px 1fr 110px; border-bottom: 2px solid #000; background: #1a1a1a; color: #fff; }
+.date-bar .cell { padding: 6px 10px; font-weight: bold; font-size: 13px; border-right: 1px solid #555; display: flex; align-items: center; }
+.date-bar .cell:last-child { border-right: none; }
+#clock { font-size: 12px; font-weight: normal; color: #ddd; }
+
+/* ─── SCAN ROWS ─── */
+.scan-section { border-bottom: 2px solid #000; }
+.scan-row { border-bottom: 1px solid #ddd; }
+.scan-row:last-child { border-bottom: none; }
+.scan-main { display: grid; grid-template-columns: 60px 150px 1fr; min-height: 40px; align-items: center; }
+.scan-label {
+  background: #1a1a1a; color: #ff4444; font-weight: 900; font-size: 13px;
+  padding: 6px 8px; display: flex; align-items: center; justify-content: center; height: 100%;
+}
+.scan-name {
+  background: #f0f0f0; font-weight: bold; font-size: 12px; padding: 6px 8px;
+  display: flex; align-items: center; border-left: 1px solid #ccc; border-right: 1px solid #ccc; height: 100%;
+}
+.scan-input { padding: 4px 8px; height: 100%; display: flex; align-items: center; gap: 4px; }
+.scan-input input {
+  flex: 1; padding: 4px 8px; font-size: 13px; border: 1px solid #aaa;
+  border-radius: 3px; outline: none; font-family: 'Consolas', monospace;
+}
+.scan-input input:focus { border-color: #0078d4; background: #f0f8ff; }
+
+/* auto-fill display row */
+.scan-info {
+  display: grid; grid-template-columns: 210px 1fr;
+  background: #f8f8f8; border-top: 1px dashed #ddd;
+  min-height: 24px;
+}
+.scan-info-label {
+  padding: 3px 8px 3px 68px; font-size: 11px; color: #666;
+  border-right: 1px dashed #ddd;
+}
+.scan-info-value {
+  padding: 3px 8px; font-size: 12px; font-weight: bold;
+  color: #0070c0; min-height: 24px;
+}
+.scan-info-value.ok   { color: #007a38; }
+.scan-info-value.warn { color: #cc6600; }
+.scan-info-value.ng   { color: #cc0000; }
+
+/* ─── CHECK APPEARANCE ─── */
+.check-header {
+  display: grid; grid-template-columns: 1fr 210px 150px;
+  background: #1a1a1a; color: #fff; border-bottom: 1px solid #333;
+}
+.check-header div { padding: 6px 10px; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.check-header div:first-child { border-right: 1px solid #555; justify-content: flex-start; padding-left: 12px; }
+.check-header div:nth-child(2) { border-right: 1px solid #555; font-size: 11px; }
+
+.check-row { display: grid; grid-template-columns: 1fr 210px 150px; border-bottom: 1px solid #ccc; min-height: 60px; align-items: stretch; }
+.check-row.no-img { grid-template-columns: 1fr 210px; }
+.check-row:last-child { border-bottom: none; }
+
+.check-desc { padding: 8px 12px; font-size: 12px; font-weight: bold; display: flex; align-items: center; border-right: 1px solid #ccc; }
+.check-desc small { font-weight: normal; color: #0070c0; display: block; font-size: 10px; }
+.check-btns { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 4px; padding: 6px 8px; border-right: 1px solid #ccc; }
+
+.btn-check {
+  padding: 5px 0; font-size: 13px; font-weight: 900;
+  border: 2px solid #999; border-radius: 3px; cursor: pointer;
+  background: #e8e8e8; color: #333; transition: all 0.15s; flex: 1; min-width: 52px; text-align: center;
+}
+.btn-check:hover { opacity: 0.85; transform: scale(1.03); }
+.btn-check.active-ok { background: #00b050; color: #fff; border-color: #007a38; }
+.btn-check.active-ng { background: #cc0000; color: #fff; border-color: #900; }
+.btn-check.active-na { background: #666; color: #fff; border-color: #444; }
+
+/* ─── NG SAMPLE IMAGE CELL ─── */
+.ng-sample {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 4px; gap: 2px; background: #1a1a1a; overflow: hidden;
+}
+.ng-sample img {
+  max-width: 100%; max-height: 90px; object-fit: contain;
+  cursor: zoom-in; border-radius: 2px;
+  transition: transform 0.15s;
+}
+.ng-sample img:hover { transform: scale(1.05); }
+.ng-sample .no-img { font-size: 10px; color: #666; text-align: center; }
+
+/* ─── RIGHT PANEL ─── */
+.spec-header { background: #e0e0e0; text-align: center; padding: 8px; font-size: 16px; font-weight: 900; border-bottom: 2px solid #000; }
+
+.spec-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid #ccc; }
+.spec-cell { padding: 5px 10px; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; font-size: 12px; }
+.spec-cell:nth-child(3n) { border-right: none; }
+.spec-cell label { font-weight: bold; display: block; font-size: 11px; color: #444; margin-bottom: 2px; }
+.spec-cell input {
+  width: 100%; padding: 3px 6px; font-size: 12px;
+  border: 1px solid #bbb; border-radius: 2px; background: #fff; outline: none;
+}
+.spec-cell input:focus { border-color: #0078d4; }
+.spec-cell input[readonly] { background: #f0f0f0; color: #333; }
+
+.spec-row-header { display: grid; grid-template-columns: repeat(4, 1fr); background: #1a1a1a; border-bottom: 1px solid #555; }
+.spec-cell-header { background: #1a1a1a; color: #fff; font-weight: bold; font-size: 11px; text-align: center; padding: 4px 6px; border-right: 1px solid #555; }
+.spec-cell-header:last-child { border-right: none; }
+.spec-cell-header.blue { color: #4fc3f7; }
+.spec-row-values { display: grid; grid-template-columns: repeat(4, 1fr); }
+.spec-row-values .spec-cell { border-bottom: none; }
+.spec-row-values .spec-cell:last-child { border-right: none; }
+.spec-cell input.blue-val { color: #0070c0; font-weight: bold; }
+
+.mid-grid { display: grid; grid-template-columns: 1fr 220px; border-bottom: 2px solid #000; }
+.process-box { border-right: 2px solid #000; padding: 10px; }
+.process-box h3 { background: #1a1a1a; color: #fff; text-align: center; padding: 6px; font-size: 14px; margin-bottom: 8px; }
+.process-link { color: #0070c0; font-weight: bold; font-size: 13px; text-align: center; display: block; margin: 6px 0; }
+.process-scan { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.process-scan input { flex: 1; padding: 5px 8px; font-size: 13px; border: 1px solid #aaa; border-radius: 3px; outline: none; }
+
+.leader-box { padding: 10px; }
+.leader-box h3 { background: #1a1a1a; color: #fff; text-align: center; padding: 6px; font-size: 13px; margin-bottom: 8px; }
+.leader-scan { display: flex; align-items: center; gap: 6px; }
+.leader-scan input { flex: 1; padding: 5px 8px; font-size: 13px; border: 1px solid #aaa; border-radius: 3px; outline: none; }
+#leader-status { font-size: 11px; color: #cc0000; font-weight: bold; margin-top: 4px; text-align: center; min-height: 16px; }
+
+.bottom-grid { display: grid; grid-template-columns: 1fr 130px 190px; min-height: 90px; }
+.status-box { background: #1a1a1a; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; border-right: 2px solid #000; }
+.status-box h3 { color: #fff; font-size: 14px; font-weight: 900; margin-bottom: 4px; }
+#status-display { font-size: 44px; font-weight: 900; color: #fff; background: #cc0000; padding: 4px 30px; border-radius: 4px; min-width: 140px; text-align: center; letter-spacing: 2px; }
+#status-display.ok { background: #00b050; }
+
+.btn-reset { background: #cc0000; color: #fff; border: none; font-size: 18px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; border-right: 2px solid #000; }
+.btn-reset:hover { background: #a00000; }
+.btn-confirm { background: #1a3c6b; color: #fff; border: none; font-size: 18px; font-weight: 900; cursor: pointer; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.2; }
+.btn-confirm:hover { background: #0d2a4f; }
+.btn-confirm:disabled { background: #555; cursor: not-allowed; }
+
+/* ─── NO INSULATION ROW ─── */
+.scan-row.no-insulation .scan-main { background: #1a1a1a; }
+.scan-row.no-insulation .scan-label { background: #000; color: #555; }
+.scan-row.no-insulation .scan-name { background: #2a2a2a; color: #666; border-color: #444; }
+.scan-row.no-insulation .scan-input input {
+  background: #111; color: #555; border-color: #444; cursor: not-allowed;
+  pointer-events: none;
+}
+.scan-row.no-insulation .scan-input input::placeholder { color: #444; }
+.scan-row.no-insulation .scan-info { background: #1a1a1a; }
+.scan-row.no-insulation .scan-info-label { color: #555; border-color: #333; }
+.scan-row.no-insulation .scan-info-value { color: #666; }
+
+/* ─── IMAGE ZOOM MODAL ─── */
+#imgModal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.9); z-index:9000; align-items:center; justify-content:center; cursor:zoom-out; }
+#imgModal.open { display:flex; }
+#imgModal img { max-width:90vw; max-height:88vh; object-fit:contain; border-radius:6px; }
+#imgModal .close-btn { position:fixed; top:14px; right:18px; color:#fff; font-size:30px; cursor:pointer; line-height:1; }
+
+/* ─── TOAST ─── */
+#toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); padding:12px 28px; background:#00b050; color:#fff; font-size:16px; font-weight:bold; border-radius:6px; z-index:8888; opacity:0; transition:opacity 0.3s; pointer-events:none; }
+#toast.error { background:#cc0000; }
+#toast.show { opacity:1; }
+
+/* ─── SCAN CLEAR BUTTON ─── */
+.btn-scan-clear {
+  padding: 3px 8px; font-size: 11px; font-weight: bold; line-height: 1.4;
+  border: 1px solid #bbb; border-radius: 3px; cursor: pointer; flex-shrink: 0;
+  background: #e8e8e8; color: #666; white-space: nowrap;
+}
+.btn-scan-clear:hover { background: #cc0000; color: #fff; border-color: #900; }
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- IMAGE ZOOM MODAL -->
+<div id="imgModal" onclick="closeZoom()">
+  <span class="close-btn" onclick="closeZoom()">✕</span>
+  <img id="modalImg" src="" alt="">
+</div>
+
+<div class="sheet-wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-title">
+      <h1>CUTTING MACHINE AND INSULATION</h1>
+      <p>APPEARANCE AND DIMENSION CHECK</p>
+    </div>
+    <div class="header-right">
+      <div class="header-sheetno">Sheet No.: CH-541-11-12-01</div>
+      <a class="header-dash-link" href="/dashboard/firstlot" target="win_dashboard">📊 Dashboard</a>
+    </div>
+  </div>
+
+  <div class="body-grid">
+
+    <!-- ════ ROW 1, COL 1 — DATE BAR + SCAN ROWS ════ -->
+    <div class="scan-panel">
+      <div class="date-bar">
+        <div class="cell">DATE</div>
+        <div class="cell"><span id="clock"></span></div>
+        <div class="cell" style="border-right:none;font-size:11px;">DETAIL | RESULT</div>
+      </div>
+      <div class="scan-section">
+        <!-- SCAN: ID CARD -->
+        <div class="scan-row">
+          <div class="scan-main">
+            <div class="scan-label">SCAN</div>
+            <div class="scan-name">📷 ID.CARD</div>
+            <div class="scan-input">
+              <input type="text" id="scan-idcard" placeholder="Scan ID Card..."
+                oninput="onScanIdCard()" data-next="scan-mcline" data-min-length="5">
+            </div>
+          </div>
+          <div class="scan-info">
+            <div class="scan-info-label">ชื่อผู้สแกน :</div>
+            <div class="scan-info-value" id="info-idcard">—</div>
+          </div>
+        </div>
+        <!-- SCAN: MC/LINE -->
+        <div class="scan-row">
+          <div class="scan-main">
+            <div class="scan-label">SCAN</div>
+            <div class="scan-name">📷 MC./LINE</div>
+            <div class="scan-input">
+              <input type="text" id="scan-mcline" placeholder="Scan MC / Line..."
+                oninput="onScanMachine()" data-next="scan-tag1" data-min-length="4">
+            </div>
+          </div>
+          <div class="scan-info">
+            <div class="scan-info-label">เครื่องจักร :</div>
+            <div class="scan-info-value" id="info-mcline">—</div>
+          </div>
+        </div>
+        <!-- SCAN: TAG FG -->
+        <div class="scan-row">
+          <div class="scan-main">
+            <div class="scan-label">SCAN</div>
+            <div class="scan-name">📷 TAG FG.</div>
+            <div class="scan-input">
+              <input type="text" id="scan-tag1" placeholder="Scan Tag FG..."
+                oninput="onScanTag1()" data-next="scan-insulation" data-min-length="30">
+              <button class="btn-scan-clear" type="button" onclick="clearTag1()" tabindex="-1" title="ล้าง TAG FG">✕ CLR</button>
+            </div>
+          </div>
+          <div class="scan-info">
+            <div class="scan-info-label">Item FG :</div>
+            <div class="scan-info-value" id="info-tag1">—</div>
+          </div>
+        </div>
+        <!-- SCAN: ITEM INSULATION 1 -->
+        <div class="scan-row">
+          <div class="scan-main">
+            <div class="scan-label">SCAN</div>
+            <div class="scan-name">📷 ITEM INSUL. 1</div>
+            <div class="scan-input">
+              <input type="text" id="scan-insulation" placeholder="Scan Item Insulation 1..."
+                data-next="leader-scan" data-min-length="15">
+              <button class="btn-scan-clear" type="button" onclick="clearInsulation()" tabindex="-1" title="ล้าง Insulation 1">✕ CLR</button>
+            </div>
+          </div>
+          <div class="scan-info">
+            <div class="scan-info-label">Insulation 1 :</div>
+            <div class="scan-info-value" id="info-insulation">—</div>
+          </div>
+        </div>
+        <!-- SCAN: ITEM INSULATION 2 -->
+        <div class="scan-row">
+          <div class="scan-main">
+            <div class="scan-label">SCAN</div>
+            <div class="scan-name">📷 ITEM INSUL. 2</div>
+            <div class="scan-input">
+              <input type="text" id="scan-insulation-2" placeholder="Scan Item Insulation 2..."
+                data-next="leader-scan" data-min-length="15">
+              <button class="btn-scan-clear" type="button" onclick="clearInsulation2()" tabindex="-1" title="ล้าง Insulation 2">✕ CLR</button>
+            </div>
+          </div>
+          <div class="scan-info">
+            <div class="scan-info-label">Insulation 2 :</div>
+            <div class="scan-info-value" id="info-insulation-2">—</div>
+          </div>
+        </div>
+      </div><!-- /scan-section -->
+    </div><!-- /scan-panel -->
+
+    <!-- ════ ROW 1, COL 2 — SPEC FROM MASTER ════ -->
+    <div class="spec-panel">
+      <div class="spec-header">SPEC FROM MASTER!</div>
+      <div class="spec-grid">
+        <div class="spec-cell"><label>ITEM DWG :</label><input type="text" id="spec-itemdwg" readonly></div>
+        <div class="spec-cell"><label>TYPE</label><input type="text" id="spec-type" readonly></div>
+        <div class="spec-cell"><label>LINE</label><input type="text" id="spec-line" readonly></div>
+        <div class="spec-cell" style="grid-column:span 2"><label>ITEM NAME :</label><input type="text" id="spec-itemname" readonly></div>
+        <div class="spec-cell"><label>SEQ.</label><input type="text" id="spec-seq" readonly></div>
+        <div class="spec-cell"><label>LOT</label><input type="text" id="spec-lot" readonly></div>
+        <div class="spec-cell"><label>PROD.MONTH</label><input type="text" id="spec-prodmonth" readonly placeholder="MM/YYYY"></div>
+        <div class="spec-cell"><label>MC Cutting.</label><input type="text" id="spec-mccutting" readonly></div>
+        <div class="spec-cell"><label>INSUL. ITEM 1</label><input type="text" id="spec-insulitem" readonly></div>
+        <div class="spec-cell"><label>INSUL. ITEM 2</label><input type="text" id="spec-insulitem2" readonly></div>
+        <div class="spec-cell" style="grid-column:span 2">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1.6fr;gap:6px">
+            <div>
+              <label style="font-weight:bold;font-size:11px;color:#444;display:block;margin-bottom:2px">LINE</label>
+              <input type="text" id="spec-insul-line" readonly style="width:100%;padding:3px 6px;font-size:12px;border:1px solid #bbb;border-radius:2px;background:#f0f0f0;color:#333;outline:none">
+            </div>
+            <div>
+              <label style="font-weight:bold;font-size:11px;color:#444;display:block;margin-bottom:2px">SEQ.</label>
+              <input type="text" id="spec-insul-seq" readonly style="width:100%;padding:3px 6px;font-size:12px;border:1px solid #bbb;border-radius:2px;background:#f0f0f0;color:#333;outline:none">
+            </div>
+            <div>
+              <label style="font-weight:bold;font-size:11px;color:#444;display:block;margin-bottom:2px">LOT</label>
+              <input type="text" id="spec-insul-lot" readonly style="width:100%;padding:3px 6px;font-size:12px;border:1px solid #bbb;border-radius:2px;background:#f0f0f0;color:#333;outline:none">
+            </div>
+            <div>
+              <label style="font-weight:bold;font-size:11px;color:#444;display:block;margin-bottom:2px">VENDOR</label>
+              <div style="display:flex;gap:3px;align-items:center">
+                <input type="text" id="spec-insul-vendor" readonly style="flex:1;min-width:0;padding:3px 6px;font-size:12px;border:1px solid #bbb;border-radius:2px;background:#f0f0f0;color:#0070c0;font-weight:bold;outline:none">
+                <button class="btn-scan-clear" type="button" onclick="clearInsulVendor()" tabindex="-1" title="ล้าง Vendor">✕</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="spec-row-header">
+        <div class="spec-cell-header">INSULATION Q'TY</div>
+        <div class="spec-cell-header">CUTTING PCS.</div>
+        <div class="spec-cell-header blue">LAY DOWN,Side</div>
+        <div class="spec-cell-header blue">LAY DOWN,Middle</div>
+      </div>
+      <div class="spec-row-values">
+        <div class="spec-cell"><input type="text" id="spec-insulqty" readonly class="blue-val"></div>
+        <div class="spec-cell"><input type="text" id="spec-cuttingpcs" readonly class="blue-val"></div>
+        <div class="spec-cell"><input type="text" id="spec-laydownside" class="blue-val"></div>
+        <div class="spec-cell"><input type="text" id="spec-laydownmid" class="blue-val"></div>
+      </div>
+    </div><!-- /spec-panel -->
+
+    <!-- ════ ROW 2, COL 1 — CHECK APPEARANCE ════ -->
+    <div class="check-panel">
+      <div class="check-header">
+        <div>Check Appearance &nbsp; Check list</div>
+        <div style="background:#333;font-size:11px;">Result</div>
+        <div style="background:#cc0000;font-size:11px;color:#fff;flex-direction:column;">
+          <span>Appearance</span><span>NG.Sample</span>
+        </div>
+      </div>
+      <!-- Check 1: Lay down -->
+      <div class="check-row">
+        <div class="check-desc">ตำแหน่ง Lay down ถูกต้อง</div>
+        <div class="check-btns">
+          <button class="btn-check" data-check="laydown" data-val="NA" onclick="setCheck(this)">NA</button>
+          <button class="btn-check" data-check="laydown" data-val="OK" onclick="setCheck(this)">OK</button>
+          <button class="btn-check" data-check="laydown" data-val="NG" onclick="setCheck(this)">NG</button>
+        </div>
+        <div class="ng-sample">
+          <img src="/images/cut_image18.png" alt="NG Sample: Lay Down"
+            onclick="zoomImg(this.src)" title="NG Sample — ตำแหน่ง Lay Down">
+        </div>
+      </div>
+      <!-- Check 2: Burr -->
+      <div class="check-row">
+        <div class="check-desc">ฟันไม่เป็นครีบหรือ Burr</div>
+        <div class="check-btns">
+          <button class="btn-check" data-check="burr" data-val="OK" onclick="setCheck(this)">OK</button>
+          <button class="btn-check" data-check="burr" data-val="NG" onclick="setCheck(this)">NG</button>
+        </div>
+        <div class="ng-sample">
+          <img src="/images/cut_image19.png" alt="NG Sample: Burr"
+            onclick="zoomImg(this.src)" title="NG Sample — Burr" style="max-height:44px">
+          <img src="/images/cut_image21.png" alt="NG Sample: Burr 2"
+            onclick="zoomImg(this.src)" title="NG Sample — Burr 2" style="max-height:44px">
+        </div>
+      </div>
+      <!-- Check 3: Drawing (no image) -->
+      <div class="check-row no-img">
+        <div class="check-desc">ตำแหน่งการตัดตรงตาม Drawing</div>
+        <div class="check-btns">
+          <button class="btn-check" data-check="drawing" data-val="OK" onclick="setCheck(this)">OK</button>
+          <button class="btn-check" data-check="drawing" data-val="NG" onclick="setCheck(this)">NG</button>
+        </div>
+      </div>
+      <!-- Check 4: Copper pipe (no image) -->
+      <div class="check-row no-img">
+        <div class="check-desc">ไม่ตัดโดนปลายท่อทองแดง</div>
+        <div class="check-btns">
+          <button class="btn-check" data-check="copper" data-val="OK" onclick="setCheck(this)">OK</button>
+          <button class="btn-check" data-check="copper" data-val="NG" onclick="setCheck(this)">NG</button>
+        </div>
+      </div>
+      <!-- Check 5: Apprence Judgment (no image) -->
+      <div class="check-row no-img" style="border-bottom:none;">
+        <div class="check-desc">
+          Apprence Judgment
+          <small>ตรวจสอบ Apprence ตาม Limit sample</small>
+        </div>
+        <div class="check-btns">
+          <button class="btn-check" data-check="apprence" data-val="OK" onclick="setCheck(this)">OK</button>
+          <button class="btn-check" data-check="apprence" data-val="NG" onclick="setCheck(this)">NG</button>
+        </div>
+      </div>
+    </div><!-- /check-panel -->
+
+    <!-- ════ ROW 2, COL 2 — PROCESS CONTROL + LEADER + STATUS ════ -->
+    <div class="controls-panel">
+      <!-- PROCESS CONTROL + LEADER -->
+      <div class="mid-grid">
+        <div class="process-box">
+          <h3>PROCESS CONTROL</h3>
+          <button id="btn-open-cut" onclick="openCutImage()"
+            style="width:100%;margin:6px 0 4px;padding:10px;background:#0070c0;color:#fff;border:none;border-radius:5px;font-size:14px;font-weight:bold;cursor:pointer;letter-spacing:.5px">
+            📂 เปิดภาพ CUT Drawing
+          </button>
+          <div id="cut-img-status" style="font-size:11px;color:#888;text-align:center">—</div>
+        </div>
+        <div class="leader-box">
+          <h3>LEADER CONFIRM CHECK</h3>
+          <div class="leader-scan">
+            <span style="font-size:20px;color:#555;">📷</span>
+            <input type="text" id="leader-scan" placeholder="Leader ID..."
+              oninput="updateLeaderStatus()" data-next="">
+          </div>
+          <div id="leader-status">ข้อมูลไม่ครบถ้วน</div>
+        </div>
+      </div>
+      <!-- STATUS + BUTTONS -->
+      <div class="bottom-grid">
+        <div class="status-box">
+          <h3>STATUS CHECK</h3>
+          <div id="status-display">NG</div>
+        </div>
+        <button class="btn-reset" onclick="resetForm()">RESET</button>
+        <button class="btn-confirm" id="btn-confirm" onclick="confirmCheck()" disabled title="กรุณา Scan Leader ID ก่อน">CONFIRM<br>CHECK</button>
+      </div>
+    </div><!-- /controls-panel -->
+
+  </div><!-- /body-grid -->
+
+</div><!-- /sheet-wrapper -->
+
+<script>
+// ════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════
+const API = '/cutting';
+
+// ════════════════════════════════════════════════
+// MASTER DATA
+// ════════════════════════════════════════════════
+let EMPLOYEES = {}, MACHINES = {}, MASTER_ITEMS = {}, CHECKERS = {};
+
+async function loadMaster() {
+  // Add timestamp to bypass browser cache — master JSON is rebuilt on every server start
+  const t = Date.now();
+  try {
+    const [emp, mch, items, chk] = await Promise.all([
+      fetch(`${API}/data/employees.json?t=${t}`).then(r => r.json()),
+      fetch(`${API}/data/machines.json?t=${t}`).then(r => r.json()),
+      fetch(`${API}/data/master_items.json?t=${t}`).then(r => r.json()),
+      fetch(`${API}/data/checkers.json?t=${t}`).then(r => r.json()),
+    ]);
+    EMPLOYEES    = emp;
+    MACHINES     = mch;
+    MASTER_ITEMS = items;
+    CHECKERS     = chk;
+    console.log('[Master] loaded:', Object.keys(MASTER_ITEMS).length, 'items');
+  } catch(e) {
+    console.warn('[Master] load failed:', e.message);
+  }
+}
+loadMaster();
+
+// ════════════════════════════════════════════════
+// BARCODE EXTRACTORS
+// ════════════════════════════════════════════════
+// Employee: barcode เช่น "I542D12116" → last 5 = "12116"
+//           หรือ "AA12116" → last 5 = "12116"
+function extractEmpCode(raw) {
+  const r = raw.trim();
+  if (r.length >= 5) return r.slice(-5);
+  return r;
+}
+
+// Machine: barcode เช่น "I542ECT04" → regex หา CT04 / EX05 / ...
+function extractMachineCode(raw) {
+  const r = raw.trim().toUpperCase();
+  const m = r.match(/([A-Z]{2}\d{2,3})/g);
+  if (m) return m[m.length - 1];
+  if (r.length >= 4) return r.slice(-4);
+  return r;
+}
+
+// TAG FG: MID(raw,65,12) = substring(64,76)
+function extractFGCode(raw) {
+  const r = raw.trim();
+  if (r.length >= 76) return r.substring(64, 76).trim();
+  return r.trim();
+}
+
+// Insulation barcode parser — supports two formats:
+//
+// Format A: pipe-delimited  I542Gxxxxxx|LINE|HEX1 IN|SEQ|ITEM|LOT|timestamp|supplierCode|...
+//   Vendor rules: parts[7] non-empty → ASIA INOAC
+//                 parts[7] empty, item starts SU → ARMSTRONG
+//                 parts[7] empty, item starts VU → CHUBUTSU
+//
+// Format B: fixed-width (no pipes) — positions are 1-based (Excel MID convention):
+//   Item Insu : MID(65,11) → substring(64,75)
+//   Seq       : MID(117,4) → substring(116,120), parseInt removes leading zeros
+//   Line      : MID(271,2) → substring(270,272)
+//   Vendor    : empty (not determined from this format)
+function parseInsulBarcode(raw) {
+  const r = raw.trim();
+
+  // ── Format A: pipe-delimited ─────────────────────────────────────────
+  if (r.includes('|')) {
+    const parts = r.split('|');
+    if (parts.length < 6) return null;
+    const item     = (parts[4] || '').trim();
+    const suppCode = (parts[7] || '').trim();
+    let vendor = '';
+    if (suppCode)                               vendor = 'ASIA INOAC';
+    else if (item.toUpperCase().startsWith('SU')) vendor = 'ARMSTRONG';
+    else if (item.toUpperCase().startsWith('VU')) vendor = 'CHUBUTSU';
+    return {
+      item,
+      line:   (parts[1] || '').trim(),
+      seq:    (parts[3] || '').trim(),
+      lot:    (parts[5] || '').trim(),
+      vendor
+    };
+  }
+
+  // ── Format B: fixed-width (new format) ──────────────────────────────
+  if (r.length >= 273) {
+    const item = r.substring(64, 75).trim();
+    const seq  = String(parseInt(r.substring(116, 120).trim()) || '').trim();
+    const line = r.substring(270, 272).trim();
+    if (item) {
+      return { item, line, seq, lot: '', vendor: '' };
+    }
+  }
+
+  return null;
+}
+
+// ════════════════════════════════════════════════
+// SCAN AUTO-FILL HANDLERS
+// ════════════════════════════════════════════════
+function onScanIdCard() {
+  const raw = document.getElementById('scan-idcard').value;
+  const el  = document.getElementById('info-idcard');
+  if (!raw.trim()) { el.textContent = '—'; el.className = 'scan-info-value'; return; }
+
+  const code = extractEmpCode(raw);
+  // DATA BACKUP col N: ชื่อพนักงาน
+  const name = EMPLOYEES[code];
+  if (name) {
+    el.textContent = `${name}  (${code})`;
+    el.className = 'scan-info-value ok';
+  } else {
+    el.textContent = `ไม่พบรหัส [${code}]`;
+    el.className = 'scan-info-value warn';
+  }
+}
+
+function onScanMachine() {
+  const raw = document.getElementById('scan-mcline').value;
+  const el  = document.getElementById('info-mcline');
+  if (!raw.trim()) { el.textContent = '—'; el.className = 'scan-info-value'; return; }
+
+  const code = extractMachineCode(raw);
+  // DATA BACKUP col H: ชื่อเต็มเครื่องจักร
+  const name = MACHINES[code] || MACHINES[raw.trim().toUpperCase()];
+  if (name) {
+    el.textContent = `${name}`;
+    el.className = 'scan-info-value ok';
+  } else {
+    el.textContent = `ไม่พบเครื่อง [${code}]`;
+    el.className = 'scan-info-value warn';
+  }
+}
+
+function onScanTag1() {
+  const raw = document.getElementById('scan-tag1').value.trim();
+  const el  = document.getElementById('info-tag1');
+  if (!raw) { el.textContent = '—'; el.className = 'scan-info-value'; clearSpec(); return; }
+
+  // ── Extract fields from barcode ──────────────────
+  // E10 = MID(65,12) = substring(64,76)
+  const fg = raw.length >= 76 ? raw.substring(64, 76).trim() : raw;
+
+  // ITEM DWG  = TRIM(MID(65,12)) = substring(64,76)  [same position as FG code]
+  const itemDwg  = raw.length >= 76  ? raw.substring(64, 76).trim()  : fg;
+
+  // LINE     = MID(116,2) = substring(115,117)
+  const line = raw.length >= 117 ? raw.substring(115, 117).trim() : '';
+
+  // SEQ      = MID(119,3)*1 = substring(118,121) → parseInt removes leading zeros
+  const seq  = raw.length >= 121 ? String(parseInt(raw.substring(118, 121)) || '').trim() : '';
+
+  // LOT      = MID(170,3)*1 = substring(169,172)
+  const lot  = raw.length >= 172 ? String(parseInt(raw.substring(169, 172)) || '').trim() : '';
+
+  // ITEM NAME = MID(80,30) = substring(79,109)
+  const itemName = raw.length >= 109 ? raw.substring(79, 109).trim() : '';
+
+  // PROD.MONTH = UPPER(MID(110,2))&"/"&UPPER(MID(112,4)) = substring(109,111) + "/" + substring(111,115)
+  const pm1 = raw.length >= 111 ? raw.substring(109, 111).toUpperCase().trim() : '';
+  const pm2 = raw.length >= 115 ? raw.substring(111, 115).toUpperCase().trim() : '';
+  const prodMonth = (pm1 && pm2) ? `${pm1}/${pm2}` : '';
+
+  // Update info row
+  el.textContent = fg || raw;
+  el.className   = fg ? 'scan-info-value ok' : 'scan-info-value';
+
+  // ── Fill direct barcode fields ────────────────────
+  setVal('spec-itemdwg',   itemDwg);
+  setVal('spec-line',      line.toUpperCase());
+  setVal('spec-seq',       seq);
+  setVal('spec-lot',       lot);
+  setVal('spec-itemname',  itemName.toUpperCase());
+  setVal('spec-prodmonth', prodMonth);
+
+  // ── Fill from Master UPD lookup ───────────────────
+  const master = MASTER_ITEMS[fg];
+  if (master) {
+    setVal('spec-type',       master.type       || '');
+    setVal('spec-mccutting',  master.cuttingMC  || '');
+    setVal('spec-insulqty',   master.insulQty   || '');
+    setVal('spec-cuttingpcs', master.cuttingPcs || '');
+    setVal('spec-insulitem',  master.insulItem  || '');
+    setVal('spec-insulitem2', master.insulItem2 || '');
+    // Lay down Side  — col HL: 'O' → ✓, anything else/blank → empty
+    setLaydownVal('spec-laydownside',  master.laydownSide);
+    // Lay down Middle — col HM: 'O' → ✓, anything else/blank → empty
+    setLaydownVal('spec-laydownmid',   master.laydownMiddle);
+  } else if (fg) {
+    // FG found in barcode but not in master
+    ['spec-type','spec-mccutting','spec-insulqty','spec-cuttingpcs',
+     'spec-insulitem','spec-insulitem2'].forEach(id => setVal(id, ''));
+    setLaydownVal('spec-laydownside', '');
+    setLaydownVal('spec-laydownmid',  '');
+  }
+
+  // ── Insulation scan rows: ไฮไลท์ดำถ้าไม่ใช้ Insulation ────────
+  updateInsulationRows();
+}
+
+function updateInsulationRows() {
+  const qty        = document.getElementById('spec-insulqty').value.trim();
+  const insulItem2 = document.getElementById('spec-insulitem2').value.trim();
+  const row1   = document.querySelector('#scan-insulation').closest('.scan-row');
+  const row2   = document.querySelector('#scan-insulation-2').closest('.scan-row');
+  const info1  = document.getElementById('info-insulation');
+  const info2  = document.getElementById('info-insulation-2');
+  const tag1El = document.getElementById('scan-tag1');
+  const scan1  = document.getElementById('scan-insulation');
+
+  // qty = '' → master not yet loaded; leave both rows active (default state)
+  if (qty === '') {
+    row1.classList.remove('no-insulation');
+    row2.classList.remove('no-insulation');
+    tag1El.dataset.next = 'scan-insulation';
+    scan1.dataset.next  = 'leader-scan';
+    if (info1.textContent === 'ไม่ใช้ Insulation') { info1.textContent = '—'; info1.className = 'scan-info-value'; }
+    if (info2.textContent === 'ไม่ใช้ Insulation' || info2.textContent === 'ไม่มี Item Insulation 2') {
+      info2.textContent = '—'; info2.className = 'scan-info-value';
+    }
+    return;
+  }
+
+  // hasInsul: qty > 0  OR  insulItem1 code exists in master (qty=0 แต่มี item → ต้องสแกน)
+  const insulItem1 = document.getElementById('spec-insulitem').value.trim();
+  const hasInsul = (qty !== '0' && qty !== '-') || insulItem1 !== '';
+
+  if (!hasInsul) {
+    // ── Case 0: No Insulation — disable BOTH rows ──────────────────
+    row1.classList.add('no-insulation');
+    row2.classList.add('no-insulation');
+    setVal('scan-insulation',   '');
+    setVal('scan-insulation-2', '');
+    setVal('spec-insul-line', ''); setVal('spec-insul-seq', '');
+    setVal('spec-insul-lot',  ''); setVal('spec-insul-vendor', '');
+    insulMismatch  = false;
+    insulMismatch2 = false;
+    info1.textContent = 'ไม่ใช้ Insulation'; info1.className = 'scan-info-value warn';
+    info2.textContent = 'ไม่ใช้ Insulation'; info2.className = 'scan-info-value warn';
+    tag1El.dataset.next = 'leader-scan';
+  } else if (!insulItem2) {
+    // ── Case 1: 1 Insulation Item — enable row1, disable row2 ─────
+    row1.classList.remove('no-insulation');
+    row2.classList.add('no-insulation');
+    setVal('scan-insulation-2', '');
+    insulMismatch2 = false;
+    if (info1.textContent === 'ไม่ใช้ Insulation') { info1.textContent = '—'; info1.className = 'scan-info-value'; }
+    info2.textContent = 'ไม่มี Item Insulation 2'; info2.className = 'scan-info-value warn';
+    tag1El.dataset.next = 'scan-insulation';
+    scan1.dataset.next  = 'leader-scan';
+  } else {
+    // ── Case 2: 2 Insulation Items — enable BOTH rows ─────────────
+    row1.classList.remove('no-insulation');
+    row2.classList.remove('no-insulation');
+    if (info1.textContent === 'ไม่ใช้ Insulation') { info1.textContent = '—'; info1.className = 'scan-info-value'; }
+    if (info2.textContent === 'ไม่ใช้ Insulation' || info2.textContent === 'ไม่มี Item Insulation 2') {
+      info2.textContent = '—'; info2.className = 'scan-info-value';
+    }
+    tag1El.dataset.next = 'scan-insulation';
+    scan1.dataset.next  = 'scan-insulation-2';
+    document.getElementById('scan-insulation-2').dataset.next = 'leader-scan';
+  }
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+// Lay down fields: 'O' → ✓ (green), anything else/blank → empty (reset style)
+// Accepts: 'O' / 'o' (letter O), '○' (U+25CB circle), '〇' (U+3007 ideographic circle)
+function setLaydownVal(id, rawVal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const v = String(rawVal || '').trim();
+  const isActive = v.toUpperCase() === 'O' || v === '○' || v === '〇';
+  el.value            = isActive ? '✓' : '';
+  el.style.color      = isActive ? '#007a38' : '';
+  el.style.fontWeight = isActive ? '900'     : '';
+  el.style.fontSize   = isActive ? '15px'    : '';
+  el.style.textAlign  = isActive ? 'center'  : '';
+}
+
+function clearSpec() {
+  ['spec-itemdwg','spec-type','spec-line','spec-itemname','spec-seq','spec-lot',
+   'spec-prodmonth','spec-mccutting','spec-insulqty','spec-cuttingpcs',
+   'spec-insulitem','spec-insulitem2'].forEach(id => setVal(id, ''));
+  setLaydownVal('spec-laydownside',  '');
+  setLaydownVal('spec-laydownmid',   '');
+  // Reset both insulation rows and restore default Enter-key routing
+  const insulRow  = document.querySelector('#scan-insulation').closest('.scan-row');
+  const insulRow2 = document.querySelector('#scan-insulation-2').closest('.scan-row');
+  insulRow.classList.remove('no-insulation');
+  insulRow2.classList.remove('no-insulation');
+  document.getElementById('scan-tag1').dataset.next = 'scan-insulation';
+  document.getElementById('scan-insulation').dataset.next = 'leader-scan';
+  const info1 = document.getElementById('info-insulation');
+  if (info1.textContent === 'ไม่ใช้ Insulation') { info1.textContent = '—'; info1.className = 'scan-info-value'; }
+  const info2 = document.getElementById('info-insulation-2');
+  if (info2.textContent === 'ไม่ใช้ Insulation' || info2.textContent === 'ไม่มี Item Insulation 2') {
+    info2.textContent = '—'; info2.className = 'scan-info-value';
+  }
+}
+
+// INSULATION — validate item + extract Line/Seq/Lot/Vendor, then cross-check with TAG FG
+document.getElementById('scan-insulation').addEventListener('input', function() {
+  const raw      = this.value.trim();
+  const infoEl   = document.getElementById('info-insulation');
+  const insulRow = this.closest('.scan-row');
+  const noInsul  = insulRow && insulRow.classList.contains('no-insulation');
+
+  // Clear derived fields and reset mismatch flag on every change
+  setVal('spec-insul-line', ''); setVal('spec-insul-seq', '');
+  setVal('spec-insul-lot',  ''); setVal('spec-insul-vendor', '');
+  insulMismatch = false;
+
+  if (!raw) {
+    infoEl.textContent = '—';
+    infoEl.className = 'scan-info-value';
+    updateStatus();
+    return;
+  }
+
+  // Parse barcode (pipe-delimited insulation format)
+  const parsed    = parseInsulBarcode(raw);
+  const extracted = parsed ? parsed.item : extractFGCode(raw);
+
+  // ── 1. Validate Item code vs expected from master ─────────────────
+  const expected = document.getElementById('spec-insulitem').value.trim();
+  if (expected && extracted) {
+    if (extracted === expected) {
+      infoEl.textContent = `✓ ${extracted}`;
+      infoEl.className = 'scan-info-value ok';
+    } else {
+      infoEl.textContent = `⚠ ไม่ตรง: ${extracted} (ต้องการ ${expected})`;
+      infoEl.className = 'scan-info-value warn';
+    }
+  } else {
+    infoEl.textContent = extracted || raw;
+    infoEl.className = 'scan-info-value ok';
+  }
+
+  // ── 2. Fill Line / Seq / Lot / Vendor (skip if ไม่ใช้ Insulation) ─
+  if (!noInsul && parsed) {
+    const tagLine = document.getElementById('spec-line').value.trim();
+    const tagSeq  = document.getElementById('spec-seq').value.trim();
+    const insLine = effInsulLine(tagLine, parsed.line, raw);
+
+    setVal('spec-insul-line',   insLine.toUpperCase());
+    setVal('spec-insul-seq',    parsed.seq);
+    setVal('spec-insul-lot',    parsed.lot);
+    setVal('spec-insul-vendor', parsed.vendor);
+
+    // ── 3. Cross-validate LINE / SEQ against TAG FG barcode (LOT excluded) ─
+    const mismatches = [];
+    if (tagLine && insLine && !valSame(tagLine, insLine))
+      mismatches.push(`LINE: FG [${tagLine}] ≠ Insu [${insLine.toUpperCase()}]`);
+    if (tagSeq && parsed.seq && !valSame(tagSeq, parsed.seq))
+      mismatches.push(`SEQ: FG [${tagSeq}] ≠ Insu [${parsed.seq}]`);
+
+    if (mismatches.length > 0) {
+      insulMismatch = true;
+      infoEl.textContent = `❌ NG — ${mismatches.join(' | ')}`;
+      infoEl.className = 'scan-info-value ng';
+    }
+  }
+
+  updateStatus();
+});
+
+// INSULATION 2 — validate Item code vs spec-insulitem2 + LINE/SEQ vs TAG FG
+document.getElementById('scan-insulation-2').addEventListener('input', function() {
+  const raw    = this.value.trim();
+  const infoEl = document.getElementById('info-insulation-2');
+  const insulRow2 = this.closest('.scan-row');
+  const noInsul   = insulRow2 && insulRow2.classList.contains('no-insulation');
+
+  insulMismatch2 = false;
+
+  if (!raw) {
+    infoEl.textContent = '—';
+    infoEl.className = 'scan-info-value';
+    updateStatus();
+    return;
+  }
+
+  const parsed    = parseInsulBarcode(raw);
+  const extracted = parsed ? parsed.item : extractFGCode(raw);
+
+  // ── 1. Validate Item code vs expected from master ──────────────────
+  const expected = document.getElementById('spec-insulitem2').value.trim();
+  if (expected && extracted) {
+    if (extracted === expected) {
+      infoEl.textContent = `✓ ${extracted}`;
+      infoEl.className = 'scan-info-value ok';
+    } else {
+      infoEl.textContent = `⚠ ไม่ตรง: ${extracted} (ต้องการ ${expected})`;
+      infoEl.className = 'scan-info-value warn';
+      insulMismatch2 = true;
+    }
+  } else {
+    infoEl.textContent = extracted || raw;
+    infoEl.className = 'scan-info-value ok';
+  }
+
+  // ── 2. Cross-validate LINE / SEQ against TAG FG barcode ───────────
+  if (!noInsul && parsed) {
+    const tagLine = document.getElementById('spec-line').value.trim();
+    const tagSeq  = document.getElementById('spec-seq').value.trim();
+    const insLine = effInsulLine(tagLine, parsed.line, raw);
+    const mismatches = [];
+    if (tagLine && insLine && !valSame(tagLine, insLine))
+      mismatches.push(`LINE: FG [${tagLine}] ≠ Insu2 [${insLine.toUpperCase()}]`);
+    if (tagSeq && parsed.seq && !valSame(tagSeq, parsed.seq))
+      mismatches.push(`SEQ: FG [${tagSeq}] ≠ Insu2 [${parsed.seq}]`);
+    if (mismatches.length > 0) {
+      insulMismatch2 = true;
+      infoEl.textContent = `❌ NG — ${mismatches.join(' | ')}`;
+      infoEl.className = 'scan-info-value ng';
+    }
+  }
+
+  updateStatus();
+});
+
+// ════════════════════════════════════════════════
+// ENTER KEY → advance to next field
+// ════════════════════════════════════════════════
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  const el = document.activeElement;
+  if (!el || el.tagName.toLowerCase() !== 'input') return;
+  if (el.type === 'submit' || el.type === 'button') return;
+  e.preventDefault();
+
+  // data-min-length guard: don't advance if barcode is too short
+  // (protects against scanner Enter firing while still typing)
+  const minLen = parseInt(el.dataset.minLength || '0', 10);
+  if (minLen > 0 && el.value.trim().length < minLen) return;
+
+  const nextId = el.dataset.next;
+  if (nextId) {
+    const next = document.getElementById(nextId);
+    if (next) { next.focus(); next.select(); }
+  }
+}, true);
+
+// ════════════════════════════════════════════════
+// CLOCK
+// ════════════════════════════════════════════════
+(function() {
+  const el = document.getElementById('clock');
+  const u = () => {
+    el.textContent = new Date().toLocaleString('th-TH', {
+      day:'2-digit', month:'2-digit', year:'2-digit',
+      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+    });
+  };
+  u(); setInterval(u, 1000);
+})();
+
+// ════════════════════════════════════════════════
+// CHECK BUTTONS
+// ════════════════════════════════════════════════
+const checks = {};
+let insulMismatch  = false;  // true = LINE/SEQ หรือ Item ของ Insulation 1 ≠ TAG FG → force NG
+let insulMismatch2 = false;  // true = Item ของ Insulation 2 ≠ spec-insulitem2 → force NG
+
+// Compare two field values (numeric-aware, case-insensitive)
+function valSame(a, b) {
+  if (!a || !b) return true;   // missing side = no basis to flag mismatch
+  const ai = parseInt(a, 10), bi = parseInt(b, 10);
+  if (!isNaN(ai) && !isNaN(bi)) return ai === bi;
+  return a.trim().toUpperCase() === b.trim().toUpperCase();
+}
+
+// Effective insulation LINE used to cross-check against TAG FG.
+//  - FG line "SR": insulation tags carry no fixed-width line field, so derive
+//    it via =MID(RIGHT(B2,5),1,2) → first 2 chars of the last 5 (e.g. "SRV03" → "SR").
+//  - Any other FG line: keep the default parsed line (original logic).
+function effInsulLine(tagLine, parsedLine, raw) {
+  if ((tagLine || '').trim().toUpperCase() === 'SR') {
+    return (raw || '').trim().slice(-5).substring(0, 2);   // =MID(RIGHT(B2,5),1,2)
+  }
+  return parsedLine;
+}
+
+function setCheck(btn) {
+  const name = btn.dataset.check, val = btn.dataset.val;
+
+  // ── Laydown validation: ถ้าไม่มี Laydown position → ห้ามกด OK ──────────
+  if (name === 'laydown' && val === 'OK') {
+    const side = document.getElementById('spec-laydownside').value.trim();
+    const mid  = document.getElementById('spec-laydownmid').value.trim();
+    if (!side && !mid) {
+      showToast('กรุณากดปุ่ม NA เนื่องจากไม่มีการเลือกตำแหน่ง Laydown', true);
+      return;   // block — do not change state
+    }
+  }
+
+  document.querySelectorAll(`[data-check="${name}"]`).forEach(b =>
+    b.classList.remove('active-ok','active-ng','active-na'));
+  btn.classList.add(val==='OK'?'active-ok':val==='NG'?'active-ng':'active-na');
+  checks[name] = val;
+  updateStatus();
+}
+
+function updateStatus() {
+  const allKeys = ['laydown','burr','drawing','copper','apprence'];
+  const allSet  = allKeys.every(k => checks[k]);
+  const hasNG   = Object.values(checks).includes('NG');
+  const el = document.getElementById('status-display');
+  if (!allSet || hasNG || insulMismatch || insulMismatch2) {
+    el.textContent = 'NG'; el.className = '';
+  } else {
+    el.textContent = 'OK'; el.className = 'ok';
+  }
+}
+
+function updateLeaderStatus() {
+  const raw = document.getElementById('leader-scan').value.trim();
+  const el  = document.getElementById('leader-status');
+  const btn = document.getElementById('btn-confirm');
+
+  if (!raw) {
+    el.textContent = 'ข้อมูลไม่ครบถ้วน';
+    el.style.color = '#cc0000';
+    btn.disabled = true;
+    return;
+  }
+
+  const code = extractEmpCode(raw);
+  const checker = CHECKERS[code];
+  if (checker) {
+    el.textContent = `✓ ${checker.name}  (${checker.role})`;
+    el.style.color = '#007a38';
+    btn.disabled = false;
+  } else {
+    // ถ้าไม่พบใน checkers ให้แสดง warning แต่ยังไม่ allow
+    el.textContent = `⚠ ไม่พบ Leader [${code}]`;
+    el.style.color = '#cc6600';
+    btn.disabled = true;
+  }
+}
+
+// ════════════════════════════════════════════════
+// PROCESS CONTROL — Open CUT Drawing Image
+// ════════════════════════════════════════════════
+function openCutImage() {
+  const itemDwg = document.getElementById('spec-itemdwg').value.trim();
+  const statusEl = document.getElementById('cut-img-status');
+  if (!itemDwg) {
+    statusEl.textContent = '⚠ กรุณา Scan TAG FG ก่อน';
+    statusEl.style.color = '#cc6600';
+    return;
+  }
+  const filename = encodeURIComponent(itemDwg + '-CUT.jpg');
+  const url = `/cutting/process-control/${filename}`;
+  statusEl.textContent = `🔍 ${itemDwg}-CUT.jpg`;
+  statusEl.style.color = '#888';
+
+  // ตรวจสอบว่าไฟล์มีอยู่จริง
+  fetch(url, { method: 'HEAD' })
+    .then(res => {
+      if (res.ok) {
+        statusEl.textContent = `✓ ${itemDwg}-CUT.jpg`;
+        statusEl.style.color = '#007a38';
+        document.getElementById('modalImg').src = url;
+        document.getElementById('imgModal').classList.add('open');
+      } else {
+        statusEl.textContent = `⚠ ไม่พบไฟล์: ${itemDwg}-CUT.jpg`;
+        statusEl.style.color = '#cc0000';
+        alert(`ไม่พบภาพ CUT Drawing สำหรับ ${itemDwg}\n\nทำการแจ้งหัวหน้างาน และ Quality Co`);
+      }
+    })
+    .catch(() => {
+      statusEl.textContent = `❌ ไม่สามารถเชื่อมต่อ`;
+      statusEl.style.color = '#cc0000';
+      alert(`ไม่สามารถเชื่อมต่อเพื่อตรวจสอบไฟล์\n\nทำการแจ้งหัวหน้างาน และ Quality Co`);
+    });
+}
+
+// ════════════════════════════════════════════════
+// IMAGE ZOOM
+// ════════════════════════════════════════════════
+function zoomImg(src) {
+  document.getElementById('modalImg').src = src;
+  document.getElementById('imgModal').classList.add('open');
+}
+function closeZoom() {
+  document.getElementById('imgModal').classList.remove('open');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeZoom(); });
+
+// ════════════════════════════════════════════════
+// FIELD CLEAR HELPERS (individual scan buttons)
+// ════════════════════════════════════════════════
+function clearTag1() {
+  // Clear TAG FG scan input + all spec fields derived from it
+  setVal('scan-tag1', '');
+  const el = document.getElementById('info-tag1');
+  el.textContent = '—'; el.className = 'scan-info-value';
+  clearSpec();
+  // Cross-validation is now void (no TAG FG data to compare against)
+  insulMismatch = false;
+  updateStatus();
+  document.getElementById('scan-tag1').focus();
+}
+
+function clearInsulation() {
+  // Clear insulation scan + its parsed fields
+  setVal('scan-insulation', '');
+  const insulRow = document.querySelector('#scan-insulation').closest('.scan-row');
+  if (!insulRow.classList.contains('no-insulation')) {
+    const el = document.getElementById('info-insulation');
+    el.textContent = '—'; el.className = 'scan-info-value';
+  }
+  setVal('spec-insul-line', '');
+  setVal('spec-insul-seq', '');
+  setVal('spec-insul-lot', '');
+  setVal('spec-insul-vendor', '');
+  insulMismatch = false;
+  updateStatus();
+  document.getElementById('scan-insulation').focus();
+}
+
+function clearInsulation2() {
+  setVal('scan-insulation-2', '');
+  const insulRow2 = document.querySelector('#scan-insulation-2').closest('.scan-row');
+  if (!insulRow2.classList.contains('no-insulation')) {
+    const el = document.getElementById('info-insulation-2');
+    el.textContent = '—'; el.className = 'scan-info-value';
+  }
+  insulMismatch2 = false;
+  updateStatus();
+  document.getElementById('scan-insulation-2').focus();
+}
+
+function clearInsulVendor() {
+  setVal('spec-insul-vendor', '');
+}
+
+// ════════════════════════════════════════════════
+// RESET
+// ════════════════════════════════════════════════
+function resetForm() {
+  if (!confirm('ต้องการ Reset ข้อมูลทั้งหมดหรือไม่?')) return;
+
+  // ── 1. Clear all scan inputs ──────────────────
+  [
+    'scan-idcard', 'scan-mcline',
+    'scan-tag1',   'scan-insulation', 'scan-insulation-2',
+    'leader-scan'
+  ].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+
+  // ── 2. Clear all spec/auto-fill fields ────────
+  [
+    'spec-itemdwg', 'spec-type',     'spec-line',     'spec-itemname',
+    'spec-seq',     'spec-lot',      'spec-prodmonth',   'spec-mccutting',
+    'spec-insulqty','spec-cuttingpcs','spec-insulitem','spec-insulitem2',
+    'spec-insul-line','spec-insul-seq','spec-insul-lot','spec-insul-vendor',
+  ].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+  setLaydownVal('spec-laydownside', '');
+  setLaydownVal('spec-laydownmid',  '');
+
+  // ── 3. Reset all info display labels ──────────
+  ['info-idcard','info-mcline','info-tag1','info-insulation','info-insulation-2'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) { e.textContent = '—'; e.className = 'scan-info-value'; }
+  });
+
+  // ── 4. Remove insulation rows dark highlight + restore default Enter routing ──
+  const insulRow  = document.querySelector('#scan-insulation').closest('.scan-row');
+  const insulRow2 = document.querySelector('#scan-insulation-2').closest('.scan-row');
+  if (insulRow)  insulRow.classList.remove('no-insulation');
+  if (insulRow2) insulRow2.classList.remove('no-insulation');
+  document.getElementById('scan-tag1').dataset.next = 'scan-insulation';
+  document.getElementById('scan-insulation').dataset.next = 'leader-scan';
+
+  // ── 5. Reset check buttons, checks object & mismatch flags ────────
+  document.querySelectorAll('.btn-check').forEach(b =>
+    b.classList.remove('active-ok', 'active-ng', 'active-na'));
+  for (const k in checks) delete checks[k];
+  insulMismatch  = false;
+  insulMismatch2 = false;
+  updateStatus();
+
+  // ── 6. Reset process control status ───────────
+  const cs = document.getElementById('cut-img-status');
+  if (cs) { cs.textContent = '—'; cs.style.color = '#888'; }
+
+  // ── 7. Reset leader / confirm section ─────────
+  const ls = document.getElementById('leader-status');
+  ls.textContent = 'ข้อมูลไม่ครบถ้วน';
+  ls.style.color = '#cc0000';
+  document.getElementById('btn-confirm').disabled = true;
+
+  // ── 8. Return focus to first field ────────────
+  document.getElementById('scan-idcard').focus();
+}
+
+// ════════════════════════════════════════════════
+// CONFIRM & SAVE
+// ════════════════════════════════════════════════
+async function confirmCheck() {
+  const leader = document.getElementById('leader-scan').value.trim();
+  if (!leader) {
+    showToast('กรุณา Scan Leader ID ก่อนยืนยัน', true);
+    document.getElementById('leader-scan').focus(); return;
+  }
+  const allKeys = ['laydown','burr','drawing','copper','apprence'];
+  if (!allKeys.every(k => checks[k])) {
+    showToast('กรุณาตรวจสอบ Check list ให้ครบทุกรายการ', true); return;
+  }
+  if (insulMismatch || insulMismatch2) {
+    showToast('❌ Item / LINE / SEQ ของ Insulation ไม่ตรงกับ TAG FG — กรุณาตรวจสอบข้อมูลอีกครั้ง', true);
+    return;
+  }
+
+  const btn = document.getElementById('btn-confirm');
+  btn.disabled = true;
+
+  // Resolve names
+  const idRaw     = document.getElementById('scan-idcard').value.trim();
+  const mcRaw     = document.getElementById('scan-mcline').value.trim();
+  const tag1Raw   = document.getElementById('scan-tag1').value.trim();
+  const insulRaw  = document.getElementById('scan-insulation').value.trim();
+  const insulRaw2 = document.getElementById('scan-insulation-2').value.trim();
+  const empCode   = extractEmpCode(idRaw);
+  const mcCode    = extractMachineCode(mcRaw);
+  const empName   = EMPLOYEES[empCode] || empCode;
+  const mcName    = MACHINES[mcCode] || MACHINES[mcRaw.toUpperCase()] || mcCode;
+  const leaderCode  = extractEmpCode(leader);
+  const leaderChecker = CHECKERS[leaderCode];
+  const leaderName  = leaderChecker ? leaderChecker.name : leader;
+  // Parse insulation barcodes — used for item code, vendor, and raw tag storage
+  const insulParsed  = insulRaw  ? parseInsulBarcode(insulRaw)  : null;
+  const insulParsed2 = insulRaw2 ? parseInsulBarcode(insulRaw2) : null;
+
+  const record = {
+    sheetNo:           'CH-541-11-12-01',
+    idCard:            empName,
+    mcLine:            mcName,
+    tagFgNo1:          extractFGCode(tag1Raw),
+    tagFgNo2:          '',
+    itemInsulation:    insulParsed ? insulParsed.item : (insulRaw ? extractFGCode(insulRaw) : ''),
+    vendorInsulation:  document.getElementById('spec-insul-vendor').value.trim(),
+    tagInsulation:     insulRaw,   // raw barcode — saved silently, not shown in UI
+    itemInsulation2:   insulParsed2 ? insulParsed2.item : (insulRaw2 ? extractFGCode(insulRaw2) : ''),
+    vendorInsulation2: insulParsed2 ? (insulParsed2.vendor || '') : '',
+    tagInsulation2:    insulRaw2,  // raw barcode 2 — saved silently
+    checkLaydown:   checks['laydown']  || '',
+    checkBurr:      checks['burr']     || '',
+    checkDrawing:   checks['drawing']  || '',
+    checkCopper:    checks['copper']   || '',
+    checkApprence:  checks['apprence'] || '',
+    itemDwg:        document.getElementById('spec-itemdwg').value.trim(),
+    itemType:       document.getElementById('spec-type').value.trim(),
+    line:           document.getElementById('spec-line').value.trim(),
+    itemName:       document.getElementById('spec-itemname').value.trim(),
+    seq:            document.getElementById('spec-seq').value.trim(),
+    lot:            document.getElementById('spec-lot').value.trim(),
+    prodMonth:      document.getElementById('spec-prodmonth').value,
+    mcCutting:      document.getElementById('spec-mccutting').value.trim(),
+    insulationQty:  document.getElementById('spec-insulqty').value,
+    cuttingPcs:     document.getElementById('spec-cuttingpcs').value,
+    layDownSide:    document.getElementById('spec-laydownside').value.trim() === '✓',
+    layDownMiddle:  document.getElementById('spec-laydownmid').value.trim() === '✓',
+    leaderConfirm:  leaderName,
+    status:         document.getElementById('status-display').textContent,
+  };
+
+  try {
+    const res = await fetch(`${API}/api/cutting-record`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showToast(`บันทึกสำเร็จ ✓  (ID: ${data.id})`);
+      setTimeout(() => resetForm(), 2000);
+    } else {
+      showToast('เกิดข้อผิดพลาด: ' + data.error, true);
+    }
+  } catch (err) {
+    showToast('ไม่สามารถเชื่อมต่อ Server: ' + err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════
+function showToast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = (isError ? 'error ' : '') + 'show';
+  setTimeout(() => { el.className = ''; }, 3500);
+}
+
+// Init focus
+document.getElementById('scan-idcard').focus();
+</script>
+</body>
+</html>

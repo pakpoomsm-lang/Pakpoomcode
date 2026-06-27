@@ -1,0 +1,625 @@
+{% extends "base.html" %}
+
+{% block title %}จัดการพนักงาน | OT Control{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">People Data</p>
+        <h1>จัดการพนักงาน</h1>
+        <p class="hero-copy">เพิ่ม แก้ไข นำเข้า และลบข้อมูลพนักงานจากตารางได้โดยตรง พร้อมส่งออกรายชื่อเป็น Excel</p>
+    </div>
+    <div class="hero-actions">
+        <button class="btn btn-success" onclick="exportEmployees()">
+            <i class="bi bi-file-earmark-excel"></i> Export Excel
+        </button>
+    </div>
+</section>
+
+<section class="control-panel">
+    <div class="section-title">
+        <i class="bi bi-file-earmark-arrow-up"></i>
+        <div>
+            <h2>นำเข้าจาก Excel</h2>
+            <p>เลือกไฟล์เพื่อแทนที่รายชื่อพนักงานในระบบด้วยข้อมูลชุดใหม่</p>
+        </div>
+    </div>
+    <div class="import-row">
+        <input type="file" class="form-control" id="excelFile" accept=".xlsx,.xls">
+        <div class="toolbar justify-content-end">
+            <button class="btn btn-soft" id="downloadTemplateBtn" type="button">
+                <i class="bi bi-download"></i> Download Template
+            </button>
+            <button class="btn btn-success" id="importEmployeesBtn" type="button">
+                <i class="bi bi-upload"></i> Import Excel
+            </button>
+        </div>
+    </div>
+    <div id="importStatus" class="mt-3"></div>
+</section>
+
+<section class="control-panel">
+    <div class="section-title">
+        <i class="bi bi-person-plus"></i>
+        <div>
+            <h2>เพิ่มพนักงานใหม่</h2>
+            <p>กรอกข้อมูลแล้วกดบันทึกเพื่อเพิ่มเข้าในระบบทันที</p>
+        </div>
+    </div>
+    <div class="employee-form-grid" id="newEmployeeForm">
+        <input class="form-control" data-field="emp_id" placeholder="รหัสพนักงาน">
+        <input class="form-control" data-field="first_name" placeholder="ชื่อ">
+        <input class="form-control" data-field="last_name" placeholder="นามสกุล">
+        <input class="form-control" data-field="workplace" placeholder="สถานที่ทำงาน">
+        <select class="form-select" data-field="group_name" id="newGroupSelect">
+            <option value="">Group</option>
+        </select>
+        <select class="form-select" data-field="emp_type">
+            <option value="">ประเภท</option>
+            <option value="MCP">MCP</option>
+            <option value="SUB">SUB</option>
+            <option value="STU">STU</option>
+        </select>
+        <select class="form-select" data-field="shift">
+            <option value="">Shift</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="D">D</option>
+        </select>
+        <select class="form-select" data-field="supervisor" id="newSupervisorSelect" onchange="handleSupervisorSelect(this)">
+            <option value="">หัวหน้างาน</option>
+        </select>
+        <button class="btn btn-primary" onclick="saveNewEmployee()">
+            <i class="bi bi-save"></i> บันทึก
+        </button>
+    </div>
+    <div id="employeeStatus" class="mt-3"></div>
+</section>
+
+<section class="data-panel">
+    <div class="data-panel-header">
+        <div class="section-title">
+            <i class="bi bi-pencil-square"></i>
+            <div>
+                <h2>แก้ไขรายชื่อพนักงาน</h2>
+                <p>แก้ข้อมูลในช่องแล้วกดบันทึกที่ท้ายแถว</p>
+            </div>
+        </div>
+        <span class="count-pill" id="employeeCount">0 คน</span>
+    </div>
+    <div class="search-row">
+        <i class="bi bi-search"></i>
+        <input type="text" class="form-control" id="searchBox" placeholder="ค้นหา รหัส / ชื่อ / สถานที่..." oninput="applyCurrentFilter()">
+    </div>
+    <div class="filter-bar">
+        <select class="form-select form-select-sm filter-chip" id="filterShift" onchange="applyCurrentFilter()">
+            <option value="">Shift ทั้งหมด</option>
+            <option value="A">Shift A</option>
+            <option value="B">Shift B</option>
+            <option value="D">Shift D</option>
+        </select>
+        <select class="form-select form-select-sm filter-chip" id="filterGL" onchange="applyCurrentFilter()">
+            <option value="">GL ทั้งหมด</option>
+        </select>
+        <select class="form-select form-select-sm filter-chip" id="filterGroup" onchange="applyCurrentFilter()">
+            <option value="">Group ทั้งหมด</option>
+        </select>
+        <button class="btn btn-sm btn-outline-secondary filter-clear-btn" id="clearFilterBtn" onclick="clearFilters()" style="display:none">
+            <i class="bi bi-x-circle"></i> ล้าง filter
+        </button>
+    </div>
+    <div class="table-responsive app-table-wrap employee-editor-wrap">
+        <table class="table table-hover align-middle app-table employee-editor-table" id="employeeTable">
+            <thead>
+                <tr>
+                    <th width="96">รหัส</th>
+                    <th width="130">ชื่อ</th>
+                    <th width="135">นามสกุล</th>
+                    <th width="190">สถานที่ทำงาน</th>
+                    <th width="115">Group</th>
+                    <th width="92">ประเภท</th>
+                    <th width="74">Shift</th>
+                    <th width="165">หัวหน้างาน</th>
+                    <th width="118">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="employeeTableBody">
+                <tr>
+                    <td colspan="9" class="empty-cell">
+                        <i class="bi bi-arrow-repeat"></i> กำลังโหลดข้อมูล...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allEmployees = [];
+let groupOptions = [];
+let supervisorOptions = [];
+const preferredSupervisors = [
+    { match: 'ภาคภูมิพรมชา', fallback: 'ภาคภูมิ พรมชา', displayName: 'ภาคภูมิ พรมชา (SV)' },
+    { match: 'ศุภมาศปลงจิตร', fallback: 'ศุภมาศ ปลงจิตร', displayName: 'ศุภมาศ ปลงจิตร (FM)' },
+    { match: 'วัชราศรีบาลชื่น', fallback: 'วัชรา ศรีบาลชื่น', displayName: 'วัชรา ศรีบาลชื่น (FM)' },
+    { match: 'ประถมสุขรัมย์', fallback: 'ประถม สุขรัมย์', displayName: 'ประถม สุขรัมย์ (FM)' }
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('downloadTemplateBtn')?.addEventListener('click', downloadEmployeeTemplate);
+    document.getElementById('importEmployeesBtn')?.addEventListener('click', importEmployees);
+    loadEmployees();
+});
+
+function loadEmployees() {
+    fetch('/api/employees/list')
+        .then(response => response.json())
+        .then(data => {
+            allEmployees = data;
+            refreshDropdownOptions(data);
+            applyCurrentFilter(); // จะ update count เองภายใน
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showStatus('โหลดข้อมูลพนักงานไม่สำเร็จ', 'danger');
+        });
+}
+
+function employeeTemplate(emp) {
+    const typeOptions = ['', 'MCP', 'SUB', 'STU'];
+    const shiftOptions = ['', 'A', 'B', 'D'];
+    const optionHtml = (items, current, label) => items.map(item => {
+        const text = item || label;
+        return `<option value="${escapeAttr(item)}" ${item === (current || '') ? 'selected' : ''}>${escapeHtml(text)}</option>`;
+    }).join('');
+
+    return `
+        <td><input class="form-control inline-input" data-field="emp_id" value="${escapeAttr(emp.emp_id)}"></td>
+        <td><input class="form-control inline-input" data-field="first_name" value="${escapeAttr(emp.first_name)}"></td>
+        <td><input class="form-control inline-input" data-field="last_name" value="${escapeAttr(emp.last_name)}"></td>
+        <td><input class="form-control inline-input" data-field="workplace" value="${escapeAttr(emp.workplace)}"></td>
+        <td><select class="form-select inline-input" data-field="group_name">${buildSelectOptions(groupOptions, emp.group_name || '', 'เลือก')}</select></td>
+        <td><select class="form-select inline-input" data-field="emp_type">${optionHtml(typeOptions, emp.emp_type, 'เลือก')}</select></td>
+        <td><select class="form-select inline-input" data-field="shift">${optionHtml(shiftOptions, emp.shift, '-')}</select></td>
+        <td><select class="form-select inline-input" data-field="supervisor" onchange="handleSupervisorSelect(this)">${buildSupervisorOptions(emp.supervisor || '')}</select></td>
+        <td>
+            <div class="table-actions">
+                <button class="btn btn-primary btn-sm" onclick="saveEmployeeRow(this)">
+                    <i class="bi bi-save"></i> บันทึก
+                </button>
+                <button class="btn btn-outline-danger btn-sm" onclick="deleteEmployeeRow(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </td>
+    `;
+}
+
+function refreshDropdownOptions(data) {
+    groupOptions = uniqueValues(data.map(emp => emp.group_name)).filter(group => group.toLowerCase() !== 'fm');
+    supervisorOptions = sortSupervisorOptions(uniqueValues(data.map(emp => emp.supervisor)), true);
+    updateAddFormDropdowns();
+    updateFilterDropdowns();
+}
+
+function updateFilterDropdowns() {
+    // GL filter
+    const glSel = document.getElementById('filterGL');
+    if (glSel) {
+        const current = glSel.value;
+        glSel.innerHTML = '<option value="">GL ทั้งหมด</option>';
+        supervisorOptions.filter(Boolean).forEach(s => {
+            const o = document.createElement('option');
+            o.value = s;
+            o.textContent = getSupervisorDisplayName(s);
+            if (s === current) o.selected = true;
+            glSel.appendChild(o);
+        });
+    }
+    // Group filter
+    const groupSel = document.getElementById('filterGroup');
+    if (groupSel) {
+        const current = groupSel.value;
+        groupSel.innerHTML = '<option value="">Group ทั้งหมด</option>';
+        groupOptions.forEach(g => {
+            const o = document.createElement('option');
+            o.value = g; o.textContent = g;
+            if (g === current) o.selected = true;
+            groupSel.appendChild(o);
+        });
+    }
+}
+
+function updateAddFormDropdowns() {
+    const groupSelect = document.getElementById('newGroupSelect');
+    const supervisorSelect = document.getElementById('newSupervisorSelect');
+
+    if (groupSelect) {
+        const current = groupSelect.value;
+        groupSelect.innerHTML = buildSelectOptions(groupOptions, current, 'Group');
+    }
+
+    if (supervisorSelect) {
+        const current = supervisorSelect.value;
+        supervisorSelect.innerHTML = buildSupervisorOptions(current);
+    }
+}
+
+function buildSelectOptions(options, currentValue, emptyLabel) {
+    const values = options.includes(currentValue) || !currentValue
+        ? options
+        : [currentValue, ...options];
+
+    return [
+        `<option value="">${escapeHtml(emptyLabel)}</option>`,
+        ...values.map(value => `<option value="${escapeAttr(value)}" ${value === currentValue ? 'selected' : ''}>${escapeHtml(value)}</option>`)
+    ].join('');
+}
+
+function buildSupervisorOptions(currentValue) {
+    const values = supervisorOptions.includes(currentValue) || !currentValue
+        ? supervisorOptions
+        : [currentValue, ...supervisorOptions];
+
+    return [
+        '<option value="">หัวหน้างาน</option>',
+        ...values.map(value => `<option value="${escapeAttr(value)}" ${value === currentValue ? 'selected' : ''}>${escapeHtml(getSupervisorDisplayName(value))}</option>`),
+        '<option value="__add_new__">+ เพิ่มหัวหน้างานใหม่...</option>',
+        '<option value="__delete_name__">- ลบหัวหน้างาน...</option>'
+    ].join('');
+}
+
+function handleSupervisorSelect(select) {
+    if (select.value === '__delete_name__') {
+        deleteSupervisorFromSelect(select);
+        return;
+    }
+
+    if (select.value !== '__add_new__') return;
+
+    const newSupervisor = prompt('กรอกชื่อหัวหน้างานใหม่');
+    if (!newSupervisor || !newSupervisor.trim()) {
+        select.value = '';
+        return;
+    }
+
+    const cleanName = newSupervisor.trim();
+    if (!supervisorOptions.includes(cleanName)) {
+        supervisorOptions.push(cleanName);
+        supervisorOptions = sortSupervisorOptions(supervisorOptions, true);
+    }
+
+    document.querySelectorAll('select[data-field="supervisor"]').forEach(supervisorSelect => {
+        const selectedValue = supervisorSelect === select ? cleanName : supervisorSelect.value;
+        supervisorSelect.innerHTML = buildSupervisorOptions(selectedValue);
+    });
+}
+
+function deleteSupervisorFromSelect(select) {
+    const currentOptions = supervisorOptions.filter(Boolean);
+    if (currentOptions.length === 0) {
+        showStatus('ยังไม่มีรายชื่อหัวหน้างานให้ลบ', 'info');
+        select.value = '';
+        return;
+    }
+
+    const supervisorToDelete = prompt(
+        `พิมพ์ชื่อหัวหน้างานที่ต้องการลบ\n\nรายชื่อที่มี:\n${currentOptions.join('\n')}`,
+        select.dataset.previousValue || ''
+    );
+
+    if (!supervisorToDelete || !supervisorToDelete.trim()) {
+        select.value = select.dataset.previousValue || '';
+        return;
+    }
+
+    const cleanName = supervisorToDelete.trim();
+    if (!supervisorOptions.includes(cleanName)) {
+        showStatus(`ไม่พบชื่อหัวหน้างาน "${cleanName}" ในรายการ`, 'danger');
+        select.value = select.dataset.previousValue || '';
+        return;
+    }
+
+    if (!confirm(`ต้องการลบชื่อหัวหน้างาน "${cleanName}" ออกจาก dropdown และล้างชื่อนี้จากพนักงานทุกคนใช่หรือไม่?`)) {
+        select.value = select.dataset.previousValue || '';
+        return;
+    }
+
+    fetch('/api/employees/supervisors/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supervisor: cleanName })
+    })
+        .then(response => response.json().then(result => ({ ok: response.ok, result })))
+        .then(({ ok, result }) => {
+            showStatus(result.message, ok && result.success ? 'success' : 'danger');
+            if (ok && result.success) {
+                supervisorOptions = supervisorOptions.filter(name => name !== cleanName);
+                document.querySelectorAll('select[data-field="supervisor"]').forEach(supervisorSelect => {
+                    const selectedValue = supervisorSelect.value === cleanName ? '' : supervisorSelect.value;
+                    supervisorSelect.innerHTML = buildSupervisorOptions(selectedValue);
+                });
+                loadEmployees();
+            } else {
+                select.value = select.dataset.previousValue || '';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showStatus('ลบชื่อหัวหน้างานไม่สำเร็จ', 'danger');
+            select.value = select.dataset.previousValue || '';
+        });
+}
+
+function uniqueValues(values) {
+    return [...new Set(values.map(value => (value || '').toString().trim()).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'th'));
+}
+
+function sortSupervisorOptions(supervisors, includeMissingPreferred = false) {
+    const values = [...new Set((supervisors || []).map(value => (value || '').trim()).filter(Boolean))];
+
+    if (includeMissingPreferred) {
+        preferredSupervisors.forEach(meta => {
+            if (!values.some(value => isPreferredSupervisor(value, meta))) {
+                values.push(meta.fallback);
+            }
+        });
+    }
+
+    return values.sort((a, b) => {
+        const aRank = getPreferredSupervisorRank(a);
+        const bRank = getPreferredSupervisorRank(b);
+        if (aRank !== bRank) return aRank - bRank;
+        return a.localeCompare(b, 'th');
+    });
+}
+
+function getPreferredSupervisorRank(supervisorName) {
+    const index = preferredSupervisors.findIndex(meta => isPreferredSupervisor(supervisorName, meta));
+    return index === -1 ? preferredSupervisors.length : index;
+}
+
+function isPreferredSupervisor(supervisorName, meta) {
+    const normalized = (supervisorName || '').replace(/\s+/g, '');
+    return normalized.includes(meta.match);
+}
+
+function getSupervisorDisplayName(supervisorName) {
+    const meta = preferredSupervisors.find(item => isPreferredSupervisor(supervisorName, item));
+    return meta ? meta.displayName : supervisorName;
+}
+
+function displayEmployees(data) {
+    const tbody = document.getElementById('employeeTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-cell"><i class="bi bi-inbox"></i> ยังไม่มีข้อมูลพนักงาน เพิ่มพนักงานใหม่จากฟอร์มด้านบนได้เลย</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    data.forEach(emp => {
+        const row = document.createElement('tr');
+        row.dataset.originalEmpId = emp.emp_id;
+        row.innerHTML = employeeTemplate(emp);
+        tbody.appendChild(row);
+    });
+}
+
+function updateEmployeeCount(filtered, total) {
+    const el = document.getElementById('employeeCount');
+    if (total === undefined || filtered === total) {
+        el.textContent = `${filtered} คน`;
+    } else {
+        el.textContent = `${filtered} / ${total} คน`;
+        el.style.background = filtered < total ? '#e8f4fd' : '';
+        el.style.color      = filtered < total ? '#0d6efd'  : '';
+    }
+}
+
+function filterTable() {
+    applyCurrentFilter();
+}
+
+function applyCurrentFilter() {
+    const searchText  = document.getElementById('searchBox').value.toLowerCase();
+    const filterShift = document.getElementById('filterShift')?.value  || '';
+    const filterGL    = document.getElementById('filterGL')?.value     || '';
+    const filterGroup = document.getElementById('filterGroup')?.value  || '';
+
+    const hasFilter = searchText || filterShift || filterGL || filterGroup;
+    const clearBtn  = document.getElementById('clearFilterBtn');
+    if (clearBtn) clearBtn.style.display = hasFilter ? '' : 'none';
+
+    // ไฮไลต์ chip ที่ใช้งาน
+    ['filterShift','filterGL','filterGroup'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.toggle('filter-chip-active', !!el.value);
+    });
+
+    const filtered = allEmployees.filter(emp => {
+        const matchSearch = !searchText ||
+            safeLower(emp.emp_id).includes(searchText)   ||
+            safeLower(emp.name).includes(searchText)      ||
+            safeLower(emp.workplace).includes(searchText) ||
+            safeLower(emp.group_name).includes(searchText)||
+            safeLower(emp.supervisor).includes(searchText);
+
+        const matchShift = !filterShift || emp.shift === filterShift;
+        const matchGL    = !filterGL    || emp.supervisor === filterGL;
+        const matchGroup = !filterGroup || emp.group_name === filterGroup;
+
+        return matchSearch && matchShift && matchGL && matchGroup;
+    });
+
+    displayEmployees(filtered);
+    updateEmployeeCount(filtered.length, allEmployees.length);
+}
+
+function clearFilters() {
+    document.getElementById('searchBox').value   = '';
+    document.getElementById('filterShift').value = '';
+    document.getElementById('filterGL').value    = '';
+    document.getElementById('filterGroup').value = '';
+    applyCurrentFilter();
+}
+
+function saveNewEmployee() {
+    const form = document.getElementById('newEmployeeForm');
+    const data = collectFields(form);
+    saveEmployee(data, () => {
+        form.querySelectorAll('input').forEach(input => input.value = '');
+        form.querySelectorAll('select').forEach(select => select.value = '');
+        loadEmployees();
+    });
+}
+
+function saveEmployeeRow(button) {
+    const row = button.closest('tr');
+    const data = collectFields(row);
+    data.original_emp_id = row.dataset.originalEmpId;
+    saveEmployee(data, loadEmployees);
+}
+
+function deleteEmployeeRow(button) {
+    const row = button.closest('tr');
+    const empId = row.dataset.originalEmpId;
+    const name = `${row.querySelector('[data-field="first_name"]').value} ${row.querySelector('[data-field="last_name"]').value}`.trim();
+
+    if (!confirm(`ต้องการลบ ${empId} ${name} ใช่หรือไม่?`)) return;
+
+    fetch('/api/employees/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emp_id: empId })
+    })
+        .then(response => response.json().then(data => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+            showStatus(data.message, ok && data.success ? 'success' : 'danger');
+            if (ok && data.success) loadEmployees();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showStatus('ลบข้อมูลไม่สำเร็จ', 'danger');
+        });
+}
+
+function saveEmployee(data, onSuccess) {
+    if (!data.emp_id || !data.first_name) {
+        showStatus('กรุณาระบุรหัสพนักงานและชื่อ', 'danger');
+        return;
+    }
+
+    fetch('/api/employees/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+        .then(response => response.json().then(result => ({ ok: response.ok, result })))
+        .then(({ ok, result }) => {
+            showStatus(result.message, ok && result.success ? 'success' : 'danger');
+            if (ok && result.success && onSuccess) onSuccess();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showStatus('บันทึกข้อมูลไม่สำเร็จ', 'danger');
+        });
+}
+
+function collectFields(container) {
+    const data = {};
+    container.querySelectorAll('[data-field]').forEach(input => {
+        data[input.dataset.field] = input.value.trim();
+    });
+    return data;
+}
+
+function exportEmployees() {
+    window.location.href = '/api/employees/export';
+}
+
+function downloadEmployeeTemplate() {
+    window.location.href = '/api/employees/template';
+}
+
+function importEmployees() {
+    const fileInput = document.getElementById('excelFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        showImportStatus('กรุณาเลือกไฟล์ Excel', 'danger');
+        return;
+    }
+
+    if (!confirm('การ Import จะล้างรายชื่อพนักงานเดิม แล้วแทนที่ด้วยข้อมูลจากไฟล์นี้ ต้องการดำเนินการต่อหรือไม่?')) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    showImportStatus('กำลังนำเข้าข้อมูล...', 'info');
+
+    fetch('/api/employees/import', { method: 'POST', body: formData })
+        .then(response => response.json().then(result => ({ ok: response.ok, result })))
+        .then(({ ok, result }) => {
+            showImportStatus(result.message, ok && result.success ? 'success' : 'danger');
+            if (ok && result.success) {
+                fileInput.value = '';
+                loadEmployees();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showImportStatus('เกิดข้อผิดพลาดในการนำเข้าข้อมูล', 'danger');
+        });
+}
+
+function showImportStatus(message, type) {
+    const statusDiv = document.getElementById('importStatus');
+    const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle';
+    statusDiv.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            <i class="bi bi-${icon}"></i> ${escapeHtml(message)}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    setTimeout(() => { statusDiv.innerHTML = ''; }, 7000);
+}
+
+function showStatus(message, type) {
+    const statusDiv = document.getElementById('employeeStatus');
+    const icon = type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-triangle' : 'info-circle';
+    statusDiv.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            <i class="bi bi-${icon}"></i> ${escapeHtml(message)}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    setTimeout(() => { statusDiv.innerHTML = ''; }, 5000);
+}
+
+function safeLower(value) {
+    return (value || '').toString().toLowerCase();
+}
+
+function escapeHtml(value) {
+    return (value || '').toString()
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+window.downloadEmployeeTemplate = downloadEmployeeTemplate;
+window.importEmployees = importEmployees;
+window.exportEmployees = exportEmployees;
+</script>
+{% endblock %}

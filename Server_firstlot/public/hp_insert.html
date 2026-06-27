@@ -1,0 +1,1865 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hairpin Insert Check Sheet First Lot</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #1a1a1a; color: #fff; min-height: 100vh; }
+
+/* ── TOP BAR ── */
+.top-bar {
+  background: #0d0d5e;
+  display: grid; grid-template-columns: 1fr auto auto;
+  align-items: stretch; border-bottom: 3px solid #00c8d4;
+}
+.top-title {
+  padding: 12px 20px; font-size: 22px; font-weight: 900; font-style: italic;
+  color: #f5c518; text-transform: uppercase; letter-spacing: 1px;
+  text-shadow: 1px 1px 4px rgba(0,0,0,.6); display: flex; align-items: center;
+}
+.top-sheetno {
+  background: #fff; color: #111; padding: 8px 18px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-left: 2px solid #00c8d4; font-size: 11px; line-height: 1.9; white-space: nowrap;
+}
+.top-sheetno .lbl { font-style: italic; color: #777; font-size: 10px; }
+.top-sheetno .val { font-weight: 800; font-size: 13px; }
+.top-dash {
+  background: #4a5e12; border: none; cursor: pointer; padding: 0 22px;
+  color: #fff; font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; gap: 6px; transition: background .2s;
+}
+.top-dash:hover { background: #5e7618; }
+
+/* ── TWO-COLUMN MAIN ── */
+.main-layout {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  min-height: calc(100vh - 58px);
+}
+
+/* ══════════════════════════════
+   LEFT PANEL — INPUT FIELDS
+══════════════════════════════ */
+.left-panel {
+  border-right: 2px solid #333;
+  display: flex; flex-direction: column;
+  order: 2;
+}
+
+/* section label strip */
+.panel-label {
+  background: #1d2d44; color: #93c5fd;
+  padding: 6px 16px; font-size: 10px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  border-bottom: 1px solid #2a3f5e;
+}
+
+/* field grid rows */
+.field-row {
+  display: grid; gap: 8px; padding: 12px 16px;
+  border-bottom: 1px solid #2a2a2a;
+  background: #222;
+}
+.field-row.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.field-row.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.field-row.cols-6 { grid-template-columns: repeat(6, 1fr); }
+.field-row.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.field-row.cols-1 { grid-template-columns: 1fr; }
+.field-row:nth-child(even) { background: #252525; }
+
+/* Mark Color buttons */
+.mc-btn {
+  background: var(--c); color: #fff;
+  border: 2px solid transparent; border-radius: 5px;
+  padding: 9px 2px; font-size: 12px; font-weight: 800; cursor: pointer;
+  letter-spacing: .3px; transition: .12s; opacity: 1;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+}
+.mc-btn:hover:not(:disabled) { filter: brightness(1.12); }
+
+/* Zoom-on-hover image (Appearance Check NG sample) */
+.zoom-img {
+  transition: transform .2s ease, box-shadow .2s ease;
+  transform-origin: left center;
+  cursor: zoom-in;
+}
+.zoom-img:hover {
+  transform: scale(2.6);
+  box-shadow: 0 8px 30px rgba(0,0,0,.85);
+  position: relative;
+  z-index: 2147483647;   /* max z-index — overlay above everything */
+}
+.mc-btn:disabled { cursor: not-allowed; opacity: .3; filter: grayscale(.6); }
+.mc-btn.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #fff, 0 0 12px 2px var(--c);
+  transform: translateY(-1px);
+}
+
+.f-block { display: flex; flex-direction: column; gap: 4px; }
+.f-lbl {
+  font-size: 9px; font-weight: 700; color: #7ab3f5;
+  text-transform: uppercase; letter-spacing: .6px;
+}
+/* ── BUTTON GROUP ── */
+.btn-group { display: flex; gap: 4px; }
+.bg-btn {
+  flex: 1; padding: 5px 0; font-size: 11px; font-weight: 700;
+  border: 1px solid #444; border-radius: 4px;
+  background: #1e1e1e; color: #888; cursor: pointer;
+  letter-spacing: .5px; transition: background .15s, color .15s, border-color .15s;
+}
+.bg-btn:hover { background: #2a2a2a; color: #ccc; }
+.bg-btn.active { background: #1d4ed8; color: #fff; border-color: #3b82f6; }
+
+/* ── REQUIRED FIELD HIGHLIGHT ── */
+.req-wrap { position: relative; }
+.req-wrap.req-active input:not([type=hidden]),
+.req-wrap.req-active .btn-group {
+  border: 1.5px solid #f59e0b !important;
+  box-shadow: 0 0 6px rgba(245,158,11,.35);
+  border-radius: 4px;
+}
+.req-wrap.req-active input[type=text] { border-radius: 4px; }
+.req-badge {
+  display: none;
+  position: absolute; top: -9px; right: 0;
+  background: #f59e0b; color: #000;
+  font-size: 9px; font-weight: 800; letter-spacing: .5px;
+  padding: 1px 6px; border-radius: 3px;
+  pointer-events: none; white-space: nowrap;
+}
+.req-wrap.req-active .req-badge { display: block; }
+@keyframes req-pulse {
+  0%,100% { box-shadow: 0 0 5px rgba(245,158,11,.3); }
+  50%      { box-shadow: 0 0 12px rgba(245,158,11,.7); }
+}
+.req-wrap.req-active input:not([type=hidden]),
+.req-wrap.req-active .btn-group { animation: req-pulse 1.8s ease-in-out infinite; }
+
+/* ── ALL STATUS SUMMARY ── */
+.ast-row { display:flex; align-items:center; justify-content:space-between; padding:2px 0; }
+.ast-lbl { font-size:10px; color:#64748b; }
+.ast-val { font-size:10px; font-weight:800; color:#555; min-width:28px; text-align:right; }
+.ast-val.ok  { color:#6ee7b7; }
+.ast-val.ng  { color:#fca5a5; }
+.ast-val.pen { color:#fbbf24; }
+
+/* ── SPEC CHECK PANEL ── */
+/* overflow:visible so the hover-zoom image can escape the panel box */
+.spec-panel { border: 1px solid #2a3f5e; border-radius: 6px; overflow: visible; }
+.spec-panel-header {
+  background: #0f2744; color: #7dd3fc;
+  padding: 7px 14px; font-size: 11px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  border-radius: 6px 6px 0 0;   /* keep rounded top now that panel isn't clipping */
+}
+.spec-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  align-items: center; gap: 10px;
+  padding: 7px 14px; border-bottom: 1px solid #1e1e1e;
+  background: #1a1a1a;
+}
+.spec-row:last-child { border-bottom: none; }
+.spec-row:nth-child(even) { background: #1f1f1f; }
+.spec-lbl { font-size: 11px; font-weight: 600; color: #ccc; }
+.spec-btns { display: flex; gap: 4px; }
+.spec-btn {
+  padding: 4px 14px; font-size: 11px; font-weight: 700;
+  border-radius: 3px; border: 1px solid #444;
+  background: #222; color: #888; cursor: pointer; transition: all .15s;
+}
+.spec-btn:hover { background: #2a2a2a; color: #ccc; }
+.spec-btn.ok-active  { background: #065f46; color: #6ee7b7; border-color: #059669; }
+.spec-btn.ng-active  { background: #7f1d1d; color: #fca5a5; border-color: #dc2626; }
+.spec-status {
+  min-width: 52px; text-align: center;
+  font-size: 11px; font-weight: 800; color: #555;
+  padding: 3px 8px; border-radius: 3px; border: 1px solid #2a2a2a;
+  background: #111;
+}
+.spec-status.ok { color: #6ee7b7; border-color: #065f46; }
+.spec-status.ng { color: #fca5a5; border-color: #7f1d1d; }
+
+.f-block input, .f-block select {
+  background: #111; border: 1px solid #3a3a3a; color: #fff;
+  padding: 6px 9px; font-size: 12px; border-radius: 4px; width: 100%;
+}
+.f-block input:focus, .f-block select:focus {
+  border-color: #00c8d4; outline: none; background: #0d0d0d;
+}
+.f-block input::placeholder { color: #555; }
+.f-block select option { background: #111; }
+
+/* ── MEASUREMENT SECTION ── */
+.meas-section { flex: 1; }
+.meas-header {
+  background: #7f1d1d; color: #fff;
+  padding: 7px 16px; font-size: 11px; font-weight: 700;
+  letter-spacing: .3px; display: flex; align-items: center; gap: 8px;
+}
+.meas-body {
+  background: #222; padding: 14px 16px;
+  display: flex; gap: 14px; align-items: flex-start;
+}
+.meas-img-wrap { flex: 0 0 120px; }
+.meas-img-label { font-size: 10px; color: #888; margin-bottom: 5px; font-weight: 600; }
+.meas-img-box {
+  background: #111; border: 1px solid #444; border-radius: 6px;
+  padding: 8px; display: flex; align-items: center; justify-content: center;
+  min-height: 90px;
+}
+.meas-right { flex: 1; min-width: 0; }
+.meas-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.meas-table th {
+  background: #111; color: #888; font-size: 10px; font-weight: 700;
+  padding: 5px 8px; border: 1px solid #333; text-align: center;
+}
+.meas-table td { border: 1px solid #333; padding: 3px 5px; }
+.meas-table td.row-lbl {
+  background: #111; color: #ccc; font-size: 10px; font-weight: 600; padding: 5px 8px;
+  white-space: nowrap;
+}
+.meas-table input {
+  width: 100%; background: #0d0d0d; border: 1px solid #444; color: #0f0;
+  padding: 4px 5px; font-size: 11px; text-align: center; border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+.meas-table input:focus { outline: none; border-color: #00c8d4; }
+.calc-bar {
+  background: #00897b; height: 26px;
+  font-size: 12px; font-weight: 700; color: #fff;
+  text-align: center; vertical-align: middle; letter-spacing: 1px;
+}
+.meas-spec-row { margin-bottom: 8px; font-size: 11px; color: #888; display: flex; align-items: center; gap: 6px; }
+.spec-lbl { font-weight: 700; color: #f5c518; }
+.meas-controls { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.ctrl-group { display: flex; flex-direction: column; gap: 5px; }
+.ctrl-row { display: flex; align-items: center; gap: 6px; }
+.ctrl-row label {
+  width: 44px; font-size: 10px; font-weight: 700; color: #f5c518;
+  background: #2a2a2a; padding: 4px 6px; border-radius: 3px; text-align: center;
+}
+.ctrl-row input {
+  width: 100px; background: #0d0d0d; border: 1px solid #444; color: #ccc;
+  padding: 4px 7px; font-size: 11px; border-radius: 3px; text-align: center;
+}
+.ctrl-row input:focus { outline: none; border-color: #00c8d4; }
+.result-group { display: flex; flex-direction: column; gap: 6px; }
+.avg-box, .result-box { display: flex; align-items: center; gap: 6px; }
+.avg-lbl { background: #00897b; color: #fff; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 3px; white-space: nowrap; }
+.avg-val { background: #0d0d0d; border: 1px solid #444; color: #0f0; padding: 4px 12px; font-size: 12px; font-weight: 700; border-radius: 3px; min-width: 80px; text-align: center; font-family: 'Courier New', monospace; }
+.result-lbl { background: #b45309; color: #fff; font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 3px; white-space: nowrap; }
+.result-val { background: #0d0d0d; border: 1px solid #444; color: #888; padding: 4px 12px; font-size: 12px; font-weight: 800; border-radius: 3px; min-width: 80px; text-align: center; }
+.result-ok { background: #064e3b !important; color: #6ee7b7 !important; border-color: #34d399 !important; }
+.result-ng { background: #7f1d1d !important; color: #fca5a5 !important; border-color: #ef4444 !important; }
+
+/* ══════════════════════════════
+   RIGHT PANEL — SCAN DISPLAY
+══════════════════════════════ */
+.right-panel {
+  background: #1e1e1e;
+  display: flex; flex-direction: column;
+  order: 1;
+}
+.scan-panel-header {
+  background: #1d2d44; color: #93c5fd;
+  padding: 6px 16px; font-size: 10px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  border-bottom: 1px solid #2a3f5e;
+}
+.scan-block {
+  border-bottom: 1px solid #2a2a2a;
+  flex: 1;
+}
+.scan-block:last-child { border-bottom: none; }
+.scan-blk-header {
+  background: #c0392b; color: #fff;
+  padding: 6px 12px; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.scan-blk-header.dark { background: #8b1a1a; }
+.scan-blk-header .step { font-size: 10px; opacity: .8; }
+.scan-blk-body { padding: 8px 12px; }
+.scan-input-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.scan-input-row input {
+  flex: 1; background: #111; border: 1px solid #444; color: #fff;
+  padding: 6px 10px; font-size: 12px; border-radius: 4px;
+}
+.scan-input-row input:focus { outline: none; border-color: #00c8d4; }
+.scan-input-row input::placeholder { color: #555; }
+.clear-btn {
+  background: #7f1d1d; border: none; color: #fca5a5;
+  padding: 6px 10px; border-radius: 4px; cursor: pointer;
+  font-size: 10px; font-weight: 700; white-space: nowrap;
+  transition: background .2s;
+}
+.clear-btn:hover { background: #991b1b; }
+.scan-display {
+  background: #000; border: 1px solid #333; border-radius: 4px;
+  padding: 7px 12px; font-size: 13px; color: #0f0;
+  font-family: 'Courier New', monospace; letter-spacing: .5px;
+  min-height: 32px; word-break: break-all; margin-bottom: 5px;
+}
+.scan-tag-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.scan-tag {
+  background: #2a2a2a; color: #aaa;
+  font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: 600;
+}
+.scan-tag .v { color: #f5c518; }
+
+/* ── BLOCK DISABLED ── */
+.scan-block.disabled {
+  position: relative; pointer-events: none;
+}
+.scan-block.disabled::after {
+  content: 'ไม่มี Hairpin No.2';
+  position: absolute; inset: 0;
+  background: rgba(10,10,10,.82);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: #555;
+  letter-spacing: 1px;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5); transition: opacity .4s; color: #fff;
+}
+
+/* ── PRINT ── */
+@media print {
+  body { background: #fff; color: #000; }
+  .top-bar { background: #0d0d5e !important; print-color-adjust: exact; }
+  .right-panel { display: none; }
+  .main-layout { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<div class="top-bar">
+  <div class="top-title">Hairpin Insert Check Sheet&nbsp;<span style="color:#fff;font-style:normal;font-size:17px;margin-left:6px">— First Lot</span></div>
+  <div class="top-sheetno">
+    <span class="lbl">Sheet No.</span>
+    <span class="val">CH-541-04-01&nbsp;&nbsp;Rev.04</span>
+  </div>
+  <button class="top-dash" onclick="openDashboard()">📊 Dashboard</button>
+</div>
+
+<div class="main-layout">
+
+  <!-- ══════════════════════════════
+       LEFT — INPUT FIELDS
+  ══════════════════════════════ -->
+  <div class="left-panel">
+
+    <div class="panel-label">📋 Record Details — กรอกข้อมูล</div>
+
+    <!-- Row 1: DATE TIME LINE SEQ LOT UNIT -->
+    <div class="field-row cols-6">
+      <div class="f-block">
+        <div class="f-lbl">DATE</div>
+        <input type="date" id="f-date">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">TIME</div>
+        <input type="time" id="f-time">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">LINE</div>
+        <input type="text" id="f-line" placeholder="A / B / C">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">SEQ.</div>
+        <input type="text" id="f-seq" placeholder="—">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">PROD. MONTH</div>
+        <input type="text" id="f-lot" placeholder="MM/YYYY">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">LOT</div>
+        <input type="number" id="f-unit" placeholder="0">
+      </div>
+    </div>
+
+    <!-- Row 2: HP TUBE TYPE, EL HAIR PIN, HAIRPIN BENDER NO. -->
+    <div class="field-row cols-3">
+      <div class="f-block">
+        <div class="f-lbl">HP TUBE TYPE</div>
+        <input type="text" id="f-hptype" placeholder="70UMK ... (HP1)">
+        <input type="text" id="f-hptype2" placeholder="70UMK ... (HP2)" style="display:none;margin-top:4px;">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">EL HAIR PIN (MM)</div>
+        <div style="display:flex;gap:4px;align-items:stretch;">
+          <input type="text" id="f-elHp" placeholder="903 (HP1)" style="flex:1;">
+          <button type="button" id="btn-ellen-1" onclick="toggleElLength(1)" title="เปลี่ยนความยาว"
+            style="display:none;flex:0 0 auto;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;
+                   border-radius:4px;font-size:10px;font-weight:700;padding:0 8px;cursor:pointer;white-space:nowrap;">⇄ เปลี่ยนความยาว</button>
+        </div>
+        <div style="display:flex;gap:4px;align-items:stretch;margin-top:4px;">
+          <input type="text" id="f-elHp2" placeholder="903 (HP2)" style="flex:1;display:none;">
+          <button type="button" id="btn-ellen-2" onclick="toggleElLength(2)" title="เปลี่ยนความยาว"
+            style="display:none;flex:0 0 auto;background:#1e3a5f;border:1px solid #2563eb;color:#93c5fd;
+                   border-radius:4px;font-size:10px;font-weight:700;padding:0 8px;cursor:pointer;white-space:nowrap;">⇄ เปลี่ยนความยาว</button>
+        </div>
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">HAIRPIN BENDER NO.</div>
+        <input type="text" id="f-bender" placeholder="HP15 (HP1)">
+        <input type="text" id="f-bender2" placeholder="HP15 (HP2)" style="display:none;margin-top:4px;">
+      </div>
+    </div>
+
+    <!-- Row 3a: PROD TYPE / NAME, DESCRIPTION -->
+    <div class="field-row cols-2">
+      <div class="f-block">
+        <div class="f-lbl">PROD. TYPE / NAME</div>
+        <input type="text" id="f-type" placeholder="BACK 1Z ...">
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">DESCRIPTION</div>
+        <input type="text" id="f-desc" placeholder="—" readonly>
+      </div>
+    </div>
+
+    <!-- Row 3b: FIN PITCH, Item Fin Index -->
+    <div class="field-row cols-2">
+      <div class="f-block">
+        <div class="f-lbl">FIN PITCH</div>
+        <div class="req-wrap" id="req-finpitch">
+          <span class="req-badge">▶ Next Step</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="text" id="f-finpitch" placeholder="1.2" style="flex:1;" oninput="updateFinPitchStatus();updateReqState()">
+            <span id="finpitch-status" style="font-size:12px;font-weight:800;min-width:36px;display:none;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="f-block">
+        <div class="f-lbl">ITEM FIN INDEX</div>
+        <input type="text" id="f-finindex" placeholder="—" readonly>
+      </div>
+    </div>
+
+    <!-- Row 3c: MARK COLOR (8 colours, validated vs HEI BC:BJ) -->
+    <div class="field-row cols-1">
+      <div class="f-block">
+        <div class="f-lbl">MARK COLOR
+          <span id="markcolor-expect" style="font-weight:400;color:#a78bfa;margin-left:8px;"></span>
+        </div>
+        <input type="hidden" id="f-markcolor">
+        <div class="req-wrap" id="req-markcolor">
+          <span class="req-badge">▶ Next Step</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="bg-markcolor" style="flex:1;display:grid;grid-template-columns:repeat(8,1fr);gap:5px;">
+              <button type="button" class="mc-btn" data-val="GREEN"  style="--c:#22c55e;">เขียว</button>
+              <button type="button" class="mc-btn" data-val="BLUE"   style="--c:#3b82f6;">ฟ้า</button>
+              <button type="button" class="mc-btn" data-val="RED"    style="--c:#ef4444;">แดง</button>
+              <button type="button" class="mc-btn" data-val="WHITE"  style="--c:#f1f5f9;color:#111;">ขาว</button>
+              <button type="button" class="mc-btn" data-val="PURPLE" style="--c:#a855f7;">ม่วง</button>
+              <button type="button" class="mc-btn" data-val="BLACK"  style="--c:#1f2937;">ดำ</button>
+              <button type="button" class="mc-btn" data-val="YELLOW" style="--c:#eab308;color:#111;">เหลือง</button>
+              <button type="button" class="mc-btn" data-val="ORANGE" style="--c:#f97316;">ส้ม</button>
+            </div>
+            <span id="markcolor-status" style="font-size:13px;font-weight:800;min-width:40px;display:none;"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SPEC CHECK + CONFIRM SCAN ── -->
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-top:10px;">
+
+    <div class="spec-panel" style="margin-top:0;flex:0 0 auto;width:40%;">
+      <div class="spec-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>✔ Spec Check — Hairpin Insert</span>
+        <button onclick="openProcessControl()"
+          style="background:#0a3d1f;border:1px solid #166534;color:#4ade80;
+                 font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;
+                 cursor:pointer;letter-spacing:.5px;">📋 Process Control</button>
+      </div>
+      <div class="spec-row">
+        <span class="spec-lbl">Hairpin == DWG</span>
+        <div class="spec-btns">
+          <button class="spec-btn" onclick="setSpec('sc-1','OK')">OK</button>
+          <button class="spec-btn" onclick="setSpec('sc-1','NG')">NG</button>
+        </div>
+        <span class="spec-status" id="sc-1">—</span>
+      </div>
+
+      <div class="spec-row">
+        <span class="spec-lbl">FIN == DWG</span>
+        <div class="spec-btns">
+          <button class="spec-btn" onclick="setSpec('sc-2','OK')">OK</button>
+          <button class="spec-btn" onclick="setSpec('sc-2','NG')">NG</button>
+        </div>
+        <span class="spec-status" id="sc-2">—</span>
+      </div>
+
+      <div class="spec-row">
+        <span class="spec-lbl">Assembly == DWG</span>
+        <div class="spec-btns">
+          <button class="spec-btn" onclick="setSpec('sc-3','OK')">OK</button>
+          <button class="spec-btn" onclick="setSpec('sc-3','NG')">NG</button>
+        </div>
+        <span class="spec-status" id="sc-3">—</span>
+      </div>
+
+      <div class="spec-row">
+        <span class="spec-lbl">FIN Pattern == DWG</span>
+        <div class="spec-btns">
+          <button class="spec-btn" onclick="setSpec('sc-4','OK')">OK</button>
+          <button class="spec-btn" onclick="setSpec('sc-4','NG')">NG</button>
+        </div>
+        <span class="spec-status" id="sc-4">—</span>
+      </div>
+
+      <div class="spec-row" style="align-items:center;">
+        <div class="spec-lbl" style="display:flex;flex-direction:row;align-items:center;gap:10px;">
+          <span>Appearance Check</span>
+          <img class="zoom-img" src="/expander/firstlot/images/hp_appearance_ng.png" alt="ตัวอย่าง NG"
+               onerror="this.style.display='none'"
+               style="max-width:200px;max-height:120px;border:1px solid #7f1d1d;border-radius:5px;background:#000;">
+        </div>
+        <div class="spec-btns">
+          <button class="spec-btn" onclick="setSpec('sc-5','OK')">OK</button>
+          <button class="spec-btn" onclick="setSpec('sc-5','NG')">NG</button>
+        </div>
+        <span class="spec-status" id="sc-5">—</span>
+      </div>
+
+    </div>
+    <!-- end spec-panel -->
+
+    <!-- Right column: OVERALL + Name Confirm -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+
+    <!-- Overall Status -->
+    <div id="all-status-box"
+      style="display:flex;align-items:center;justify-content:center;gap:16px;
+             background:#0d0d0d;border:1px solid #2a3f5e;border-radius:6px;padding:12px 24px;">
+      <span style="font-size:10px;font-weight:800;color:#475569;letter-spacing:1.5px;text-transform:uppercase;">OVERALL</span>
+      <span id="ast-overall" style="font-size:28px;font-weight:900;color:#555;">—</span>
+    </div>
+
+    <!-- Confirm Scan -->
+    <div style="border:1px solid #2a3f5e;border-radius:6px;overflow:hidden;">
+      <div style="background:#0f2744;color:#7dd3fc;padding:7px 14px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
+        👤 Name Confirm
+      </div>
+      <div style="padding:10px 14px;background:#1a1a1a;display:flex;flex-direction:column;gap:8px;">
+
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input id="s-confirm" type="text" placeholder="Scan barcode..." autocomplete="off"
+            style="flex:1;background:#111;border:1px solid #3a3a3a;color:#fff;padding:6px 9px;font-size:12px;border-radius:4px;"
+            oninput="onScan('confirm',this.value)">
+          <button onclick="clearScan('confirm')"
+            style="background:#2a0000;border:1px solid #7f1d1d;color:#fca5a5;padding:5px 9px;border-radius:4px;font-size:12px;cursor:pointer;">✕</button>
+        </div>
+        <div style="font-size:11px;color:#555;padding:2px 0;">
+          ID: <span id="t-confirm" style="color:#f5c518;font-weight:700;">—</span>
+        </div>
+        <div id="n-confirm"
+          style="background:#111;border:1px solid #2a2a2a;border-radius:4px;padding:8px 10px;
+                 font-size:13px;font-weight:700;color:#6ee7b7;min-height:34px;">—</div>
+
+        <!-- Action buttons -->
+        <div style="display:flex;gap:6px;margin-top:4px;">
+          <button onclick="saveRecord('lot')"
+            style="flex:1;background:#064e3b;border:1px solid #065f46;color:#6ee7b7;
+                   padding:6px 4px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;">
+            💾 Lot
+          </button>
+          <button onclick="saveRecord('finish')"
+            style="flex:1;background:#064e3b;border:1px solid #065f46;color:#6ee7b7;
+                   padding:6px 4px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;">
+            💾 Finish Type
+          </button>
+          <button onclick="clearAll()"
+            style="flex:1;background:#2a0a0a;border:1px solid #7f1d1d;color:#fca5a5;
+                   padding:6px 4px;border-radius:4px;font-size:11px;font-weight:800;cursor:pointer;">
+            🗑 Clear All
+          </button>
+        </div>
+      </div>
+    </div>
+
+    </div><!-- end right column -->
+
+    </div><!-- end flex row -->
+
+  </div>
+  <!-- end left panel -->
+
+  <!-- ══════════════════════════════
+       RIGHT — SCAN DISPLAY
+  ══════════════════════════════ -->
+  <div class="right-panel">
+
+    <div class="scan-panel-header">🔍 Scan Data — ข้อมูลจากการสแกน</div>
+
+    <!-- 1. Checker -->
+    <div class="scan-block">
+      <div class="scan-blk-header">
+        <span>Checker</span><span class="step">1. Scan</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-checker" type="text" placeholder="Scan / Type..." autocomplete="off"
+                 oninput="onScan('checker',this.value)">
+          <button class="clear-btn" onclick="clearScan('checker')">✕</button>
+        </div>
+        <div class="scan-display" id="d-checker">—</div>
+        <div class="scan-tag-row">
+          <div class="scan-tag">ID: <span class="v" id="t-checker">—</span></div>
+          <div class="scan-tag">NAME: <span class="v" id="n-checker">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Hairpin Insert No. -->
+    <div class="scan-block">
+      <div class="scan-blk-header">
+        <span>Hairpin Insert No.</span><span class="step">2. Scan</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-mc" type="text" placeholder="Scan / Type..." autocomplete="off"
+                 oninput="onScan('mc',this.value)">
+          <button class="clear-btn" onclick="clearScan('mc')">✕</button>
+        </div>
+        <div class="scan-display" id="d-mc">—</div>
+        <div class="scan-tag-row">
+          <div class="scan-tag">CODE: <span class="v" id="t-mc">—</span></div>
+          <div class="scan-tag">NAME: <span class="v" id="n-mc">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Item WIP -->
+    <div class="scan-block" style="border-bottom:2px solid #f5c518;">
+      <div class="scan-blk-header" style="background:#1d4ed8;">
+        <span>Item WIP</span><span class="step">3. Scan → Auto Fill</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-wo" type="text" placeholder="Scan Item WIP barcode..." autocomplete="off"
+                 oninput="onScan('wo',this.value)">
+          <button class="clear-btn" onclick="clearScan('wo')">✕</button>
+        </div>
+        <div id="d-wo" style="display:none">—</div>
+        <div class="scan-tag-row" style="flex-wrap:wrap;gap:4px;margin-top:4px;">
+          <div class="scan-tag">LINE: <span class="v" id="wo-line">—</span></div>
+          <div class="scan-tag">SEQ: <span class="v" id="wo-seq">—</span></div>
+          <div class="scan-tag">LOT: <span class="v" id="wo-lot">—</span></div>
+          <div class="scan-tag">PROD/MONTH: <span class="v" id="wo-pm">—</span></div>
+          <div class="scan-tag">ITEM: <span class="v" id="wo-item">—</span></div>
+          <div class="scan-tag">TYPE: <span class="v" id="wo-type">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Hairpin Bender No. -->
+    <div class="scan-block">
+      <div class="scan-blk-header">
+        <span>Machine : Hairpin Bender No.</span><span class="step">4. Scan</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-bender" type="text" placeholder="Scan / Type..." autocomplete="off"
+                 oninput="onScan('bender',this.value)">
+          <button class="clear-btn" onclick="clearScan('bender')">✕</button>
+        </div>
+        <div class="scan-display" id="d-bender">—</div>
+      </div>
+    </div>
+
+    <!-- hidden item elements — filled by Item WIP scan -->
+    <span id="d-item" style="display:none">—</span>
+    <span id="t-item" style="display:none">—</span>
+
+    <!-- 5. Item Hairpin No. 1 -->
+    <div class="scan-block">
+      <div class="scan-blk-header dark">
+        <span>Item Hairpin No.1 (โค้งใหญ่)</span><span class="step">5. Scan</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-hp1" type="text" placeholder="Scan / Type..." autocomplete="off" oninput="onScan('hp1',this.value)">
+          <button class="clear-btn" onclick="clearScan('hp1')">✕</button>
+        </div>
+        <div class="scan-display" id="d-hp1" style="display:none">—</div>
+        <div class="scan-tag-row" style="gap:5px;flex-wrap:wrap;">
+          <div class="scan-tag">HP1: <span class="v" id="t-hp1">—</span></div>
+          <div class="scan-tag">EXPECT: <span class="v" id="exp-hp1" style="color:#a78bfa;">—</span></div>
+          <div class="scan-tag" id="cmp-hp1-tag" style="display:none">STATUS: <span class="v" id="cmp-hp1">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Hairpin Bender No. (โค้งเล็ก) -->
+    <div class="scan-block disabled" id="block-bender2" style="margin-top:auto;display:none;">
+      <div class="scan-blk-header">
+        <span>Machine : Hairpin Bender No. (โค้งเล็ก)</span><span class="step">6. Scan</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-bender2" type="text" placeholder="Scan / Type..." autocomplete="off"
+                 oninput="onScan('bender2',this.value)">
+          <button class="clear-btn" onclick="clearScan('bender2')">✕</button>
+        </div>
+        <div class="scan-display" id="d-bender2">—</div>
+      </div>
+    </div>
+
+    <!-- 7. Item Hairpin No. 2 -->
+    <div class="scan-block disabled" id="block-hp2" style="display:none;">
+      <div class="scan-blk-header dark">
+        <span>Item Hairpin No.2 (โค้งเล็ก)</span><span class="step">7. Scan</span>
+      </div>
+      <div class="scan-blk-body">
+        <div class="scan-input-row">
+          <input id="s-hp2" type="text" placeholder="Scan / Type..." autocomplete="off" oninput="onScan('hp2',this.value)">
+          <button class="clear-btn" onclick="clearScan('hp2')">✕</button>
+        </div>
+        <div class="scan-display" id="d-hp2" style="display:none">—</div>
+        <div class="scan-tag-row" style="gap:5px;flex-wrap:wrap;">
+          <div class="scan-tag">HP2: <span class="v" id="t-hp2">—</span></div>
+          <div class="scan-tag">EXPECT: <span class="v" id="exp-hp2" style="color:#a78bfa;">—</span></div>
+          <div class="scan-tag" id="cmp-hp2-tag" style="display:none">STATUS: <span class="v" id="cmp-hp2">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- master data status (reload handled by Admin → Reload Master) -->
+    <div style="padding:8px 12px;border-top:1px solid #2a2a2a;">
+      <div id="data-status" style="font-size:9px;color:#555;text-align:center;">—</div>
+    </div>
+
+  </div>
+  <!-- end right panel -->
+
+</div><!-- end main-layout -->
+
+<script>
+const scanState = { wo:'', checker:'', mc:'', bender:'', bender2:'', item:'', hp1:'', hp2:'', confirm:'' };
+// Background-fetch metadata parsed from the Hairpin No.1 / No.2 barcodes
+// (Line/Seq/Prod-month) — saved to SQL only, hidden from the dashboard.
+const hpMeta = { hp1:{line:'',seq:'',prodMonth:''}, hp2:{line:'',seq:'',prodMonth:''} };
+const heiExpect  = { hp1:'', hp2:'' };   // expected HP from WIP item lookup
+let expectedColors   = [];                // valid Mark Colors from HEI master BC:BJ
+let expectedFinPitch = '';                // expected Fin Pitch from HEI master Col AZ
+let itemPipe         = '';                // pipe diameter of WIP item ('5' / '7' / '')
+const masterData = { checkers:[], machines:[], confirms:[] };
+
+// keys that need name lookup
+const LOOKUP = {
+  checker: { list: 'checkers', idField: 'id'   },
+  mc:      { list: 'machines', idField: 'code' },
+  confirm: { list: 'confirms', idField: 'id'   }
+};
+// keys that trim first 5 chars (barcode prefix)
+const TRIM5 = new Set(['checker','mc','item','confirm']);
+
+// MID helper (1-indexed, like Excel)
+function mid(s, start, len) { return s.substring(start-1, start-1+len).trim(); }
+
+function parseWorkOrder(s) {
+  if (s.length < 120) return null;
+  const line      = mid(s, 116, 2);
+  const seq       = mid(s, 118, 4);
+  const lot       = mid(s, 167, 6);
+  const prodMonth = mid(s, 110, 2) + '/' + mid(s, 112, 4);
+  const item      = mid(s, 64, 12);
+  const prodType  = mid(s, 182, 15);   // PROD. TYPE / NAME = MID(182,15)
+  const desc      = mid(s, 79, 20);     // DESCRIPTION = MID(C16,79,20)
+  // Type: find "WP0-" pattern then extract 14 chars
+  const wiIdx = s.indexOf('WP0-');
+  const type  = wiIdx >= 0 ? s.substring(wiIdx, wiIdx + 14).trim() : '';
+  return { line, seq, lot, prodMonth, item, type, prodType, desc };
+}
+
+function setHP2BlockDisabled(disabled) {
+  // disabled = item has NO Hairpin No.2 → hide the HP2 + its Bender block entirely
+  const blk  = document.getElementById('block-hp2');
+  const blkB = document.getElementById('block-bender2');
+  if (disabled) {
+    if (blk)  { blk.classList.add('disabled');  blk.style.display  = 'none'; }
+    if (blkB) { blkB.classList.add('disabled'); blkB.style.display = 'none'; }
+    // clear hp2 value
+    scanState.hp2 = '';
+    const inp = document.getElementById('s-hp2'); if (inp) inp.value = '';
+    const dEl = document.getElementById('d-hp2'); if (dEl) { dEl.textContent = '—'; dEl.style.border = '1px solid #333'; }
+    const tEl = document.getElementById('t-hp2'); if (tEl) tEl.textContent = '—';
+    // clear bender2 value
+    scanState.bender2 = '';
+    const inp2 = document.getElementById('s-bender2'); if (inp2) inp2.value = '';
+    const dEl2 = document.getElementById('d-bender2'); if (dEl2) dEl2.textContent = '—';
+    const fb2  = document.getElementById('f-bender2'); if (fb2) fb2.value = '';
+  } else {
+    if (blk)  { blk.classList.remove('disabled');  blk.style.display  = ''; }
+    if (blkB) { blkB.classList.remove('disabled'); blkB.style.display = ''; }
+  }
+}
+
+/* EL HAIR PIN length toggle.
+   HP Tube Type like "OFC7-739/759" holds 2 lengths (739 / 759).
+   The "⇄ เปลี่ยนความยาว" button toggles EL HAIR PIN between them. */
+function elLengths(row) {
+  const tube = (document.getElementById(row === 2 ? 'f-hptype2' : 'f-hptype')?.value || '');
+  const tail = tube.split('-').pop() || '';        // "739/759" or "739/759S"
+  return tail.split('/')
+             .map(s => (s.match(/\d+/) || [''])[0]) // strip trailing letters e.g. "759S"→"759"
+             .filter(Boolean);
+}
+function toggleElLength(row) {
+  const el   = document.getElementById(row === 2 ? 'f-elHp2' : 'f-elHp');
+  if (!el) return;
+  const lens = elLengths(row);
+  if (lens.length < 2) return;
+  const idx  = lens.indexOf(el.value.trim());
+  el.value   = lens[(idx + 1) % lens.length];      // cycle to next length
+}
+function updateElLenBtn(row) {
+  const btn = document.getElementById(row === 2 ? 'btn-ellen-2' : 'btn-ellen-1');
+  if (!btn) return;
+  btn.style.display = elLengths(row).length >= 2 ? '' : 'none';
+}
+
+function updateHPStatus(key) {
+  const expect = heiExpect[key];
+  const actual = scanState[key];
+  const tagEl  = document.getElementById(`cmp-${key}-tag`);
+  const cmpEl  = document.getElementById(`cmp-${key}`);
+  const dispEl = document.getElementById(`d-${key}`);
+  if (!expect || !actual) {
+    if (tagEl) tagEl.style.display = 'none';
+    return;
+  }
+  const matched = actual.toUpperCase() === expect.toUpperCase();
+  if (tagEl) tagEl.style.display = '';
+  if (cmpEl) {
+    cmpEl.textContent = matched ? '✅ OK' : '❌ NG';
+    cmpEl.style.color = matched ? '#6ee7b7' : '#fca5a5';
+  }
+  updateAllStatus();
+}
+
+function setHPTubeRows(twoRows) {
+  // toggle the 2nd row for HP TUBE TYPE, EL HAIR PIN and HAIRPIN BENDER NO. together
+  ['f-hptype2', 'f-elHp2', 'f-bender2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (twoRows) {
+      el.style.display = '';
+    } else {
+      el.style.display = 'none';
+      el.value = '';
+    }
+  });
+}
+
+async function checkHP2ForItem(itemCode) {
+  // reset expectation
+  heiExpect.hp1 = ''; heiExpect.hp2 = '';
+  const e1 = document.getElementById('exp-hp1');
+  const e2 = document.getElementById('exp-hp2');
+  const sv = (id, v) => { const el=document.getElementById(id); if(el) el.value=v; };
+  if (!itemCode) {
+    if (e1) e1.textContent = '—';
+    if (e2) e2.textContent = '—';
+    expectedFinPitch = '';
+    itemPipe = '';
+    setHP2BlockDisabled(true);   // no item → hide HP2
+    setHPTubeRows(false);
+    sv('f-finindex', '');
+    applyMarkColors([]);
+    validatePipeInsert();
+    updateHPStatus('hp1'); updateHPStatus('hp2');
+    updateFinPitchStatus();
+    return;
+  }
+  try {
+    const res  = await fetch(`/hp_insert/api/hei_lookup?item=${encodeURIComponent(itemCode)}`);
+    const data = await res.json();
+    heiExpect.hp1 = data.hp1 || '';
+    heiExpect.hp2 = data.hp2 || '';
+    if (e1) e1.textContent = data.found ? (data.hp1 || '—') : '(ไม่พบ)';
+    if (e2) e2.textContent = data.found ? (data.hp2 || '—') : '(ไม่พบ)';
+    // Fin Pitch expected value ← master Col AZ
+    expectedFinPitch = data.found ? (data.finpitch || '') : '';
+    updateFinPitchStatus();
+    // Item Fin Index ← master Col AX
+    sv('f-finindex', data.found ? (data.finindex || '') : '');
+    // Mark Color valid set ← master BC:BJ
+    applyMarkColors(data.found ? (data.markcolors || []) : []);
+    // Pipe diameter ← copper columns
+    itemPipe = data.found ? (data.pipe || '') : '';
+    validatePipeInsert();
+    // lock HP2 when item found in master but has no HP2 (column AK empty)
+    setHP2BlockDisabled(data.found && !data.hp2);
+    // HP Tube Type rows: 2 rows only when both HP1 & HP2 exist
+    setHPTubeRows(!!(data.hp1 && data.hp2));
+  } catch {
+    if (e1) e1.textContent = '(server error)';
+    if (e2) e2.textContent = '(server error)';
+    applyMarkColors([]);
+    itemPipe = ''; validatePipeInsert();
+    setHP2BlockDisabled(false);   // server error → leave HP2 usable
+    setHPTubeRows(false);
+  }
+  updateHPStatus('hp1'); updateHPStatus('hp2');
+}
+
+/* ── RULE: Insert No.20/21 → Item WIP must be 5mm pipe ── */
+function getInsertNo() {
+  // machine scanned at step 2 → code like "HP20" / name "Hairpin Insert no.20"
+  const src = (scanState.mc || '') + ' ' +
+              (document.getElementById('n-mc')?.textContent || '');
+  const m = src.match(/(\d{1,2})\s*$/) || src.match(/(\d{1,2})/);
+  return m ? parseInt(m[1], 10) : null;
+}
+function validatePipeInsert() {
+  const no = getInsertNo();
+  const mustBe5 = (no === 20 || no === 21);
+  // alert only when we have both an item AND a clear non-5mm pipe on a 5mm-only machine
+  const bad = mustBe5 && !!scanState.item && itemPipe === '7';
+  showPipeAlert(bad);
+}
+function showPipeAlert(on) {
+  let el = document.getElementById('pipe-alert');
+  if (on) {
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pipe-alert';
+      el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10001;background:#b91c1c;color:#fff;'
+        + 'font-size:16px;font-weight:800;text-align:center;padding:12px;box-shadow:0 3px 14px #000;'
+        + 'letter-spacing:.3px;animation:pipeBlink 1s steps(1) infinite;';
+      el.innerHTML = '⚠ ทำการตรวจสอบ Item WIP หรือ Hairpin Insert อีกครั้ง'
+        + ' <button onclick="document.getElementById(\'pipe-alert\').remove()" '
+        + 'style="margin-left:14px;background:#fff;color:#b91c1c;border:none;border-radius:4px;'
+        + 'padding:3px 12px;font-weight:800;cursor:pointer;">✕</button>';
+      document.body.appendChild(el);
+      if (!document.getElementById('pipe-blink-style')) {
+        const st = document.createElement('style'); st.id = 'pipe-blink-style';
+        st.textContent = '@keyframes pipeBlink{50%{background:#7f1d1d}}';
+        document.head.appendChild(st);
+      }
+      toast('⚠ ทำการตรวจสอบ Item WIP หรือ Hairpin Insert อีกครั้ง', '#7f1d1d');
+    }
+    el.style.display = 'block';
+  } else if (el) {
+    el.remove();
+  }
+}
+
+/* ── RECHECK SCANS: all required scans must be complete before record ── */
+function recheckScans() {
+  // key → scanState key, label, scan input id (for focus)
+  const required = [
+    { key: 'checker', label: 'Checker',                id: 's-checker' },
+    { key: 'mc',      label: 'Hairpin Insert No.',     id: 's-mc'      },
+    { key: 'item',    label: 'Item WIP',               id: 's-wo'      },
+    { key: 'bender',  label: 'Machine Hairpin Bender', id: 's-bender'  },
+    { key: 'hp1',     label: 'Item Hairpin Bender',    id: 's-hp1'     },
+  ];
+  const missing = required.filter(r => !(scanState[r.key] || '').trim());
+  if (missing.length) {
+    alert('ตรวจสอบการสแกนข้อมูล เช่น Item WIP หรือ Item  Hairpin Bender เป็นต้น');
+    const first = document.getElementById(missing[0].id);
+    if (first) { first.focus(); first.select?.(); }
+    return false;
+  }
+  return true;
+}
+
+/* ── SAVE RECORD ── */
+async function saveRecord(mode = 'lot') {
+  const gv = id => (document.getElementById(id)?.value || '').trim();
+  const gt = id => (document.getElementById(id)?.textContent || '').trim();
+
+  // ── Recheck required scans first — block record if any scan missing ──
+  if (!recheckScans()) return;
+
+  // ── Validate before save (both Lot & Finish Type) ──
+  const confirmName = gt('n-confirm');
+  if (!confirmName || confirmName === '—') {
+    toast('❌ กรุณาสแกน Name Confirm ก่อนบันทึก', '#7f1d1d');
+    return;
+  }
+  const overallNow = gt('ast-overall');
+  if (overallNow !== 'OK') {
+    toast('❌ OVERALL ต้องเป็น OK จึงจะบันทึกได้', '#7f1d1d');
+    return;
+  }
+
+  // Hairpin Insert No. → save as machine name e.g. "Hairpin Insert No.20"
+  const mcCode = gt('t-mc') !== '—' ? gt('t-mc') : '';
+  const mcName = gt('n-mc') !== '—' ? gt('n-mc') : '';
+  const hpInsertNo = mcName || (mcCode ? 'Hairpin Insert No.' + mcCode.replace(/^\D+/, '') : '');
+
+  // Mark Color → Thai names joined by comma e.g. "เขียว,ม่วง,ดำ" (N/A → '')
+  const mcRaw = gv('f-markcolor');
+  const markColorTH = (mcRaw && mcRaw !== 'N/A')
+    ? mcRaw.split(',').map(s => MARK_COLOR_TH[s.trim().toUpperCase()] || s.trim()).filter(Boolean).join(',')
+    : '';
+
+  const payload = {
+    rec_date:         gv('f-date'),
+    rec_time:         gv('f-time'),
+    machine_finpress: hpInsertNo,
+    machine_bender:   gv('f-bender'),
+    machine_bender2:  gv('f-bender2'),
+    item_wip:         scanState.item,
+    prod_type:        gv('f-type'),
+    item_hp1:         scanState.hp1,
+    item_hp2:         scanState.hp2,
+    hp1_line:         hpMeta.hp1.line,
+    hp1_seq:          hpMeta.hp1.seq,
+    hp1_prod_month:   hpMeta.hp1.prodMonth,
+    hp2_line:         hpMeta.hp2.line,
+    hp2_seq:          hpMeta.hp2.seq,
+    hp2_prod_month:   hpMeta.hp2.prodMonth,
+    hp_tube_type:     gv('f-hptype'),
+    hp_tube_type2:    gv('f-hptype2'),
+    line:             gv('f-line'),
+    seq:              gv('f-seq'),
+    prod_month:       gv('f-lot'),    // PROD. MONTH = MM/YYYY
+    lot:              gv('f-unit'),   // LOT number = MID(167,6)*1
+    item_fin:         gv('f-finindex'),  // Item Fin Index
+    fin_pitch:        gv('f-finpitch'),
+    mark_color:       markColorTH,         // Mark Color (Thai, comma-joined) e.g. "เขียว,ม่วง,ดำ"
+    spec_hairpin:     gt('sc-1'),
+    spec_fin:         gt('sc-2'),
+    spec_assembly:    gt('sc-3'),
+    spec_fin_pattern: gt('sc-4'),
+    spec_appearance:  gt('sc-5'),
+    name_checker:     document.getElementById('n-checker')?.textContent?.trim() || '',
+    name_confirm:     document.getElementById('n-confirm')?.textContent?.trim() || '',
+    final_check:      gt('ast-overall')   // OVERALL status (OK / NG / —)
+  };
+  try {
+    const res = await fetch('/hp_insert/api/save', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.ok) {
+      // notify shared dashboard (instant refresh)
+      try { new BroadcastChannel('dash_refresh').postMessage('hins'); } catch(e) {}
+      try { localStorage.setItem('dash_refresh', Date.now().toString()); } catch(e) {}
+      if (mode === 'finish') {
+        // Finish Type → save then clear EVERYTHING (no confirm prompt)
+        clearAllSilent();
+        toast('💾 Saved (Finish Type) — cleared all', '#065f46');
+      } else {
+        // Lot → save then clear only the per-lot scan fields, keep the rest
+        clearLotScans();
+        toast('💾 Saved (Lot) — ready for next lot', '#065f46');
+      }
+    }
+    else toast('❌ Save failed: ' + data.error, '#7f1d1d');
+  } catch(e) { toast('❌ Server error', '#7f1d1d'); }
+}
+
+/* Lot save → clear ONLY Item WIP + Name Confirm. Keep all other fields (incl.
+   Fin pitch, Hairpin No.1/No.2, Bender). OK/NG checks handled inside clearScan. */
+function clearLotScans() {
+  clearScan('wo');
+  clearScan('confirm');
+  // WIP display tags tied to the Item scan (Fin pitch + Hairpin scans are kept)
+  ['wo-line','wo-seq','wo-lot','wo-pm','wo-item','wo-type','d-item','t-item'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '—';
+  });
+  scanState.item = '';
+  updateAllStatus();
+  const wip = document.getElementById('s-wo');
+  if (wip) { wip.focus(); wip.select?.(); }
+}
+
+/* Finish Type save → full clear without the confirm dialog */
+function clearAllSilent() {
+  ['checker','mc','bender','bender2','wo','hp1','hp2','confirm'].forEach(k => clearScan(k));
+  ['f-line','f-seq','f-lot','f-type','f-desc','f-unit','f-finpitch','f-finindex','f-bender','f-bender2',
+   'f-hptype','f-hptype2','f-elHp','f-elHp2','f-markcolor'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['sc-1','sc-2','sc-3','sc-4','sc-5'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = '—'; el.className = 'spec-status';
+    el.closest('.spec-row')?.querySelectorAll('.spec-btn')
+      .forEach(b => b.classList.remove('ok-active','ng-active'));
+  });
+  clearMarkColor();
+  expectedColors = []; expectedFinPitch = ''; itemPipe = ''; showPipeAlert(false);
+  Object.keys(heiExpect).forEach(k => heiExpect[k] = '');
+  setHP2BlockDisabled(true); setHPTubeRows(false);
+  updateHPStatus('hp1'); updateHPStatus('hp2');
+  updateFinPitchStatus(); updateReqState(); updateAllStatus();
+  ['wo-line','wo-seq','wo-lot','wo-pm','wo-item','wo-type','d-item','t-item',
+   'exp-hp1','exp-hp2'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '—';
+  });
+  scanState.item = '';
+  const chk = document.getElementById('s-checker');
+  if (chk) { chk.focus(); chk.select?.(); }
+}
+
+/* ── DASHBOARD ── */
+let dbAllRows = [];
+
+// name this window so the shared dashboard can focus it instead of opening a duplicate
+window.name = 'win_hpins';
+
+/* Open shared dashboard — focus existing window if already open (no reload) */
+function openDashboard() {
+  const url = 'http://10.235.117.215:3001/dashboard/firstlot';
+  const win = 'win_dashboard';
+  const w = window.open('', win);
+  if (w && !w.closed) {
+    try {
+      if (w.location.href && w.location.href !== 'about:blank') {
+        w.focus(); return;
+      }
+    } catch(e) {}
+  }
+  window.open(url, win);
+}
+function closeDashboard() {
+  document.getElementById('db-modal').style.display = 'none';
+}
+async function refreshDashboard() {
+  try {
+    const res  = await fetch('/hp_insert/api/records');
+    dbAllRows  = await res.json();
+    renderDashboard(dbAllRows);
+  } catch { toast('❌ Could not load records', '#7f1d1d'); }
+}
+function renderDashboard(rows) {
+  const body  = document.getElementById('db-body');
+  const empty = document.getElementById('db-empty');
+  const count = document.getElementById('db-count');
+  count.textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
+  if (!rows.length) { body.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+  const specColor = v => v === 'OK' ? '#6ee7b7' : v === 'NG' ? '#fca5a5' : '#555';
+  body.innerHTML = rows.map((r,i) => `
+    <tr style="background:${i%2===0?'#151515':'#1a1a1a'};">
+      <td style="padding:5px 8px;border:1px solid #222;color:#555;">${r.id}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.rec_date||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.rec_time||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;color:#93c5fd;">${r.machine_finpress||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;color:#93c5fd;">${r.machine_bender||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;color:#f5c518;font-weight:700;">${r.item_wip||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.prod_type||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.item_hp1||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.item_hp2||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;white-space:nowrap;">${r.hp_tube_type||'—'}${r.hp_tube_type2?'<br>'+r.hp_tube_type2:''}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.line||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.seq||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.prod_month||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.lot||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.item_fin||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.fin_pitch||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;">${r.fin_type||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;text-align:center;">
+        <button onclick="openDbDetail(${r.id})"
+          style="background:#0f2744;border:1px solid #2563eb;color:#93c5fd;
+                 padding:3px 10px;border-radius:3px;font-size:10px;font-weight:700;cursor:pointer;">🔍 Detail</button>
+      </td>
+      <td style="padding:5px 8px;border:1px solid #222;color:#a5f3fc;">${r.name_checker||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;color:#a5f3fc;">${r.name_confirm||'—'}</td>
+      <td style="padding:5px 8px;border:1px solid #222;color:${specColor(r.final_check)};font-weight:700;">${r.final_check||'—'}</td>
+    </tr>`).join('');
+}
+function filterDashboard() {
+  const q = document.getElementById('db-search').value.toLowerCase();
+  if (!q) { renderDashboard(dbAllRows); return; }
+  renderDashboard(dbAllRows.filter(r =>
+    Object.values(r).some(v => String(v).toLowerCase().includes(q))
+  ));
+}
+/* Delete revoked — record removal is handled in the Admin Panel only. */
+
+/* ── ALL STATUS SUMMARY ── */
+function updateAllStatus() {
+  // Collect all status values directly from source elements
+  const hp1txt = document.getElementById('cmp-hp1')?.textContent?.trim() || '';
+  const hp2txt = document.getElementById('cmp-hp2')?.textContent?.trim() || '';
+  const fptxt  = document.getElementById('finpitch-status')?.textContent?.trim() || '';
+  const fttxt  = document.getElementById('markcolor-status')?.textContent?.trim() || '';
+  const hp2Locked = document.getElementById('block-hp2')?.classList.contains('disabled');
+
+  const toVal = t => t.includes('OK') ? 'OK' : t.includes('NG') ? 'NG' : '—';
+  const specVals = ['sc-1','sc-2','sc-3','sc-4','sc-5']
+    .map(id => { const v = document.getElementById(id)?.textContent?.trim() || '—';
+                 return (v === 'OK' || v === 'NG') ? v : '—'; });
+
+  // HP2 excluded when locked (not applicable for this item)
+  const all = [toVal(hp1txt), ...(hp2Locked ? [] : [toVal(hp2txt)]),
+               toVal(fptxt), toVal(fttxt), ...specVals];
+  const filled  = all.filter(v => v !== '—');
+  const hasNG   = filled.some(v => v === 'NG');
+  const allOK   = filled.length === all.length && !hasNG;
+  const overall = document.getElementById('ast-overall');
+  if (overall) {
+    if (filled.length < all.length) {
+      // not all filled yet — stay blank
+      overall.textContent = '—'; overall.style.color = '#555';
+      overall.style.fontSize = '13px';
+    } else if (allOK) {
+      overall.textContent = 'OK'; overall.style.color = '#6ee7b7';
+      overall.style.fontSize = '22px';
+    } else {
+      overall.textContent = 'NG'; overall.style.color = '#fca5a5';
+      overall.style.fontSize = '22px';
+    }
+  }
+}
+
+/* ── SCROLL TO FIELD ── */
+function scrollToField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const inp = el.tagName === 'INPUT' ? el : el.querySelector('input');
+  if (inp) { inp.focus(); inp.select && inp.select(); }
+}
+
+/* ── CLEAR ALL ── */
+function clearAll() {
+  if (!confirm('Clear all data?')) return;
+  // scan inputs
+  ['checker','mc','bender','bender2','wo','hp1','hp2','confirm'].forEach(k => clearScan(k));
+  // form fields
+  ['f-line','f-seq','f-lot','f-type','f-desc','f-unit','f-finpitch','f-finindex','f-bender','f-bender2',
+   'f-hptype','f-hptype2','f-elHp','f-elHp2','f-markcolor'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  // spec check rows
+  ['sc-1','sc-2','sc-3','sc-4','sc-5'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = '—'; el.className = 'spec-status';
+    el.closest('.spec-row')?.querySelectorAll('.spec-btn')
+      .forEach(b => b.classList.remove('ok-active','ng-active'));
+  });
+  // mark color button group + status
+  clearMarkColor();
+  // expected values
+  expectedColors = []; expectedFinPitch = ''; itemPipe = ''; showPipeAlert(false);
+  Object.keys(heiExpect).forEach(k => heiExpect[k] = '');
+  // HP2 block
+  setHP2BlockDisabled(true); setHPTubeRows(false);
+  // status badges
+  updateHPStatus('hp1'); updateHPStatus('hp2');
+  updateFinPitchStatus(); updateReqState();
+  // WIP display tags
+  ['wo-line','wo-seq','wo-lot','wo-pm','wo-item','wo-type','d-item','t-item',
+   'exp-hp1','exp-hp2'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '—';
+  });
+  scanState.item = '';
+  toast('🗑 Cleared', '#7f1d1d');
+  // jump cursor back to Checker scan field
+  const chk = document.getElementById('s-checker');
+  if (chk) { chk.focus(); chk.select?.(); }
+}
+
+/* ── DASHBOARD: SPEC CHECK DETAIL POPUP ── */
+function openDbDetail(id) {
+  const r = dbAllRows.find(x => String(x.id) === String(id));
+  if (!r) return;
+  const col = v => v === 'OK' ? '#6ee7b7' : v === 'NG' ? '#fca5a5' : '#888';
+  const specRow = (lbl, v) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid #222;">
+      <span style="color:#cbd5e1;font-size:13px;">${lbl}</span>
+      <span style="color:${col(v)};font-weight:800;font-size:13px;">${v || '—'}</span>
+    </div>`;
+  // Hairpin Bender machines: machine_bender holds HP1 bender; HP2 bender shown if present
+  const benderHtml = `
+    <div style="padding:10px 14px;background:#141414;border-bottom:1px solid #2a2a2a;">
+      <div style="font-size:10px;font-weight:800;color:#475569;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">⚙ Machine : Hairpin Bender</div>
+      <div style="color:#93c5fd;font-size:12px;">โค้งใหญ่ (HP1): <span style="color:#fff;font-weight:700;">${r.machine_bender || '—'}</span></div>
+    </div>`;
+  document.getElementById('dbd-body').innerHTML =
+    `<div style="padding:8px 14px;background:#0d1b2e;border-bottom:1px solid #2a2a2a;font-size:12px;color:#7dd3fc;">
+       Item WIP: <b style="color:#f5c518;">${r.item_wip || '—'}</b> &nbsp;|&nbsp; Lot: <b>${r.lot || '—'}</b>
+     </div>` +
+    benderHtml +
+    specRow('Hairpin == DWG',     r.spec_hairpin) +
+    specRow('FIN == DWG',         r.spec_fin) +
+    specRow('Assembly == DWG',    r.spec_assembly) +
+    specRow('FIN Pattern == DWG', r.spec_fin_pattern) +
+    specRow('Appearance Check',   r.spec_appearance) +
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#0d0d0d;">
+       <span style="color:#475569;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">OVERALL</span>
+       <span style="color:${col(r.final_check)};font-weight:900;font-size:18px;">${r.final_check || '—'}</span>
+     </div>`;
+  document.getElementById('dbd-modal').style.display = 'flex';
+}
+function closeDbDetail() {
+  document.getElementById('dbd-modal').style.display = 'none';
+}
+
+/* ── PROCESS CONTROL IMAGE ── */
+function openProcessControl() {
+  const item = scanState.item || '';
+  if (!item) { showToast('⚠ Scan Item WIP first'); return; }
+  const url   = `/hp_insert/api/jpeg?item=${encodeURIComponent(item)}`;
+  const modal = document.getElementById('pc-modal');
+  const img   = document.getElementById('pc-img');
+  const err   = document.getElementById('pc-err');
+  const title = document.getElementById('pc-title');
+  title.textContent = `${item}-INS.jpg`;
+  img.style.display = 'none';
+  err.style.display = 'none';
+  modal.style.display = 'flex';
+  img.onload  = () => { img.style.display = 'block'; err.style.display = 'none'; };
+  img.onerror = () => { img.style.display = 'none';  err.style.display = 'block'; };
+  img.src = url;
+}
+function closePCModal() {
+  const modal = document.getElementById('pc-modal');
+  modal.style.display = 'none';
+  document.getElementById('pc-img').src = '';
+}
+
+// close on backdrop click
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('pc-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('pc-modal')) closePCModal();
+  });
+  // on program load → cursor at Checker scan field
+  const chk = document.getElementById('s-checker');
+  if (chk) { chk.focus(); chk.select?.(); }
+});
+
+/* ── SPEC CHECK: OK / NG per row ── */
+function setSpec(id, val) {
+  const status = document.getElementById(id);
+  if (!status) return;
+  const row = status.closest('.spec-row');
+  const activeClass = val === 'OK' ? 'ok-active' : 'ng-active';
+  const clickedBtn  = [...row.querySelectorAll('.spec-btn')].find(b => b.textContent.trim() === val);
+  // re-click active btn → deselect & clear
+  if (clickedBtn && clickedBtn.classList.contains(activeClass)) {
+    row.querySelectorAll('.spec-btn').forEach(b => b.classList.remove('ok-active', 'ng-active'));
+    status.textContent = '—';
+    status.className   = 'spec-status';
+    updateAllStatus();
+    return;
+  }
+  // select new value
+  row.querySelectorAll('.spec-btn').forEach(btn => {
+    btn.classList.remove('ok-active', 'ng-active');
+    if (btn.textContent.trim() === val) btn.classList.add(activeClass);
+  });
+  status.textContent = val;
+  status.className   = 'spec-status ' + (val === 'OK' ? 'ok' : 'ng');
+  updateAllStatus();
+}
+
+/* ── REQUIRED STATE: highlight unfilled fields after WIP scan ── */
+function updateReqState() {
+  const itemScanned = !!scanState.item;
+  // Fin Pitch — required when item scanned and field is empty
+  const pitchFilled = !!(document.getElementById('f-finpitch')?.value?.trim());
+  document.getElementById('req-finpitch')?.classList.toggle('req-active', itemScanned && !pitchFilled);
+  // Fin Type — required when item scanned and no button selected
+  // Mark Color — required until the selection is complete & correct (status = OK)
+  const mcStatus = document.getElementById('markcolor-status')?.textContent || '';
+  const mcOK     = mcStatus.includes('OK');
+  document.getElementById('req-markcolor')?.classList.toggle('req-active', itemScanned && !mcOK);
+}
+
+/* ── FIN PITCH: onChange validation ── */
+function updateFinPitchStatus() {
+  const el = document.getElementById('finpitch-status');
+  if (!el) return;
+  const entered = (document.getElementById('f-finpitch')?.value || '').trim();
+  if (!entered) { el.style.display = 'none'; return; }
+  if (!expectedFinPitch) {
+    el.style.display = 'inline-flex';
+    el.textContent   = '—';
+    el.style.color   = '#666';
+    return;
+  }
+  const a = parseFloat(entered), b = parseFloat(expectedFinPitch);
+  const ok = !isNaN(a) && !isNaN(b) ? Math.abs(a - b) < 0.0001
+           : entered === expectedFinPitch.trim();
+  el.style.display = 'inline-flex';
+  el.textContent   = ok ? '✅ OK' : '❌ NG';
+  el.style.color   = ok ? '#6ee7b7' : '#fca5a5';
+  updateAllStatus();
+}
+
+/* ── Rule: On Item WIP scan, the scanned item's Fin pitch (from master) must match
+   the Fin pitch carried over from the previous lot. Mismatch → alert + block. ── */
+function validateWipPitch(prevFinPitch) {
+  const prev = (prevFinPitch || '').trim();
+  const wip  = (expectedFinPitch || '').trim();   // scanned WIP's expected pitch (master)
+  if (!prev || !wip) return;                       // first lot / unknown → nothing to compare
+  const a = parseFloat(prev), b = parseFloat(wip);
+  const same = (!isNaN(a) && !isNaN(b)) ? Math.abs(a - b) < 0.0001 : prev === wip;
+  if (same) return;
+  alert('Please re-check Item WIP or Fin pitch');
+  // Block — reject this Item WIP scan; keep the Fin pitch field for re-check
+  clearScan('wo');
+  ['wo-line','wo-seq','wo-lot','wo-pm','wo-item','wo-type','d-item','t-item'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = '—';
+  });
+  ['f-line','f-seq','f-lot','f-type','f-desc','f-unit','f-finindex'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  scanState.item = '';
+  expectedFinPitch = '';
+  setHP2BlockDisabled(true);
+  updateFinPitchStatus(); updateReqState(); updateAllStatus();
+  const box = document.getElementById('s-wo');
+  if (box) { box.focus(); box.select?.(); }
+}
+
+/* ── FIN TYPE: mutual-exclusive select + inline validation ── */
+function selectMarkColor(val) {
+  // Multi-select: toggle this colour on/off
+  const btn = [...document.querySelectorAll('#bg-markcolor .mc-btn')].find(b => b.dataset.val === val);
+  if (!btn || btn.disabled) return;
+  btn.classList.toggle('active');
+
+  // current selected set
+  const selected = [...document.querySelectorAll('#bg-markcolor .mc-btn.active')].map(b => b.dataset.val);
+  const h = document.getElementById('f-markcolor');
+  if (h) h.value = selected.slice().sort().join(', ');
+
+  // Validation — selected set must EXACTLY match all required colours (HEI BC:BJ)
+  const status = document.getElementById('markcolor-status');
+  if (status) {
+    if (!expectedColors.length) {
+      status.style.display = 'inline-flex';
+      status.textContent   = '—';
+      status.style.color   = '#666';
+    } else {
+      const need  = expectedColors.slice().sort().join(',');
+      const got   = selected.slice().sort().join(',');
+      const exact = selected.length > 0 && need === got;
+      if (exact) {
+        status.style.display = 'inline-flex';
+        status.textContent   = '✅ OK';
+        status.style.color   = '#6ee7b7';
+      } else if (selected.length) {
+        status.style.display = 'inline-flex';
+        status.textContent   = `❌ NG (${selected.length}/${expectedColors.length})`;
+        status.style.color   = '#fca5a5';
+      } else {
+        status.style.display = 'none';
+        status.textContent   = '—';
+      }
+    }
+  }
+  updateReqState();
+  updateAllStatus();
+}
+
+function clearMarkColor() {
+  document.querySelectorAll('#bg-markcolor .mc-btn').forEach(b => {
+    b.classList.remove('active'); b.disabled = false;
+  });
+  const h = document.getElementById('f-markcolor');
+  if (h) h.value = '';
+  const status = document.getElementById('markcolor-status');
+  if (status) { status.style.display = 'none'; status.textContent = '—'; }
+  updateReqState();
+}
+
+// Thai labels for the expected-colour hint
+const MARK_COLOR_TH = { GREEN:'เขียว', BLUE:'ฟ้า', RED:'แดง', WHITE:'ขาว',
+                        PURPLE:'ม่วง', BLACK:'ดำ', YELLOW:'เหลือง', ORANGE:'ส้ม' };
+
+function applyMarkColors(colors) {
+  expectedColors = (colors || []).map(c => String(c).toUpperCase());
+  clearMarkColor();
+  const hint   = document.getElementById('markcolor-expect');
+  const status = document.getElementById('markcolor-status');
+  const btns   = [...document.querySelectorAll('#bg-markcolor .mc-btn')];
+
+  // Item HAS NO mark → this point is auto-OK (no selection needed, won't block save)
+  if (scanState.item && expectedColors.length === 0) {
+    if (hint) { hint.textContent = '— ไม่มี Mark สี (ข้ามได้ = OK) —'; hint.style.color = '#6ee7b7'; }
+    const h = document.getElementById('f-markcolor');
+    if (h) h.value = 'N/A';
+    if (status) { status.style.display = 'inline-flex'; status.textContent = '✅ OK'; status.style.color = '#6ee7b7'; }
+    btns.forEach(b => { b.disabled = true; b.style.opacity = '.25'; b.style.filter = 'grayscale(.7)'; });
+    updateReqState(); updateAllStatus();
+    return;
+  }
+
+  // Item HAS mark(s) → operator MUST pick ALL required colours (else NG / blank → cannot save)
+  if (hint) {
+    hint.style.color = '#a78bfa';
+    if (expectedColors.length) {
+      const names = expectedColors.map(c => MARK_COLOR_TH[c] || c).join(' + ');
+      hint.textContent = expectedColors.length > 1
+        ? `✔ ต้องเลือกให้ครบ ${expectedColors.length} สี: ${names}`
+        : `✔ ต้องเลือก Mark สี: ${names}`;
+    } else {
+      hint.textContent = '';
+    }
+  }
+  // keep every colour vivid — guidance is via the hint text + OK/NG on click
+  btns.forEach(b => { b.disabled = false; b.style.filter = ''; b.style.opacity = ''; });
+  updateReqState();
+}
+
+function onScan(key, val) {
+  // Work Order: parse and auto-fill form
+  if (key === 'wo') {
+    scanState.wo = val;
+    const dEl = document.getElementById('d-wo');
+    if (dEl) dEl.textContent = val || '—';
+    if (!val) {
+      ['line','seq','lot','pm','item','type'].forEach(k => {
+        const el = document.getElementById('wo-'+k); if(el) el.textContent = '—';
+      });
+      const clr = id => { const el=document.getElementById(id); if(el) el.value=''; };
+      clr('f-unit'); clr('f-finindex'); clr('f-finpitch'); clr('f-desc'); clr('f-type');
+      expectedFinPitch = ''; expectedColors = [];
+      clearMarkColor();
+      updateFinPitchStatus();
+      updateReqState();
+      setHP2BlockDisabled(true);   // item cleared → hide HP2
+      return;
+    }
+    const p = parseWorkOrder(val);
+    if (p) {
+      // Fin pitch carried over from the previous lot (clearLotScans keeps it) — for Rule 2 check
+      const prevFinPitch = (document.getElementById('f-finpitch')?.value || '').trim();
+      document.getElementById('wo-line').textContent = p.line;
+      document.getElementById('wo-seq').textContent  = p.seq;
+      document.getElementById('wo-lot').textContent  = p.lot;
+      document.getElementById('wo-pm').textContent   = p.prodMonth;
+      document.getElementById('wo-item').textContent = p.item;
+      document.getElementById('wo-type').textContent = p.type;
+      // Auto-fill Record Detail form
+      const sv = (id, v) => { const el=document.getElementById(id); if(el) el.value=v; };
+      sv('f-line', p.line);
+      sv('f-seq',  p.seq);
+      sv('f-lot',  p.prodMonth);
+      sv('f-type', p.prodType);   // PROD. TYPE / NAME = MID(182,15)
+      sv('f-desc', p.desc);       // DESCRIPTION = MID(79,20)
+      sv('f-unit', parseInt(p.lot, 10) || p.lot);  // Unit/Lot = MID(167,6)*1
+      // fill hidden Item No. elements
+      ['d-item','t-item'].forEach(id => { const el=document.getElementById(id); if(el) el.textContent=p.item; });
+      scanState.item = p.item;
+      // lookup HP2 existence + expected Fin pitch, then validate WIP pitch vs prev Fin pitch
+      checkHP2ForItem(p.item).then(() => validateWipPitch(prevFinPitch));
+      // highlight required fields
+      updateReqState();
+    }
+    return;
+  }
+
+  let trimmed;
+  if (key === 'hp1' || key === 'hp2') {
+    // Hairpin item: TRIM(MID(s, 64, 12))
+    trimmed = val.length >= 64 ? mid(val, 64, 12) : val;
+  } else {
+    trimmed = TRIM5.has(key) && val.length > 5 ? val.slice(5) : val;
+  }
+  scanState[key] = trimmed;
+
+  const dEl = document.getElementById('d-'+key);
+  const tEl = document.getElementById('t-'+key);
+  const nEl = document.getElementById('n-'+key);
+
+  if (dEl) dEl.textContent = trimmed || '—';
+  if (tEl) tEl.textContent = trimmed || '—';
+
+  // validate HP scan against expected value from WIP item
+  if (key === 'hp1' || key === 'hp2') {
+    updateHPStatus(key);
+    // HP Tube Type ← Scan(HPx): MID(182,15)
+    const hpTube = val.length >= 182 ? mid(val, 182, 15) : '';
+    const tubeId = key === 'hp1' ? 'f-hptype' : 'f-hptype2';
+    const tubeEl = document.getElementById(tubeId);
+    if (tubeEl) tubeEl.value = hpTube;
+    // EL HAIR PIN (MM) ← Scan(HPx): MID(187,3) — HP1→row1, HP2→row2
+    const elHp = val.length >= 187 ? mid(val, 187, 3) : '';
+    const elId = key === 'hp1' ? 'f-elHp' : 'f-elHp2';
+    const elEl = document.getElementById(elId);
+    if (elEl) elEl.value = elHp;
+    // show "เปลี่ยนความยาว" button when tube type holds 2 lengths
+    updateElLenBtn(key === 'hp1' ? 1 : 2);
+    // Rule 3: background-fetch Line/Seq/Prod-month from the hairpin barcode
+    // (same formula as the WIP fetch) → SQL only, hidden from dashboard.
+    const meta = (val && val.length >= 120) ? parseWorkOrder(val) : null;
+    hpMeta[key] = meta ? { line: meta.line, seq: meta.seq, prodMonth: meta.prodMonth }
+                       : { line:'', seq:'', prodMonth:'' };
+  }
+
+  // lookup name from master data
+  if (nEl && LOOKUP[key]) {
+    const { list, idField } = LOOKUP[key];
+    const found = masterData[list].find(r => r[idField] === trimmed);
+    nEl.textContent = found ? found.name : '—';
+    if (dEl) dEl.textContent = found ? `${trimmed}  |  ${found.name}` : trimmed || '—';
+  }
+
+  // Insert No. scanned → re-check pipe rule (machine may be scanned before/after item)
+  if (key === 'mc') validatePipeInsert();
+
+  // HAIRPIN BENDER NO. ← Scan(Bender): MID(6,4) → name lookup Sheet Machine Col B
+  if (key === 'bender' || key === 'bender2') {
+    const benderCode = val.length >= 6 ? mid(val, 6, 4) : val;
+    const m = masterData.machines.find(r => r.code === benderCode);
+    const fId = key === 'bender' ? 'f-bender' : 'f-bender2';
+    const bEl = document.getElementById(fId);
+    if (bEl) bEl.value = m ? m.name : benderCode;
+    const dEl = document.getElementById('d-' + key);
+    if (dEl) dEl.textContent = benderCode ? (m ? `${benderCode}  |  ${m.name}` : benderCode) : '—';
+  }
+}
+
+function clearScan(key) {
+  scanState[key] = '';
+  const inp = document.getElementById('s-'+key);
+  if (inp) inp.value = '';
+  const dEl = document.getElementById('d-'+key);
+  const tEl = document.getElementById('t-'+key);
+  const nEl = document.getElementById('n-'+key);
+  if (dEl) { dEl.textContent = '—'; dEl.style.border = '1px solid #333'; }
+  if (tEl) tEl.textContent = '—';
+  if (nEl) nEl.textContent = '—';
+  if (key === 'hp1' || key === 'hp2') {
+    updateHPStatus(key);
+    const tubeEl = document.getElementById(key === 'hp1' ? 'f-hptype' : 'f-hptype2');
+    if (tubeEl) tubeEl.value = '';
+    const elEl = document.getElementById(key === 'hp1' ? 'f-elHp' : 'f-elHp2');
+    if (elEl) elEl.value = '';
+    updateElLenBtn(key === 'hp1' ? 1 : 2);
+    hpMeta[key] = { line:'', seq:'', prodMonth:'' };
+  }
+  if (key === 'bender') { const bEl = document.getElementById('f-bender'); if (bEl) bEl.value = ''; }
+  if (key === 'bender2') { const bEl = document.getElementById('f-bender2'); if (bEl) bEl.value = ''; }
+  // re-check pipe rule when machine cleared (item handled via onScan/checkHP2ForItem)
+  if (key === 'mc') validatePipeInsert();
+}
+
+async function loadMasterData(manual = false) {
+  const status = document.getElementById('data-status');
+  if (status) status.textContent = 'กำลังโหลด...';
+  try {
+    // manual reload → force server to re-read ALL Excel master files (clears server cache)
+    if (manual) {
+      const rr = await fetch('/hp_insert/api/reload');
+      const rj = await rr.json();
+      if (!rj.ok) throw new Error(rj.error || 'reload failed');
+      toast(`🔄 Server โหลด Excel ใหม่: HEI ${rj.hei} / Speclist ${rj.speclist} รายการ`, '#1e3a5f');
+    }
+    const res = await fetch('/hp_insert/api/data');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    masterData.checkers = data.checkers || [];
+    masterData.machines = data.machines || [];
+    masterData.confirms = data.confirms || [];
+    const msg = `✅ โหลดแล้ว: Checker ${masterData.checkers.length} / Machine ${masterData.machines.length}`;
+    if (status) { status.textContent = msg; status.style.color = '#555'; status.style.fontWeight = 'normal'; }
+    if (manual) toast(msg, '#065f46');
+    // re-run lookups for the item on screen so fresh master values apply immediately
+    if (manual && scanState.item) {
+      checkHP2ForItem(scanState.item);
+    }
+  } catch (e) {
+    const msg = '⚠️ Data Server ไม่ตอบสนอง — กรุณาตรวจสอบการเชื่อมต่อ Server';
+    if (status) { status.textContent = msg; status.style.color = '#ef4444'; status.style.fontWeight = '700'; }
+    if (manual) toast('⚠️ Server ไม่ตอบสนอง — Reload ไม่สำเร็จ', '#7f1d1d');
+  }
+}
+
+function calcFinPitch() {
+  const pts = [...document.querySelectorAll('.fp-pt')]
+    .map(i => parseFloat(i.value)).filter(v => !isNaN(v));
+  const bar = document.getElementById('fp-calc-bar');
+  const avgEl = document.getElementById('fp-avg');
+  const resEl = document.getElementById('fp-result');
+  if (pts.length === 0) {
+    bar.textContent = ''; avgEl.textContent = '—';
+    resEl.textContent = '—'; resEl.className = 'result-val'; return;
+  }
+  const avg = pts.reduce((a,b) => a+b, 0) / pts.length;
+  const avgStr = avg.toFixed(3);
+  bar.textContent = avgStr;
+  avgEl.textContent = avgStr;
+  const mn = parseFloat(document.getElementById('fp-min').value);
+  const mx = parseFloat(document.getElementById('fp-max').value);
+  if (!isNaN(mn) && !isNaN(mx)) {
+    const ok = avg >= mn && avg <= mx;
+    resEl.textContent = ok ? 'OK' : 'NG';
+    resEl.className = 'result-val ' + (ok ? 'result-ok' : 'result-ng');
+    bar.style.background = ok ? '#00897b' : '#b91c1c';
+  } else {
+    resEl.textContent = '—'; resEl.className = 'result-val';
+    bar.style.background = '#00897b';
+  }
+}
+
+function updateSpecDisplay() {
+  const mn = document.getElementById('fp-min').value;
+  const sp = document.getElementById('fp-spec').value;
+  const mx = document.getElementById('fp-max').value;
+  document.getElementById('fp-spec-display').textContent =
+    `${sp||'—'}  (${mn||'—'}, ${mx||'—'})  mm`;
+}
+
+function toast(msg, bg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg; t.style.background = bg || '#155fa0';
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 2500);
+}
+
+// ── Enter → next input (scanner sends Enter after each scan) ──
+// Steps: 1.Checker 2.Hairpin Insert No. 3.Item WIP 4.Hairpin Bender No. 5.HP1 6.HP2
+const SCAN_FOCUS = ['s-checker', 's-mc', 's-wo', 's-bender', 's-hp1', 's-bender2', 's-hp2'];
+
+function focusNextFrom(id) {
+  const idx = SCAN_FOCUS.indexOf(id);
+  if (idx === -1) return;
+  for (let i = idx + 1; i < SCAN_FOCUS.length; i++) {
+    const nextId = SCAN_FOCUS[i];
+    // skip HP2 when locked (Count(HP_Item)==1) → jump to Step 6
+    if (nextId === 's-hp2') {
+      const blk = document.getElementById('block-hp2');
+      if (blk && blk.classList.contains('disabled')) continue;
+    }
+    const el = document.getElementById(nextId);
+    if (el) { el.focus(); el.select && el.select(); return; }
+  }
+}
+
+// init
+(function() {
+  const now = new Date();
+  document.getElementById('f-date').value = now.toISOString().slice(0, 10);
+  document.getElementById('f-time').value = now.toTimeString().slice(0, 5);
+
+  // wire Mark Color button handlers
+  document.querySelectorAll('#bg-markcolor .mc-btn').forEach(btn => {
+    btn.addEventListener('click', () => selectMarkColor(btn.dataset.val));
+  });
+
+  // attach Enter-to-next handlers on all scan inputs
+  SCAN_FOCUS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); focusNextFrom(id); }
+    });
+  });
+
+  loadMasterData();
+})();
+</script>
+
+<!-- ── DASHBOARD MODAL ── -->
+<!-- Dashboard Spec Check Detail popup -->
+<div id="dbd-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;
+     align-items:center;justify-content:center;" onclick="if(event.target===this)closeDbDetail()">
+  <div style="background:#1a1a1a;border:1px solid #2a3f5e;border-radius:10px;
+              width:min(460px,92vw);max-height:90vh;overflow:auto;box-shadow:0 10px 40px #000;">
+    <div style="background:#0f2744;color:#7dd3fc;padding:12px 18px;font-size:14px;font-weight:800;
+                letter-spacing:1px;display:flex;align-items:center;justify-content:space-between;">
+      <span>✔ Spec Check Detail</span>
+      <button onclick="closeDbDetail()"
+        style="background:#2a0000;border:1px solid #7f1d1d;color:#fca5a5;
+               padding:3px 10px;border-radius:4px;font-size:13px;cursor:pointer;">✕</button>
+    </div>
+    <div id="dbd-body"></div>
+  </div>
+</div>
+
+<div id="db-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9998;
+     flex-direction:column;">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              padding:10px 18px;background:#0d0d5e;border-bottom:2px solid #00c8d4;">
+    <span style="font-size:15px;font-weight:900;color:#f5c518;letter-spacing:1px;">📊 DASHBOARD — Hairpin Insert Records</span>
+    <div style="display:flex;gap:8px;">
+      <input id="db-search" type="text" placeholder="🔍 Search item / date..."
+        oninput="filterDashboard()"
+        style="background:#111;border:1px solid #333;color:#fff;padding:5px 10px;
+               border-radius:4px;font-size:12px;width:220px;">
+      <button onclick="closeDashboard()"
+        style="background:#7f1d1d;border:none;color:#fca5a5;font-size:12px;font-weight:800;
+               padding:5px 14px;border-radius:4px;cursor:pointer;">✕ Close</button>
+    </div>
+  </div>
+  <div style="flex:1;overflow:auto;padding:12px 16px;">
+    <table id="db-table"
+      style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap;">
+      <thead>
+        <tr style="background:#0f2744;color:#7dd3fc;position:sticky;top:0;z-index:1;">
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">#</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">วัน</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">เวลา</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Hairpin Insert No.</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">HP Bender</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Item WIP</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Prod.Type/Name</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Item HP1</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Item HP2</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">HP Tube Type</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Line</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Seq.</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Prod./Month</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Lot</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Item Fin</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Fin Pitch</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Fin Type</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Spec Check</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Checker</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Confirm</th>
+          <th style="padding:7px 10px;border:1px solid #1e3a5f;">Final Check</th>
+        </tr>
+      </thead>
+      <tbody id="db-body"></tbody>
+    </table>
+    <div id="db-empty" style="display:none;text-align:center;color:#555;padding:40px;font-size:13px;">
+      No records yet.
+    </div>
+  </div>
+  <div style="padding:6px 18px;background:#0d0d0d;border-top:1px solid #222;
+              font-size:10px;color:#555;display:flex;gap:20px;">
+    <span id="db-count">0 records</span>
+    <span>DB: hairpin_records.db</span>
+  </div>
+</div>
+
+<!-- ── PROCESS CONTROL IMAGE MODAL ── -->
+<div id="pc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;
+     display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="background:#111;border:1px solid #1d4ed8;border-radius:8px;padding:12px;max-width:92vw;max-height:90vh;
+              display:flex;flex-direction:column;gap:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;">
+      <span id="pc-title" style="font-size:12px;font-weight:700;color:#7dd3fc;letter-spacing:.5px;">—</span>
+      <button onclick="closePCModal()"
+        style="background:#7f1d1d;border:none;color:#fca5a5;font-size:13px;font-weight:800;
+               padding:3px 10px;border-radius:4px;cursor:pointer;">✕ Close</button>
+    </div>
+    <img id="pc-img" src="" alt="Process Control"
+         style="max-width:88vw;max-height:80vh;object-fit:contain;border-radius:4px;display:block;">
+    <div id="pc-err" style="display:none;color:#fca5a5;font-size:12px;text-align:center;padding:20px;">
+      ❌ Image not found
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

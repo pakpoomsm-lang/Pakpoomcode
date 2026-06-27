@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEI Dashboard — Backlog</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
+
+*{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --bg:#f0f2f5;
+  --white:#ffffff;
+  --panel:#f8f9fb;
+  --border:#e2e6ea;
+  --text:#1a202c;
+  --text-mid:#4a5568;
+  --text-dim:#8a9ab0;
+  --red:#e53e3e;
+  --red-light:#fff5f5;
+  --red-border:#fed7d7;
+  --green:#2f855a;
+  --green-light:#f0fff4;
+  --green-border:#c6f6d5;
+  --yellow:#b7791f;
+  --yellow-light:#fffff0;
+  --yellow-border:#fefcbf;
+  --blue:#2b6cb0;
+  --blue-light:#ebf8ff;
+  --blue-border:#bee3f8;
+  --purple:#6b46c1;
+  --accent:#e53e3e;
+  --mono:'IBM Plex Mono',monospace;
+}
+
+body{
+  font-family:'Sarabun',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+}
+
+/* ── HEADER ── */
+.header{
+  background:var(--white);
+  border-bottom:3px solid var(--accent);
+  padding:0 32px;
+  height:64px;
+  display:flex;
+  align-items:center;
+  gap:20px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 2px 12px rgba(0,0,0,0.06);
+}
+.logo{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.logo-mark{
+  background:var(--accent);
+  color:white;
+  font-weight:700;
+  font-size:13px;
+  padding:5px 10px;
+  border-radius:4px;
+  letter-spacing:1px;
+}
+.logo-text{
+  font-size:16px;
+  font-weight:700;
+  color:var(--text);
+  letter-spacing:1px;
+}
+.logo-sub{
+  font-size:11px;
+  color:var(--text-dim);
+  letter-spacing:2px;
+  font-family:var(--mono);
+}
+.header-right{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.btn-back{
+  background:var(--bg);
+  border:1px solid var(--border);
+  color:var(--text-mid);
+  padding:7px 16px;
+  border-radius:6px;
+  font-size:13px;
+  font-family:'Sarabun',sans-serif;
+  cursor:pointer;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  transition:all .2s;
+  font-weight:600;
+}
+.btn-back:hover{background:var(--border);}
+.last-update{
+  font-size:11px;
+  color:var(--text-dim);
+  font-family:var(--mono);
+}
+
+/* ── MAIN ── */
+.main{max-width:1280px;margin:0 auto;padding:28px 24px;}
+
+/* ── PAGE TITLE ── */
+.page-title{
+  margin-bottom:24px;
+}
+.page-title h1{
+  font-size:24px;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:4px;
+}
+.page-title p{
+  font-size:14px;
+  color:var(--text-dim);
+}
+
+/* ── STAT CARDS ── */
+.stat-grid{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:14px;
+  margin-bottom:24px;
+}
+.stat-card{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:18px 20px;
+  position:relative;
+  overflow:hidden;
+  transition:transform .2s, box-shadow .2s;
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.08);}
+.stat-card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;
+  height:3px;
+}
+.sc-total::before{background:var(--blue);}
+.sc-pending::before{background:var(--yellow);}
+.sc-done::before{background:var(--green);}
+.sc-urgent::before{background:var(--red);}
+.sc-today::before{background:var(--purple);}
+
+.stat-icon{
+  font-size:22px;
+  margin-bottom:10px;
+}
+.stat-num{
+  font-size:32px;
+  font-weight:700;
+  font-family:var(--mono);
+  line-height:1;
+  margin-bottom:5px;
+}
+.sc-total .stat-num{color:var(--blue);}
+.sc-pending .stat-num{color:var(--yellow);}
+.sc-done .stat-num{color:var(--green);}
+.sc-urgent .stat-num{color:var(--red);}
+.sc-today .stat-num{color:var(--purple);}
+.stat-label{font-size:12px;color:var(--text-dim);font-weight:500;}
+
+/* ── FILTERS ── */
+.filter-bar{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px 20px;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:20px;
+  flex-wrap:wrap;
+}
+.filter-label{font-size:13px;font-weight:600;color:var(--text-mid);margin-right:4px;}
+.filter-btn{
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--text-mid);
+  padding:6px 14px;
+  border-radius:20px;
+  font-size:12px;
+  font-family:'Sarabun',sans-serif;
+  cursor:pointer;
+  font-weight:600;
+  transition:all .2s;
+}
+.filter-btn:hover{background:var(--border);}
+.filter-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
+.filter-sep{width:1px;height:24px;background:var(--border);margin:0 4px;}
+select.filter-select{
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--text-mid);
+  padding:6px 12px;
+  border-radius:6px;
+  font-size:12px;
+  font-family:'Sarabun',sans-serif;
+  cursor:pointer;
+  outline:none;
+  font-weight:600;
+}
+.search-box{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:6px 12px;
+}
+.search-box input{
+  border:none;
+  background:transparent;
+  font-size:13px;
+  font-family:'Sarabun',sans-serif;
+  color:var(--text);
+  outline:none;
+  width:180px;
+}
+.search-box input::placeholder{color:var(--text-dim);}
+
+/* ── TABLE ── */
+.table-wrap{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  box-shadow:0 2px 8px rgba(0,0,0,0.04);
+}
+.table-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:16px 20px;
+  border-bottom:1px solid var(--border);
+}
+.table-title{font-size:14px;font-weight:700;color:var(--text);}
+.table-count{font-size:12px;color:var(--text-dim);font-family:var(--mono);}
+.btn-export{
+  background:var(--green);
+  color:white;
+  border:none;
+  padding:7px 16px;
+  border-radius:6px;
+  font-size:12px;
+  font-family:'Sarabun',sans-serif;
+  cursor:pointer;
+  font-weight:700;
+  transition:all .2s;
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.btn-export:hover{background:#276749;}
+
+table{width:100%;border-collapse:collapse;min-width:1100px;}
+thead tr{background:var(--panel);}
+thead th{
+  padding:11px 18px;
+  text-align:left;
+  font-size:11px;
+  font-weight:700;
+  color:var(--text-dim);
+  letter-spacing:1px;
+  text-transform:uppercase;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+tbody tr{
+  border-bottom:1px solid var(--border);
+  transition:background .15s;
+  cursor:default;
+}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:#f7fafc;}
+td{padding:12px 18px;font-size:13px;color:var(--text-mid);vertical-align:middle;white-space:nowrap;}
+td.td-id{
+  font-family:var(--mono);
+  font-size:12px;
+  font-weight:600;
+  color:var(--text);
+}
+td.td-part{font-weight:600;color:var(--text);}
+td.td-qty{
+  font-family:var(--mono);
+  font-weight:600;
+  color:var(--text);
+  font-size:13px;
+}
+
+/* BADGES */
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:3px 9px;
+  border-radius:20px;
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.5px;
+  white-space:nowrap;
+}
+.badge-pending{background:var(--yellow-light);color:var(--yellow);border:1px solid var(--yellow-border);}
+.badge-confirmed{background:var(--green-light);color:var(--green);border:1px solid var(--green-border);}
+.badge-urgent{background:var(--red-light);color:var(--red);border:1px solid var(--red-border);}
+.badge-normal{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border);}
+.badge-side{background:#faf5ff;color:var(--purple);border:1px solid #e9d8fd;}
+.badge-ubend{background:var(--blue-light);color:var(--blue);border:1px solid var(--blue-border);}
+
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block;}
+.dot-pending{background:var(--yellow);}
+.dot-confirmed{background:var(--green);}
+
+/* EMPTY STATE */
+.empty{
+  text-align:center;
+  padding:60px 20px;
+  color:var(--text-dim);
+}
+.empty-icon{font-size:48px;margin-bottom:12px;}
+.empty p{font-size:14px;}
+
+/* LOADING */
+.loading{
+  text-align:center;
+  padding:60px 20px;
+  color:var(--text-dim);
+}
+.spinner{
+  width:32px;height:32px;
+  border:3px solid var(--border);
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+  margin:0 auto 12px;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* PAGINATION */
+.pagination{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 20px;
+  border-top:1px solid var(--border);
+}
+.page-info{font-size:12px;color:var(--text-dim);font-family:var(--mono);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{
+  border:1px solid var(--border);
+  background:var(--white);
+  color:var(--text-mid);
+  padding:5px 12px;
+  border-radius:5px;
+  font-size:12px;
+  cursor:pointer;
+  font-family:'Sarabun',sans-serif;
+  font-weight:600;
+  transition:all .2s;
+}
+.page-btn:hover:not(:disabled){background:var(--bg);}
+.page-btn:disabled{opacity:.4;cursor:default;}
+.page-btn.active{background:var(--accent);color:white;border-color:var(--accent);}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:24px;right:24px;
+  background:var(--text);color:white;
+  padding:12px 20px;border-radius:8px;
+  font-size:13px;font-weight:600;
+  opacity:0;transform:translateY(10px);
+  transition:all .3s;pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,0.2);
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .stat-grid{grid-template-columns:repeat(3,1fr);}
+  .search-box input{width:120px;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-mark">HEI</div>
+    <div>
+      <div class="logo-text">Dashboard</div>
+      <div class="logo-sub">SMART FACTORY · BACKLOG</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-update" style="display:flex;align-items:center;gap:8px">
+      <span id="wsDot" style="width:8px;height:8px;border-radius:50%;background:#e53e3e;display:inline-block"></span>
+      <span id="wsLabel" style="font-size:11px;font-weight:700;color:#e53e3e;font-family:IBM Plex Mono,monospace">CONNECTING...</span>
+      <span style="color:var(--text-dim)">| อัปเดต: <span id="lastUpdate">--:--:--</span></span>
+    </span>
+    <button class="btn-back" onclick="location.href='/'">← กลับหน้าหลัก</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <div class="page-title">
+    <h1>📊 ประวัติ Order ทั้งหมด</h1>
+    <p>ข้อมูล Backlog รวมทุก Order ที่เคยสั่งผลิตตั้งแต่เริ่มใช้งานระบบ</p>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stat-grid">
+    <div class="stat-card sc-total">
+      <div class="stat-icon">📋</div>
+      <div class="stat-num" id="s-total">0</div>
+      <div class="stat-label">Order ทั้งหมด</div>
+    </div>
+    <div class="stat-card sc-pending">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-num" id="s-pending">0</div>
+      <div class="stat-label">รอดำเนินการ</div>
+    </div>
+    <div class="stat-card sc-done">
+      <div class="stat-icon">✅</div>
+      <div class="stat-num" id="s-done">0</div>
+      <div class="stat-label">Confirmed แล้ว</div>
+    </div>
+    <div class="stat-card sc-urgent">
+      <div class="stat-icon">🔴</div>
+      <div class="stat-num" id="s-urgent">0</div>
+      <div class="stat-label">Urgent ทั้งหมด</div>
+    </div>
+    <div class="stat-card sc-today">
+      <div class="stat-icon">📅</div>
+      <div class="stat-num" id="s-today">0</div>
+      <div class="stat-label">Order วันนี้</div>
+    </div>
+  </div>
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <span class="filter-label">สถานะ:</span>
+    <button class="filter-btn active" onclick="setFilter('status','all',this)">ทั้งหมด</button>
+    <button class="filter-btn" onclick="setFilter('status','pending',this)">⏳ Pending</button>
+    <button class="filter-btn" onclick="setFilter('status','confirmed',this)">✅ Confirmed</button>
+
+    <div class="filter-sep"></div>
+
+    <span class="filter-label">Part:</span>
+    <button class="filter-btn active" onclick="setFilter('part','all',this)" data-group="part">ทั้งหมด</button>
+    <button class="filter-btn" onclick="setFilter('part','Side Plate',this)" data-group="part">🔩 Side Plate</button>
+    <button class="filter-btn" onclick="setFilter('part','U-Bend',this)" data-group="part">🔄 U-Bend</button>
+
+    <div class="filter-sep"></div>
+
+    <span class="filter-label">Priority:</span>
+    <select class="filter-select" onchange="setFilter('priority',this.value)">
+      <option value="all">ทั้งหมด</option>
+      <option value="urgent">🔴 Urgent</option>
+      <option value="normal">🟡 Normal</option>
+    </select>
+
+    <div class="search-box">
+      <span style="color:var(--text-dim);font-size:14px">🔍</span>
+      <input type="text" id="searchInput" placeholder="ค้นหา Order ID, Model..." oninput="applyFilters()">
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <div class="table-header">
+      <div>
+        <div class="table-title">รายการ Order</div>
+        <div class="table-count" id="tableCount">โหลดข้อมูล...</div>
+      </div>
+      <button class="btn-export" onclick="exportCSV()">⬇️ Export CSV</button>
+    </div>
+
+    <div id="tableBody" style="overflow-x:auto;">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>กำลังโหลดข้อมูล...</p>
+      </div>
+    </div>
+
+    <div class="pagination" id="paginationBar" style="display:none">
+      <div class="page-info" id="pageInfo"></div>
+      <div class="page-btns" id="pageBtns"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──
+let allOrders = [];
+let filtered = [];
+let filters = { status: 'all', part: 'all', priority: 'all' };
+let currentPage = 1;
+const PER_PAGE = 15;
+
+// ── LOAD DATA ──
+async function loadOrders() {
+  try {
+    const res = await fetch('/api/orders');
+    const data = await res.json();
+    allOrders = (data.orders || []).reverse(); // ล่าสุดก่อน
+    updateStats();
+    applyFilters();
+    document.getElementById('lastUpdate').textContent =
+      new Date().toLocaleTimeString('th-TH', { hour12: false });
+  } catch(e) {
+    document.getElementById('tableBody').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">⚠️</div>
+        <p>ไม่สามารถโหลดข้อมูลได้<br>กรุณาตรวจสอบว่า Server รันอยู่</p>
+      </div>`;
+  }
+}
+
+// ── STATS ──
+function updateStats() {
+  const today = new Date().toLocaleDateString('th-TH');
+  document.getElementById('s-total').textContent = allOrders.length;
+  document.getElementById('s-pending').textContent = allOrders.filter(o => o.status === 'pending').length;
+  document.getElementById('s-done').textContent = allOrders.filter(o => o.status === 'confirmed').length;
+  document.getElementById('s-urgent').textContent = allOrders.filter(o => o.priority === 'urgent').length;
+  document.getElementById('s-today').textContent = allOrders.filter(o => o.date === today).length;
+}
+
+// ── FILTERS ──
+function setFilter(key, val, btn) {
+  filters[key] = val;
+  if (btn) {
+    const group = btn.dataset.group || key;
+    document.querySelectorAll(`.filter-btn[data-group="${group}"], .filter-btn:not([data-group])`).forEach(b => {
+      if ((b.dataset.group || key) === group) b.classList.remove('active');
+    });
+    btn.classList.add('active');
+  }
+  currentPage = 1;
+  applyFilters();
+}
+
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  filtered = allOrders.filter(o => {
+    if (filters.status !== 'all' && o.status !== filters.status) return false;
+    if (filters.part !== 'all' && o.part !== filters.part) return false;
+    if (filters.priority !== 'all' && o.priority !== filters.priority) return false;
+    if (search && !o.id.toLowerCase().includes(search) && !o.model.toLowerCase().includes(search) && !o.part.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+// ── RENDER TABLE ──
+function renderTable() {
+  const start = (currentPage - 1) * PER_PAGE;
+  const end = start + PER_PAGE;
+  const pageData = filtered.slice(start, end);
+  const total = filtered.length;
+
+  document.getElementById('tableCount').textContent = `แสดง ${Math.min(end, total)} จาก ${total} รายการ`;
+
+  if (!filtered.length) {
+    document.getElementById('tableBody').innerHTML = `
+      <div class="empty">
+        <div class="empty-icon">🔍</div>
+        <p>ไม่พบข้อมูลที่ค้นหา</p>
+      </div>`;
+    document.getElementById('paginationBar').style.display = 'none';
+    return;
+  }
+
+  const rows = pageData.map(o => {
+    const statusBadge = o.status === 'confirmed'
+      ? `<span class="badge badge-confirmed"><span class="dot dot-confirmed"></span>Confirmed</span>`
+      : `<span class="badge badge-pending"><span class="dot dot-pending"></span>Pending</span>`;
+    const priorityBadge = o.priority === 'urgent'
+      ? `<span class="badge badge-urgent">🔴 Urgent</span>`
+      : `<span class="badge badge-normal">🟡 Normal</span>`;
+    const partBadge = o.part === 'Side Plate'
+      ? `<span class="badge badge-side">🔩 Side Plate</span>`
+      : `<span class="badge badge-ubend">🔄 U-Bend</span>`;
+    const lotCell = o.lot
+      ? `<span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--blue)">${o.lot}</span>`
+      : `<span style="color:var(--text-dim)">—</span>`;
+    const lineSeq = (o.lineNum || o.seq)
+      ? `${o.lineNum||'—'} / ${o.seq||'—'}`
+      : '—';
+
+    return `<tr>
+      <td>${o.date || '—'}</td>
+      <td>${o.time || '—'}</td>
+      <td class="td-part">${partBadge}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text)">${o.itemCode || '—'}</td>
+      <td class="td-qty">${o.qty.toLocaleString()}</td>
+      <td>${lotCell}</td>
+      <td style="font-size:12px;font-family:var(--mono)">${lineSeq}</td>
+      <td style="font-size:12px;font-family:var(--mono)">${o.proMonth||'—'}</td>
+      <td style="font-size:12px">${o.employee||'—'}</td>
+      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${(o.floorRemark||o.floor_remark)?'#e53e3e':'var(--text-dim)'};font-weight:${(o.floorRemark||o.floor_remark)?'600':'400'}" title="${o.floorRemark||o.floor_remark||''}">${o.floorRemark||o.floor_remark||'—'}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px;font-family:var(--mono)">${o.confirmTime || '—'}</td>
+      <td style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--blue)">${timeDiff(o)}</td>
+      <td>${priorityBadge}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableBody').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>วันที่</th>
+          <th>เวลา</th>
+          <th>Part</th>
+          <th>Item No</th>
+          <th>จำนวน</th>
+          <th>LOT</th>
+          <th>LINE/SEQ</th>
+          <th>PRO MONTH</th>
+          <th>พนักงาน</th>
+          <th>หมายเหตุ (ปัญหา)</th>
+          <th>สถานะ</th>
+          <th>เวลา Confirm</th>
+          <th>⏱ ระยะเวลาจัดเตรียม</th>
+          <th>Priority</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  renderPagination(total);
+}
+
+// ── PAGINATION ──
+function renderPagination(total) {
+  const totalPages = Math.ceil(total / PER_PAGE);
+  const bar = document.getElementById('paginationBar');
+  if (totalPages <= 1) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+
+  const start = (currentPage - 1) * PER_PAGE + 1;
+  const end = Math.min(currentPage * PER_PAGE, total);
+  document.getElementById('pageInfo').textContent = `หน้า ${currentPage} / ${totalPages} (${start}–${end} จาก ${total})`;
+
+  let btns = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← ก่อนหน้า</button>`;
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 1) {
+      btns += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+    } else if (Math.abs(i - currentPage) === 2) {
+      btns += `<span style="padding:5px 4px;color:var(--text-dim)">...</span>`;
+    }
+  }
+  btns += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>ถัดไป →</button>`;
+  document.getElementById('pageBtns').innerHTML = btns;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  renderTable();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── EXPORT CSV ──
+function timeDiff(o) {
+  try {
+    const confirmTime = o.confirmTime || o.confirm_time;
+    const confirmDate = o.confirmDate || o.confirm_date;
+    if (!o.timestamp || !confirmTime) return '—';
+    const start = new Date(o.timestamp);
+    const dateStr = confirmDate
+      ? confirmDate.split('/').reverse().join('-')
+      : o.date ? o.date.split('/').reverse().join('-') : null;
+    if (!dateStr) return '—';
+    const end = new Date(`${dateStr}T${confirmTime}`);
+    const diffMs = end - start;
+    if (isNaN(diffMs) || diffMs < 0) return '—';
+    const mins = Math.floor(diffMs / 60000);
+    const hrs  = Math.floor(mins / 60);
+    const rem  = mins % 60;
+    if (hrs > 0) return `${hrs} ชม. ${rem} น.`;
+    return `${mins} นาที`;
+  } catch(e) { return '—'; }
+}
+
+function exportCSV() {
+  if (!filtered.length) { showToast('ไม่มีข้อมูลให้ Export'); return; }
+  const header = ['Order ID','วันที่','เวลา','Part','Item No','จำนวน','LOT','LINE','SEQ','PRO MONTH','พนักงาน','Priority','สถานะ','เวลา Confirm','ระยะเวลา','สถานะงาน','หมายเหตุ'];
+  const rows = filtered.map(o => [
+    o.id, o.date||'', o.time||'', o.part, o.itemCode||'', o.qty,
+    o.lot||'', o.lineNum||'', o.seq||'', o.proMonth||'', o.employee||'',
+    o.priority, o.status, o.confirmTime||'', timeDiff(o), o.workStatus||'', o.remark||''
+  ].map(v => `"${v}"`).join(','));
+  const csv = '\uFEFF' + [header.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `MECP_Orders_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Export CSV สำเร็จ!');
+}
+
+// ── TOAST ──
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ── WEBSOCKET REAL-TIME ──
+let ws = null;
+let reconnectCount = 0;
+let heartbeatTimer = null;
+
+function startHeartbeat() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'PING' }));
+    }
+  }, 15000);
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+}
+
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.host + '/ws');
+
+  ws.onopen = () => {
+    reconnectCount = 0;
+    setWsStatus('live');
+    startHeartbeat();
+  };
+
+  ws.onmessage = (e) => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    if (msg.type === 'PONG') return;
+    if (msg.type === 'INIT') {
+      allOrders = (msg.orders || []).slice().reverse();
+      updateStats(); applyFilters(); updateTimestamp();
+    } else if (msg.type === 'ORDER_CREATED') {
+      allOrders.unshift(msg.order);
+      updateStats(); applyFilters(); updateTimestamp();
+      showToast('📥 Order ใหม่! ' + msg.order.id + ' — ' + msg.order.part);
+      flashUpdate();
+    } else if (msg.type === 'ORDER_CONFIRMED') {
+      const idx = allOrders.findIndex(o => o.id === msg.order.id);
+      if (idx !== -1) allOrders[idx] = msg.order;
+      updateStats(); applyFilters(); updateTimestamp();
+      showToast('✅ Confirmed! ' + msg.order.id);
+      flashUpdate();
+    }
+  };
+
+  ws.onclose = () => {
+    stopHeartbeat();
+    setWsStatus('disconnected');
+    const delay = Math.min(1000 * Math.pow(1.5, reconnectCount), 10000);
+    reconnectCount++;
+    setTimeout(connectWS, delay);
+  };
+
+  ws.onerror = () => setWsStatus('disconnected');
+}
+
+function setWsStatus(state) {
+  const dot = document.getElementById('wsDot');
+  const label = document.getElementById('wsLabel');
+  if (state === 'live') {
+    dot.style.background = '#2f855a';
+    label.textContent = 'LIVE';
+    label.style.color = '#2f855a';
+  } else {
+    dot.style.background = '#e53e3e';
+    label.textContent = 'RECONNECTING...';
+    label.style.color = '#e53e3e';
+  }
+}
+
+function updateTimestamp() {
+  document.getElementById('lastUpdate').textContent =
+    new Date().toLocaleTimeString('th-TH', { hour12: false });
+}
+
+function flashUpdate() {
+  const wrap = document.querySelector('.table-wrap');
+  wrap.style.boxShadow = '0 0 0 3px rgba(47,133,90,0.4)';
+  setTimeout(() => { wrap.style.boxShadow = ''; }, 800);
+}
+
+// ── INIT ──
+loadOrders();
+connectWS();
+</script>
+</body>
+</html>

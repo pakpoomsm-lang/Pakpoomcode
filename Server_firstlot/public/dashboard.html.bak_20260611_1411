@@ -1,0 +1,2407 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dashboard — Expander First Lot Check</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117; --surface:#161b22; --surface2:#1f2937;
+  --border:#30363d; --text:#e6edf3; --dim:#8b949e;
+  --ok:#2ea043; --ok-bg:#0d2818; --ok-light:#a5d6a7;
+  --ng:#da3633; --ng-bg:#2d0f0f; --ng-light:#ef9a9a;
+  --warn:#d29922; --warn-bg:#271d00; --warn-light:#ffe082;
+  --accent:#1f6feb; --accent2:#388bfd;
+  --mono:'Consolas','Courier New',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
+
+/* ── Top Bar ──────────────────────────────────────────── */
+#topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:10px 20px;display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:100
+}
+#topbar h1{font-size:16px;font-weight:700;color:var(--text-dim);white-space:nowrap}
+#topbar h1 span{color:var(--accent2)}
+.tb-sep{flex:1}
+#lastUpdate{font-size:12px;color:var(--dim)}
+#refreshBtn{
+  background:var(--accent);color:#fff;border:none;border-radius:6px;
+  padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600
+}
+#refreshBtn:hover{background:var(--accent2)}
+#homeBtn{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
+  text-decoration:none;display:inline-flex;align-items:center;gap:5px
+}
+#homeBtn:hover{background:var(--border)}
+.auto-badge{
+  background:var(--ok-bg);color:var(--ok-light);border:1px solid var(--ok);
+  border-radius:10px;font-size:11px;padding:2px 8px;
+}
+
+/* ── Layout ───────────────────────────────────────────── */
+.page{padding:16px 20px;max-width:1400px;margin:0 auto}
+.section-title{font-size:13px;font-weight:700;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.8px;margin:18px 0 10px}
+
+/* ── Summary Row ──────────────────────────────────────── */
+#summaryRow{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.sum-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 20px;min-width:130px;flex:1
+}
+.sum-card .val{font-size:28px;font-weight:800;line-height:1.1}
+.sum-card .lbl{font-size:11px;color:var(--dim);margin-top:2px}
+.sum-total .val{color:var(--accent2)}
+.sum-pass  .val{color:var(--ok-light)}
+.sum-fail  .val{color:var(--ng-light)}
+.sum-today .val{color:var(--warn-light)}
+
+/* ── Machine Cards ────────────────────────────────────── */
+#machineGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.m-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;position:relative;overflow:hidden;
+  transition:border-color .2s
+}
+.m-card.pass{border-color:var(--ok)}
+.m-card.fail{border-color:var(--ng)}
+.m-card .mc-machine{font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px}
+.m-card .mc-status{
+  display:inline-block;padding:3px 10px;border-radius:5px;font-size:12px;font-weight:700;
+  margin-bottom:8px
+}
+.mc-status.pass{background:var(--ok-bg);color:var(--ok-light);border:1px solid var(--ok)}
+.mc-status.fail{background:var(--ng-bg);color:var(--ng-light);border:1px solid var(--ng)}
+.mc-status.na  {background:var(--surface2);color:var(--dim);border:1px solid var(--border)}
+.m-card .mc-fg{font-size:13px;font-family:var(--mono);color:var(--accent2);margin-bottom:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-card .mc-row{font-size:12px;color:var(--dim);margin:2px 0}
+.m-card .mc-row span{color:var(--text)}
+.m-card .mc-time{font-size:11px;color:var(--dim);margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+.m-card .mc-count{
+  position:absolute;top:14px;right:14px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:3px 9px;font-size:11px;color:var(--dim);text-align:center
+}
+.m-card .mc-count .n{font-size:16px;font-weight:700;color:var(--warn-light);display:block}
+.no-machine{color:var(--dim);font-size:13px;padding:20px 0}
+
+/* ── Log Table ────────────────────────────────────────── */
+#filterRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+/* Date range label */
+.flt-date-sep{font-size:12px;color:var(--dim);white-space:nowrap;display:flex;align-items:center;padding:0 2px}
+input[type="date"].flt{width:135px;cursor:pointer}
+input[type="date"].flt::-webkit-calendar-picker-indicator{filter:invert(.6)}
+
+.flt{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:6px 10px;font-size:13px;outline:none
+}
+.flt:focus{border-color:var(--accent)}
+#searchBox{min-width:200px}
+.flt-btn{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer
+}
+.flt-btn:hover{background:var(--border)}
+.exp-btn{
+  background:var(--ok);color:#fff;border:none;border-radius:6px;
+  padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600
+}
+.exp-btn:hover{background:var(--ok-light);color:#000}
+.exp-csv-btn{
+  background:var(--warn);color:#000;border:none;border-radius:6px;
+  padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600
+}
+.exp-csv-btn:hover{opacity:.85}
+#recordCount{font-size:12px;color:var(--dim);margin-left:4px}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{
+  background:var(--surface2);color:var(--dim);padding:8px 10px;
+  text-align:left;font-weight:600;white-space:nowrap;
+  border-bottom:1px solid var(--border);position:sticky;top:0
+}
+tbody tr{border-bottom:1px solid var(--border)}
+tbody tr:hover{background:var(--surface2)}
+tbody td{padding:7px 10px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.badge-pass{background:var(--ok-bg);color:var(--ok-light);border:1px solid var(--ok);
+  border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700}
+.badge-fail{background:var(--ng-bg);color:var(--ng-light);border:1px solid var(--ng);
+  border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700}
+.badge-na{background:var(--surface2);color:var(--dim);border:1px solid var(--border);
+  border-radius:4px;padding:1px 7px;font-size:11px}
+.td-id{color:var(--dim);width:40px}
+.td-fg{font-family:var(--mono);color:var(--accent2)}
+.td-machine{font-weight:600}
+
+/* HP Machine Grid — same as Expander grid */
+#hpMachineGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+
+/* ── Cutting Machine Grid — 1:1 square cards ───────── */
+#cutMachineGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px}
+.cut-mc-card{
+  background:var(--surface);border:2px solid var(--border);border-radius:14px;
+  aspect-ratio:1/1;display:flex;flex-direction:column;
+  padding:12px 12px 10px;position:relative;overflow:hidden;
+  transition:border-color .2s,box-shadow .2s
+}
+.cut-mc-card.pass{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok-bg) inset}
+.cut-mc-card.fail{border-color:var(--ng);box-shadow:0 0 0 1px var(--ng-bg) inset}
+.cut-mc-card .cmc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:4px;min-height:0}
+.cut-mc-card .cmc-name{
+  font-size:12px;font-weight:800;color:var(--text);line-height:1.3;
+  word-break:break-word;flex:1;overflow:hidden
+}
+.cut-mc-card .cmc-cnt{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:20px;font-size:11px;font-weight:800;color:var(--warn-light);
+  padding:1px 8px;white-space:nowrap;flex-shrink:0;line-height:1.6
+}
+.cut-mc-card .cmc-mid{
+  flex:1;display:flex;align-items:center;justify-content:center;padding:6px 0
+}
+.cmc-stat{
+  font-size:22px;font-weight:900;padding:8px 22px;border-radius:10px;
+  letter-spacing:2px;text-align:center;line-height:1
+}
+.cmc-stat.pass{background:var(--ok-bg);color:var(--ok-light);border:2px solid var(--ok)}
+.cmc-stat.fail{background:var(--ng-bg);color:var(--ng-light);border:2px solid var(--ng)}
+.cut-mc-card .cmc-detail{
+  display:flex;flex-direction:column;gap:2px;min-height:0
+}
+.cut-mc-card .cmc-fg{
+  font-family:var(--mono);font-size:10px;color:var(--accent2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.cut-mc-card .cmc-row{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cut-mc-card .cmc-row span{color:var(--text);font-weight:600}
+.cut-mc-card .cmc-time{
+  font-size:10px;color:var(--dim);margin-top:3px;
+  border-top:1px solid var(--border);padding-top:4px
+}
+
+/* FP Detail Modal */
+#fpDetailOverlay{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(0,0,0,.75);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:32px 16px 20px;overflow-y:auto
+}
+#fpDetailPanel{
+  background:var(--surface);border:1px solid #b45309;border-radius:14px;
+  width:100%;max-width:860px;overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.7)
+}
+.fp-det-hdr{
+  background:#3d1c00;border-bottom:1px solid #b45309;
+  padding:12px 18px;display:flex;align-items:center;gap:10px
+}
+.fp-det-title{font-size:15px;font-weight:800;color:#fdba74;flex:1}
+.fp-det-close{
+  background:#7c2d12;color:#fed7aa;border:1px solid #b45309;border-radius:6px;
+  padding:5px 14px;font-size:13px;cursor:pointer;font-weight:700
+}
+.fp-det-close:hover{background:#b45309}
+.fp-det-body{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.fp-det-section{
+  border:1px solid var(--border);border-radius:8px;overflow:hidden
+}
+.fp-det-sec-hdr{
+  background:var(--surface2);padding:6px 12px;
+  font-size:11px;font-weight:700;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.7px;border-bottom:1px solid var(--border)
+}
+.fp-det-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0
+}
+.fp-det-grid.g2{grid-template-columns:repeat(2,1fr)}
+.fp-det-grid.g3{grid-template-columns:repeat(3,1fr)}
+.fp-det-grid.g5{grid-template-columns:repeat(5,1fr)}
+.fp-det-cell{
+  padding:7px 10px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;gap:2px
+}
+.fp-det-cell:last-child,.fp-det-cell:nth-child(4n){border-right:none}
+.fp-det-lbl{font-size:10px;color:var(--dim);font-weight:600;letter-spacing:.4px}
+.fp-det-val{font-size:14px;font-weight:700;color:var(--text);font-family:var(--mono)}
+.fp-det-val.ok{color:#4ade80}
+.fp-det-val.ng{color:#f87171}
+.fp-det-val.avg{font-size:16px;color:#fbbf24}
+.fp-det-avg-row{
+  display:grid;grid-template-columns:1fr auto auto;
+  background:rgba(251,191,36,.07);padding:7px 12px;
+  align-items:center;gap:10px;border-top:1px solid var(--border)
+}
+.fp-det-avg-lbl{font-size:12px;color:#fbbf24;font-weight:700}
+.fp-det-avg-val{font-size:18px;font-weight:800;color:#fbbf24;font-family:var(--mono)}
+.fp-det-result-badge{padding:3px 14px;border-radius:5px;font-size:13px;font-weight:800}
+.detail-btn{
+  background:#7c3a04;color:#fdba74;border:1px solid #b45309;
+  border-radius:4px;padding:2px 8px;font-size:11px;cursor:pointer;
+  white-space:nowrap;font-weight:700
+}
+.detail-btn:hover{background:#b45309}
+
+/* Coil Panel Modal */
+#coilPanelOverlay{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(0,0,0,.72);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:40px 20px 20px;overflow-y:auto
+}
+#coilPanel{
+  background:var(--surface);border:1px solid #2e7d32;border-radius:14px;
+  width:100%;max-width:1100px;padding:0;overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.7)
+}
+#coilPanelHeader{
+  background:#0d2818;border-bottom:1px solid #2e7d32;
+  padding:14px 20px;display:flex;align-items:center;gap:10px
+}
+#coilPanelTitle{
+  font-size:15px;font-weight:800;color:#a5d6a7;flex:1
+}
+#coilPanelClose{
+  background:#1b5e20;color:#a5d6a7;border:1px solid #2e7d32;border-radius:6px;
+  padding:5px 14px;font-size:13px;cursor:pointer;font-weight:700
+}
+#coilPanelClose:hover{background:#2e7d32}
+#coilPanelToolbar{
+  padding:10px 16px;display:flex;gap:8px;align-items:center;
+  border-bottom:1px solid var(--border);background:var(--surface2)
+}
+.cpanel-sort-btn{
+  background:var(--surface);color:var(--dim);border:1px solid var(--border);
+  border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer;font-weight:600
+}
+.cpanel-sort-btn.active{background:#1b5e20;color:#a5d6a7;border-color:#2e7d32}
+.cpanel-sort-btn:hover:not(.active){background:var(--border);color:var(--text)}
+#coilPanelCount{font-size:12px;color:var(--dim);margin-left:4px}
+#coilPanelWrap{overflow-x:auto;max-height:65vh}
+#coilPanelTable{width:100%;border-collapse:collapse;font-size:12px}
+#coilPanelTable thead th{
+  background:#0a1f0a;color:#66bb6a;padding:8px 10px;
+  text-align:left;font-weight:700;white-space:nowrap;
+  border-bottom:1px solid #2e7d32;position:sticky;top:0;z-index:1
+}
+#coilPanelTable tbody tr{border-bottom:1px solid #1b2e1b}
+#coilPanelTable tbody tr:hover{background:#0d2818}
+#coilPanelTable tbody td{padding:6px 10px;white-space:nowrap}
+.cp-no{color:var(--dim);width:36px;text-align:center;font-weight:700}
+.cp-coilno{font-family:var(--mono);color:#80deea;font-weight:700}
+.cp-vendor{color:#a5d6a7;font-weight:700}
+.cp-raw{font-size:10px;color:var(--dim);max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.cp-bp{color:#ffe082;font-weight:700;text-align:center}
+.cp-ok{color:#a5d6a7;font-weight:700;background:#0d2818;border-radius:4px;padding:1px 8px}
+.cp-ng{color:#ef9a9a;font-weight:700;background:#2d0f0f;border-radius:4px;padding:1px 8px}
+.cp-mc{color:#bb86fc;font-weight:600}
+.cp-sep{background:#0a1f0a!important}
+.cp-sep td{color:#66bb6a;font-weight:700;font-size:11px;padding:4px 10px!important;border-bottom:1px solid #2e7d32!important}
+
+/* Pagination */
+#pagRow{display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:flex-end}
+.pg-btn{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px
+}
+.pg-btn:disabled{opacity:.3;cursor:default}
+.pg-btn:hover:not(:disabled){background:var(--border)}
+#pgInfo{font-size:12px;color:var(--dim)}
+
+/* ── Process Tabs ─────────────────────────────────────── */
+#processTabs{
+  display:flex;gap:6px;padding:14px 20px 0;
+  border-bottom:2px solid var(--border);
+  background:var(--surface);
+  position:sticky;top:57px;z-index:90
+}
+.proc-tab{
+  padding:8px 22px;border:1px solid var(--border);border-bottom:none;
+  border-radius:8px 8px 0 0;background:var(--surface2);color:var(--dim);
+  font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;
+  white-space:nowrap
+}
+.proc-tab:hover{background:var(--border);color:var(--text)}
+.proc-tab.active-exp{background:var(--accent);color:#fff;border-color:var(--accent)}
+.proc-tab.active-cut{background:#1565c0;color:#fff;border-color:#1565c0}
+.proc-tab.active-hp{background:#2e7d32;color:#fff;border-color:#2e7d32}
+.proc-tab.active-fp{background:#b45309;color:#fff;border-color:#b45309}
+
+/* ── Process Select Screen ────────────────────────────── */
+#processSelect{
+  position:fixed;inset:0;z-index:200;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px
+}
+#processSelect h2{
+  font-size:22px;font-weight:800;color:var(--text);letter-spacing:1px;
+  text-align:center
+}
+#processSelect h2 span{color:var(--accent2)}
+.ps-grid{display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+.ps-card{
+  background:var(--surface);border:2px solid var(--border);border-radius:16px;
+  padding:36px 44px;cursor:pointer;text-align:center;min-width:200px;
+  transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:14px
+}
+.ps-card:hover{transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.ps-card .ps-icon{font-size:52px;line-height:1}
+.ps-card .ps-name{font-size:15px;font-weight:700;color:var(--text)}
+.ps-card .ps-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.ps-card.ps-exp{border-color:var(--accent)}
+.ps-card.ps-exp:hover{background:#0d1b3e;border-color:var(--accent2)}
+.ps-card.ps-hp{border-color:#4caf50}
+.ps-card.ps-hp:hover{background:#0a1f0a;border-color:#81c784}
+.ps-card.ps-cut{border-color:#64b5f6}
+.ps-card.ps-cut:hover{background:#0a1628;border-color:#90caf9}
+.ps-card.ps-fp{border-color:#f97316}
+.ps-card.ps-fp:hover{background:#1c0b00;border-color:#fb923c}
+/* Program launch buttons */
+.prog-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-top:20px;padding-top:18px;border-top:1px solid var(--border)}
+.prog-row-label{width:100%;text-align:center;font-size:11px;color:var(--dim);font-weight:600;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
+.prog-btn{
+  display:flex;align-items:center;gap:8px;
+  padding:10px 22px;border-radius:8px;border:2px solid;
+  font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;
+  transition:all .15s;background:var(--surface2)
+}
+.prog-btn:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,0,0,.5)}
+.prog-btn.pb-hp  {color:#a5d6a7;border-color:#4caf50}.prog-btn.pb-hp:hover{background:#0a1f0a}
+.prog-btn.pb-fp  {color:#fdba74;border-color:#f97316}.prog-btn.pb-fp:hover{background:#1c0b00}
+.prog-btn.pb-exp {color:#90caf9;border-color:#1f6feb}.prog-btn.pb-exp:hover{background:#0d1b3e}
+.prog-btn.pb-cut {color:#90caf9;border-color:#64b5f6}.prog-btn.pb-cut:hover{background:#0a1628}
+
+/* ── Admin PIN Modal ─────────────────────────────────── */
+#adminPinOverlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:2000;align-items:center;justify-content:center
+}
+#adminPinOverlay.open{display:flex}
+#adminPinBox{
+  background:#161b22;border:1px solid #30363d;border-radius:14px;
+  padding:32px 36px;text-align:center;min-width:300px;
+  box-shadow:0 16px 48px rgba(0,0,0,.6)
+}
+#adminPinBox h3{font-size:16px;font-weight:700;color:#e6edf3;margin-bottom:6px}
+#adminPinBox p{font-size:12px;color:#8b949e;margin-bottom:20px}
+#adminPinInput{
+  background:#0d1117;border:1px solid #30363d;color:#e6edf3;
+  border-radius:8px;padding:10px 16px;font-size:22px;letter-spacing:10px;
+  width:160px;text-align:center;outline:none;display:block;margin:0 auto 14px
+}
+#adminPinInput:focus{border-color:#1f6feb}
+#adminPinErr{color:#f85149;font-size:12px;min-height:18px;margin-bottom:10px}
+.admin-pin-btns{display:flex;gap:8px;justify-content:center}
+.admin-pin-ok{
+  background:#1f6feb;color:#fff;border:none;border-radius:7px;
+  padding:8px 22px;font-size:14px;cursor:pointer;font-weight:700
+}
+.admin-pin-ok:hover{background:#388bfd}
+.admin-pin-cancel{
+  background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:7px;
+  padding:8px 16px;font-size:14px;cursor:pointer
+}
+.admin-pin-cancel:hover{background:#30363d}
+
+/* ── Toast ────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:#323232;color:#fff;padding:10px 22px;border-radius:8px;
+  font-size:13px;opacity:0;transition:all .3s;z-index:999;pointer-events:none
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Doc Control Label ──────────────────────────────── */
+#docControl{
+  font-size:11px;font-weight:600;color:#8b949e;
+  border:1px solid #30363d;border-radius:5px;
+  padding:4px 10px;white-space:nowrap;letter-spacing:.4px;
+  background:#161b22;font-family:'Consolas','Courier New',monospace;
+  flex-shrink:0;
+}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div id="topbar">
+  <h1>⚙ <span>EXPANDER</span> — FIRST LOT CHECK</h1>
+  <div id="shiftBadge" style="font-size:13px;font-weight:700;padding:4px 14px;border-radius:8px;border:1.5px solid;white-space:nowrap">—</div>
+  <div class="auto-badge" id="autoLabel">🔄 Auto 10m</div>
+  <div class="tb-sep"></div>
+  <div id="lastUpdate">—</div>
+  <button id="refreshBtn" onclick="loadAll()">↻ Refresh</button>
+  <a id="homeBtn" href="/expander/firstlot/admin" target="win_admin" style="background:#2d0f0f;color:#ef9a9a;border:1px solid #da3633;border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;text-decoration:none">🔧 Admin</a>
+  <a id="homeBtn" href="/Layout_HEI" target="_self">🏠 หน้าหลัก</a>
+</div>
+
+<!-- Process Select Screen -->
+<div id="processSelect">
+  <h2>📊 Dashboard — <span>First Lot Check</span></h2>
+
+  <div class="ps-grid">
+    <div class="ps-card ps-hp" onclick="enterProcess('hp')">
+      <div class="ps-icon">🔩</div>
+      <div class="ps-name">Process Hairpin Bender</div>
+      <div class="ps-sub">Check Appearance &amp; First Lot</div>
+    </div>
+    <div class="ps-card ps-fp" onclick="enterProcess('fp')">
+      <div class="ps-icon">🔧</div>
+      <div class="ps-name">Process Fin Press</div>
+      <div class="ps-sub">FP First Lot Confirmation</div>
+    </div>
+    <div class="ps-card" style="border-color:#555;cursor:default;opacity:.55">
+      <div class="ps-icon">🔗</div>
+      <div class="ps-name">Hairpin Insert</div>
+      <div class="ps-sub">Coming Soon</div>
+    </div>
+    <div class="ps-card ps-exp" onclick="enterProcess('exp')">
+      <div class="ps-icon">⚙️</div>
+      <div class="ps-name">Process Expander</div>
+      <div class="ps-sub">First Lot Check</div>
+    </div>
+    <div class="ps-card" style="border-color:#555;cursor:default;opacity:.55">
+      <div class="ps-icon">🔥</div>
+      <div class="ps-name">Oven</div>
+      <div class="ps-sub">Coming Soon</div>
+    </div>
+    <div class="ps-card" style="border-color:#555;cursor:default;opacity:.55">
+      <div class="ps-icon">🔥</div>
+      <div class="ps-name">Auto Brazing</div>
+      <div class="ps-sub">Coming Soon</div>
+    </div>
+    <div class="ps-card ps-cut" onclick="enterProcess('cut')">
+      <div class="ps-icon">✂️</div>
+      <div class="ps-name">Process Cutting</div>
+      <div class="ps-sub">First Lot Check</div>
+    </div>
+  </div>
+
+  <div class="prog-row">
+    <div class="prog-row-label">🚀 เปิดโปรแกรม First Lot</div>
+    <a href="/hp/firstlot"        target="win_hp"      class="prog-btn pb-hp">🔩 Hairpin Bender</a>
+    <a href="/fp/firstlot"        target="win_fp"      class="prog-btn pb-fp">🔧 Fin Press</a>
+    <a href="/expander/firstlot"  target="win_expander" class="prog-btn pb-exp">⚙ Expander</a>
+    <a href="/cutting/firstlot"   target="win_cutting" class="prog-btn pb-cut">✂ Cutting</a>
+  </div>
+
+  <!-- Bottom Center: Admin + Layout HEI -->
+  <div style="display:flex;gap:12px;justify-content:center;margin-top:28px;padding-top:18px;border-top:1px solid var(--border)">
+    <button onclick="openAdminPin()"
+       style="display:inline-flex;align-items:center;gap:6px;padding:8px 22px;
+              background:#1a1a2e;color:#bb86fc;border:1px solid #bb86fc55;border-radius:8px;
+              font-size:13px;font-weight:700;cursor:pointer;transition:.15s;"
+       onmouseover="this.style.background='#2a1a4e'" onmouseout="this.style.background='#1a1a2e'">
+      🔧 Admin
+    </button>
+    <a href="/Layout_HEI" target="win_layout"
+       style="display:inline-flex;align-items:center;gap:6px;padding:8px 22px;
+              background:#0d2535;color:#80deea;border:1px solid #00838F55;border-radius:8px;
+              font-size:13px;font-weight:700;text-decoration:none;transition:.15s;"
+       onmouseover="this.style.background='#0d3545'" onmouseout="this.style.background='#0d2535'">
+      🗺️ Layout HEI
+    </a>
+  </div>
+</div>
+
+<!-- Process Tab Bar -->
+<div id="processTabs" style="display:none">
+  <button class="proc-tab" id="ptab-hp"   onclick="switchProcess('hp')">🔩 Process Hairpin Bender</button>
+  <button class="proc-tab" id="ptab-fp"   onclick="switchProcess('fp')">🔧 Process Fin Press</button>
+  <button class="proc-tab" id="ptab-hins" onclick="switchProcess('hins')" style="opacity:.6">🔗 Hairpin Insert</button>
+  <button class="proc-tab" id="ptab-exp"  onclick="switchProcess('exp')">⚙ Process Expander</button>
+  <button class="proc-tab" id="ptab-oven" onclick="switchProcess('oven')" style="opacity:.6">🔥 Oven</button>
+  <button class="proc-tab" id="ptab-abz"  onclick="switchProcess('abz')"  style="opacity:.6">🔥 Auto Brazing</button>
+  <button class="proc-tab" id="ptab-cut"  onclick="switchProcess('cut')">✂ Process Cutting</button>
+</div>
+
+<div class="page" style="display:none">
+
+  <!-- ══ EXPANDER SECTION ══ -->
+  <div id="proc-exp">
+  <!-- Summary -->
+  <div class="section-title">ภาพรวม — <span id="shiftLabel" style="color:#ffd54f;font-size:12px">—</span>
+    <a href="/expander/firstlot" target="win_expander" style="font-size:11px;font-weight:400;color:#ffd54f;margin-left:16px;text-decoration:none;background:var(--surface2);padding:2px 10px;border-radius:5px;border:1px solid var(--border)">🔗 เปิดโปรแกรม Expander</a>
+  </div>
+  <div id="summaryRow">
+    <div class="sum-card sum-total"><div class="val" id="sTotal">—</div><div class="lbl">ทั้งหมด (Records)</div></div>
+    <div class="sum-card sum-pass"><div class="val" id="sPass">—</div><div class="lbl">PASS</div></div>
+    <div class="sum-card sum-fail"><div class="val" id="sFail">—</div><div class="lbl">FAIL</div></div>
+    <div class="sum-card sum-today"><div class="val" id="sShift">—</div><div class="lbl" id="sShiftLbl">Shift นี้</div></div>
+    <div class="sum-card sum-today" style="border-color:#64b5f6"><div class="val" id="sToday" style="color:#64b5f6">—</div><div class="lbl">วันนี้</div></div>
+    <div class="sum-card"><div class="val" id="sMachines" style="color:#bb86fc">—</div><div class="lbl">เครื่องที่ใช้งาน</div></div>
+  </div>
+
+  <!-- Machine Cards -->
+  <div class="section-title">สถานะเครื่อง Expand (งานล่าสุด)</div>
+  <div id="machineGrid"><div class="no-machine">⏳ กำลังโหลด...</div></div>
+
+  <!-- Log Table -->
+  <div class="section-title" style="margin-top:28px">Log — ประวัติการบันทึก</div>
+  <div id="filterRow">
+    <input id="searchBox" class="flt" type="text" placeholder="🔍 ค้นหา FG / Machine / Checker..." oninput="filterLog()">
+    <select id="fltMachine" class="flt" onchange="filterLog()"><option value="">เครื่องทั้งหมด</option></select>
+    <select id="fltStatus" class="flt" onchange="filterLog()">
+      <option value="">Status ทั้งหมด</option>
+      <option value="PASS">PASS</option>
+      <option value="FAIL">FAIL</option>
+    </select>
+    <select id="fltShift" class="flt" onchange="filterLog()" title="กรองตาม Shift">
+      <option value="shift">🕐 Shift นี้</option>
+      <option value="today">📅 วันนี้</option>
+      <option value="">ทั้งหมด</option>
+    </select>
+    <span class="flt-date-sep">📅 From</span>
+    <input type="date" id="fltDateFrom" class="flt" onchange="filterLog()" title="From Date">
+    <span class="flt-date-sep">→ To</span>
+    <input type="date" id="fltDateTo"   class="flt" onchange="filterLog()" title="To Date">
+    <select id="pageSize" class="flt" onchange="changePageSize()" title="จำนวนแถวต่อหน้า">
+      <option value="10" selected>10 แถว</option>
+      <option value="30">30 แถว</option>
+      <option value="50">50 แถว</option>
+      <option value="100">100 แถว</option>
+    </select>
+    <button class="flt-btn" onclick="clearFilter()">✕ ล้าง Filter</button>
+    <button class="exp-csv-btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="exp-btn" onclick="exportExcel()">📊 Export Excel</button>
+    <span id="recordCount"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table id="logTable">
+      <thead>
+        <tr>
+          <th class="td-id">#</th>
+          <th>วันที่</th>
+          <th>เวลา</th>
+          <th>เครื่อง</th>
+          <th>Item FG</th>
+          <th>Type</th>
+          <th>Checker</th>
+          <th>Confirm</th>
+          <th>Line</th>
+          <th>Seq</th>
+          <th>Qty</th>
+          <th>EL Avg</th>
+          <th>A Avg</th>
+          <th>B Avg</th>
+          <th>D%</th>
+          <th>Hairpin</th>
+          <th>FIN</th>
+          <th>SP1</th>
+          <th>SP2</th>
+          <th>SP3</th>
+          <th>Mark</th>
+          <th>Remark</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+  <div id="pagRow">
+    <button class="pg-btn" id="pgPrev" onclick="changePage(-1)">◀ ก่อนหน้า</button>
+    <span id="pgInfo">หน้า 1 / 1</span>
+    <button class="pg-btn" id="pgNext" onclick="changePage(1)">ถัดไป ▶</button>
+  </div>
+
+
+  </div><!-- /proc-exp -->
+
+  <!-- ══ CUTTING SECTION ══ -->
+  <div id="proc-cut" style="display:none">
+  <div class="section-title" style="color:#64b5f6;margin-top:16px">
+    ✂ CUTTING CHECK — ข้อมูลล่าสุด
+    <a href="/cutting/firstlot" target="win_cutting" style="font-size:11px;font-weight:400;color:var(--accent2);margin-left:12px;text-decoration:none;background:var(--surface2);padding:2px 10px;border-radius:5px;border:1px solid var(--border)">🔗 เปิดโปรแกรม Cutting</a>
+  </div>
+
+  <!-- Summary Cards -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+    <div class="sum-card sum-total"><div class="val" id="cTotal">—</div><div class="lbl">ทั้งหมด</div></div>
+    <div class="sum-card"><div class="val" id="cOk" style="color:#81d4fa">—</div><div class="lbl">OK</div></div>
+    <div class="sum-card sum-fail"><div class="val" id="cNg">—</div><div class="lbl">NG</div></div>
+    <div class="sum-card sum-today"><div class="val" id="cShift">—</div><div class="lbl" id="cShiftLbl">Shift นี้</div></div>
+    <div class="sum-card sum-today" style="border-color:#64b5f6"><div class="val" id="cToday" style="color:#64b5f6">—</div><div class="lbl">วันนี้</div></div>
+  </div>
+
+  <!-- Machine/Line Cards -->
+  <div class="section-title">สถานะ Cutting Line (Shift นี้)</div>
+  <div id="cutMachineGrid"><div class="no-machine">⏳ กำลังโหลด...</div></div>
+
+  <!-- Log Table with Filters -->
+  <div class="section-title" style="margin-top:28px">Log — ประวัติการบันทึก Cutting</div>
+  <div id="cutFilterRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+    <input id="cutSearchBox" class="flt" type="text" placeholder="🔍 ค้นหา Tag / ID / Item / Vendor..." oninput="cutFilterLog()" style="min-width:220px">
+    <select id="cutFltShift" class="flt" onchange="cutFilterLog()">
+      <option value="shift">🕐 Shift นี้</option>
+      <option value="today">📅 วันนี้</option>
+      <option value="">ทั้งหมด</option>
+    </select>
+    <span class="flt-date-sep">📅 From</span>
+    <input type="date" id="cutFltDateFrom" class="flt" onchange="cutFilterLog()" title="From Date">
+    <span class="flt-date-sep">→ To</span>
+    <input type="date" id="cutFltDateTo"   class="flt" onchange="cutFilterLog()" title="To Date">
+    <select id="cutFltMachine" class="flt" onchange="cutFilterLog()">
+      <option value="">Machine ทั้งหมด</option>
+    </select>
+    <select id="cutPageSize" class="flt" onchange="cutChangePageSize()">
+      <option value="10" selected>10 แถว</option>
+      <option value="30">30 แถว</option>
+      <option value="50">50 แถว</option>
+      <option value="100">100 แถว</option>
+    </select>
+    <button class="flt-btn" onclick="cutClearFilter()">✕ ล้าง</button>
+    <button class="exp-csv-btn" onclick="cutExportCSV()">⬇ Export CSV</button>
+    <button class="exp-btn" onclick="cutExportExcel()">📊 Export Excel</button>
+    <span id="cutRecordCount" style="font-size:12px;color:var(--dim)"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table id="cutLogTable">
+      <thead>
+        <tr>
+          <th class="td-id">#</th><th>วันที่-เวลา</th>
+          <th>ID Card</th>
+          <th>Seq.</th><th>Lot</th><th>Line</th>
+          <th>MC/Line</th>
+          <th>Type</th><th>Tag FG No.1</th>
+          <th>Item Insulation 1</th><th>Item Insulation 2</th><th>Vendor Insulation</th>
+          <th>ตำแหน่ง Lay down</th><th>Fin Burn</th><th>Cutting Point</th>
+          <th style="max-width:90px">ไม่ตัดโดนปลาย Cu</th><th>Appearance Judgment</th>
+          <th>Lay Side</th><th>Lay Mid</th>
+          <th>Leader</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="cutLogBody"></tbody>
+    </table>
+  </div>
+  <div id="cutPagRow" style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:30px;justify-content:flex-end">
+    <button class="pg-btn" id="cutPgPrev" onclick="cutChangePage(-1)">◀ ก่อนหน้า</button>
+    <span id="cutPgInfo" style="font-size:12px;color:var(--dim)">หน้า 1 / 1</span>
+    <button class="pg-btn" id="cutPgNext" onclick="cutChangePage(1)">ถัดไป ▶</button>
+  </div>
+
+  </div><!-- /proc-cut -->
+
+  <!-- ══ HP SECTION ══ -->
+  <div id="proc-hp" style="display:none">
+
+  <!-- HP Summary -->
+  <div class="section-title">ภาพรวม — <span id="hpShiftLabel" style="color:#a5d6a7;font-size:12px">—</span>
+    <a href="/hp/firstlot" target="win_hp" style="font-size:11px;font-weight:400;color:#a5d6a7;margin-left:16px;text-decoration:none;background:var(--surface2);padding:2px 10px;border-radius:5px;border:1px solid var(--border)">🔗 เปิดโปรแกรม Hairpin Check</a>
+  </div>
+  <div id="hpSummaryRow" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+    <div class="sum-card sum-total"><div class="val" id="hpTotal">—</div><div class="lbl">ทั้งหมด (Records)</div></div>
+    <div class="sum-card sum-pass"><div class="val" id="hpPass">—</div><div class="lbl">PASS</div></div>
+    <div class="sum-card sum-fail"><div class="val" id="hpFail">—</div><div class="lbl">FAIL</div></div>
+    <div class="sum-card sum-today"><div class="val" id="hpShift">—</div><div class="lbl" id="hpShiftLbl">Shift นี้</div></div>
+    <div class="sum-card sum-today" style="border-color:#64b5f6"><div class="val" id="hpToday" style="color:#64b5f6">—</div><div class="lbl">วันนี้</div></div>
+    <div class="sum-card"><div class="val" id="hpMachines" style="color:#bb86fc">—</div><div class="lbl">เครื่องที่ใช้งาน</div></div>
+  </div>
+
+  <!-- HP Machine Cards -->
+  <div class="section-title">สถานะเครื่อง Hairpin Bender (งานล่าสุด)</div>
+  <div id="hpMachineGrid"><div class="no-machine">⏳ กำลังโหลด...</div></div>
+
+  <!-- HP Log Table -->
+  <div class="section-title" style="margin-top:28px">Log — ประวัติการบันทึก HP</div>
+  <div id="hpFilterRow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+    <input id="hpSearchBox" class="flt" type="text" placeholder="🔍 ค้นหา Item / M/C / Checker..." oninput="hpFilterLog()" style="min-width:200px">
+    <select id="hpFltResult" class="flt" onchange="hpFilterLog()">
+      <option value="shift">🕐 Shift นี้</option>
+      <option value="today">📅 วันนี้</option>
+      <option value="">ทั้งหมด</option>
+    </select>
+    <span class="flt-date-sep">📅 From</span>
+    <input type="date" id="hpFltDateFrom" class="flt" onchange="hpFilterLog()" title="From Date">
+    <span class="flt-date-sep">→ To</span>
+    <input type="date" id="hpFltDateTo"   class="flt" onchange="hpFilterLog()" title="To Date">
+    <select id="hpPageSize" class="flt" onchange="hpChangePageSize()">
+      <option value="10" selected>10 แถว</option>
+      <option value="30">30 แถว</option>
+      <option value="50">50 แถว</option>
+    </select>
+    <button class="flt-btn" onclick="hpClearFilter()">✕ ล้าง</button>
+    <button class="exp-csv-btn" onclick="hpExportCSV()">⬇ Export CSV</button>
+    <button class="exp-btn" onclick="hpExportExcel()">📊 Export Excel</button>
+    <span id="hpRecordCount" style="font-size:12px;color:var(--dim)"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table id="hpLogTable">
+      <thead>
+        <tr>
+          <th class="td-id">#</th><th>วันที่</th><th>เวลา</th>
+          <th>M/C</th><th>Line</th><th>Seq</th>
+          <th>Item HP</th><th>Item FG</th>
+          <th>Coils</th><th>Vendor</th>
+          <th>Avg L1</th><th>Avg L2</th><th>Avg Flat%</th>
+          <th>ผู้ลงบันทึก</th><th>Confirm</th><th>Result</th>
+          <th style="width:60px">Detail</th>
+        </tr>
+      </thead>
+      <tbody id="hpLogBody"></tbody>
+    </table>
+  </div>
+  <div id="hpPagRow" style="display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:flex-end">
+    <button class="pg-btn" id="hpPgPrev" onclick="hpChangePage(-1)">◀ ก่อนหน้า</button>
+    <span id="hpPgInfo" style="font-size:12px;color:var(--dim)">หน้า 1 / 1</span>
+    <button class="pg-btn" id="hpPgNext" onclick="hpChangePage(1)">ถัดไป ▶</button>
+  </div>
+
+  </div><!-- /proc-hp -->
+
+  <!-- ══ FP SECTION ══ -->
+  <div id="proc-fp" style="display:none">
+
+  <div class="section-title" style="color:#fb923c;margin-top:16px">
+    🔧 FIN PRESS — FP FIRST LOT CONFIRMATION
+    <a href="javascript:openFPProgram()" style="font-size:11px;font-weight:400;color:#fb923c;margin-left:16px;text-decoration:none;background:var(--surface2);padding:2px 10px;border-radius:5px;border:1px solid var(--border)">🔗 เปิดโปรแกรม Fin Press</a>
+  </div>
+
+  <!-- FP KPI -->
+  <div id="fpSummaryRow" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+    <div class="sum-card sum-total"><div class="val" id="fpTotal">—</div><div class="lbl">ทั้งหมด (Records)</div></div>
+    <div class="sum-card sum-pass"><div class="val" id="fpOK">—</div><div class="lbl">OK</div></div>
+    <div class="sum-card sum-fail"><div class="val" id="fpNG">—</div><div class="lbl">NG</div></div>
+    <div class="sum-card sum-today"><div class="val" id="fpToday">—</div><div class="lbl">วันนี้</div></div>
+    <div class="sum-card"><div class="val" id="fpMachines" style="color:#fb923c">—</div><div class="lbl">เครื่องที่ใช้งานวันนี้</div></div>
+  </div>
+
+  <!-- FP Machine Cards -->
+  <div class="section-title">สถานะเครื่อง Fin Press (งานล่าสุด)</div>
+  <div id="fpMachineGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"><div class="no-machine">⏳ กำลังโหลด...</div></div>
+
+  <!-- FP Log Table -->
+  <div class="section-title" style="margin-top:28px">Log — ประวัติการบันทึก FP First Lot</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+    <input id="fpSearchBox" class="flt" type="text" placeholder="🔍 ค้นหา Item / M/C / Checker..." oninput="fpFilterLog()" style="min-width:200px">
+    <select id="fpFltMC" class="flt" onchange="fpFilterLog()"><option value="">เครื่องทั้งหมด</option></select>
+    <span class="flt-date-sep">📅 From</span>
+    <input type="date" id="fpFltDateFrom" class="flt" onchange="fpFilterLog()">
+    <span class="flt-date-sep">→ To</span>
+    <input type="date" id="fpFltDateTo"   class="flt" onchange="fpFilterLog()">
+    <select id="fpPageSize" class="flt" onchange="fpChangePageSize()">
+      <option value="10" selected>10 แถว</option>
+      <option value="30">30 แถว</option>
+      <option value="50">50 แถว</option>
+    </select>
+    <button class="flt-btn" onclick="fpClearFilter()">✕ ล้าง</button>
+    <button class="exp-csv-btn" onclick="fpExportCSV()">⬇ Export CSV</button>
+    <button class="exp-btn"     onclick="fpExportExcel()">📊 Export Excel</button>
+    <span id="fpRecordCount" style="font-size:12px;color:var(--dim)"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="td-id">#</th><th>วันที่</th><th>เวลา</th>
+          <th>เครื่อง</th><th>Item FG</th><th>Type</th>
+          <th>Lot</th><th>Line</th><th>Seq</th>
+          <th>Vendor</th><th>Mat Type</th><th>Oil Type</th>
+          <th>Appear</th>
+          <th>FP Avg</th>
+          <th>FF Avg</th>
+          <th>Q'ty</th><th>Q'ty Result</th>
+          <th>Checker</th><th>Confirmer</th><th>Final</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="fpLogBody"></tbody>
+    </table>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:10px;margin-bottom:30px;justify-content:flex-end">
+    <button class="pg-btn" id="fpPgPrev" onclick="fpChangePage(-1)">◀ ก่อนหน้า</button>
+    <span id="fpPgInfo" style="font-size:12px;color:var(--dim)">หน้า 1 / 1</span>
+    <button class="pg-btn" id="fpPgNext" onclick="fpChangePage(1)">ถัดไป ▶</button>
+  </div>
+
+  </div><!-- /proc-fp -->
+
+  <!-- ══ HAIRPIN INSERT SECTION (UI Only) ══ -->
+  <div id="proc-hins" style="display:none">
+    <div class="section-title">🔗 Hairpin Insert — First Lot Check</div>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:300px">
+      <div style="text-align:center;color:var(--dim)">
+        <div style="font-size:56px;margin-bottom:16px">🔗</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px">Hairpin Insert</div>
+        <div style="font-size:13px">กำลังพัฒนา — Fetch Data เร็วๆ นี้</div>
+      </div>
+    </div>
+  </div><!-- /proc-hins -->
+
+  <!-- ══ OVEN SECTION (UI Only) ══ -->
+  <div id="proc-oven" style="display:none">
+    <div class="section-title">🔥 Oven — First Lot Check</div>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:300px">
+      <div style="text-align:center;color:var(--dim)">
+        <div style="font-size:56px;margin-bottom:16px">🔥</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px">Oven</div>
+        <div style="font-size:13px">กำลังพัฒนา — Fetch Data เร็วๆ นี้</div>
+      </div>
+    </div>
+  </div><!-- /proc-oven -->
+
+  <!-- ══ AUTO BRAZING SECTION (UI Only) ══ -->
+  <div id="proc-abz" style="display:none">
+    <div class="section-title">🔥 Auto Brazing — First Lot Check</div>
+    <div style="display:flex;align-items:center;justify-content:center;min-height:300px">
+      <div style="text-align:center;color:var(--dim)">
+        <div style="font-size:56px;margin-bottom:16px">🔥</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px">Auto Brazing</div>
+        <div style="font-size:13px">กำลังพัฒนา — Fetch Data เร็วๆ นี้</div>
+      </div>
+    </div>
+  </div><!-- /proc-abz -->
+
+  <!-- ══ FP DETAIL MODAL ══ -->
+  <div id="fpDetailOverlay" style="display:none" onclick="if(event.target===this)closeFpDetail()">
+    <div id="fpDetailPanel">
+      <div class="fp-det-hdr">
+        <span class="fp-det-title" id="fpDetTitle">📋 FP Detail</span>
+        <button class="fp-det-close" onclick="closeFpDetail()">✕ ปิด</button>
+      </div>
+      <div class="fp-det-body" id="fpDetBody"></div>
+    </div>
+  </div>
+
+  <!-- ══ COIL PANEL MODAL ══ -->
+  <div id="coilPanelOverlay" style="display:none" onclick="if(event.target===this)closeCoilPanel()">
+    <div id="coilPanel">
+      <div id="coilPanelHeader">
+        <span id="coilPanelTitle">🔩 Coil No. — รายการทั้งหมด</span>
+        <input id="coilPanelSearch" class="flt" type="text" placeholder="🔍 ค้นหา Coil No. / Vendor..." oninput="coilPanelFilter()" style="min-width:220px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+          <button id="coilNavPrev" onclick="hpNavCoilRecord(-1)"
+            style="background:#1f2937;color:#8b949e;border:1px solid #30363d;border-radius:6px;
+                   padding:5px 12px;font-size:13px;cursor:pointer;font-weight:700"
+            title="ข้อมูลก่อนหน้า">◀ Prev</button>
+          <span id="coilNavInfo" style="font-size:12px;color:var(--dim);white-space:nowrap;min-width:70px;text-align:center"></span>
+          <button id="coilNavNext" onclick="hpNavCoilRecord(1)"
+            style="background:#1f6feb;color:#fff;border:1px solid #388bfd;border-radius:6px;
+                   padding:5px 12px;font-size:13px;cursor:pointer;font-weight:700"
+            title="ข้อมูลถัดไป">Next ▶</button>
+        </div>
+        <button id="coilPanelClose" onclick="closeCoilPanel()">✕ ปิด</button>
+      </div>
+      <div id="coilPanelToolbar">
+        <span style="font-size:12px;color:var(--dim);font-weight:600">จัดกลุ่มโดย:</span>
+        <button class="cpanel-sort-btn active" id="cpSortCoil" onclick="coilPanelSetSort('coilNo')">🔢 Coil No.</button>
+        <button class="cpanel-sort-btn" id="cpSortVendor" onclick="coilPanelSetSort('vendor')">🏷 Vendor</button>
+        <button class="cpanel-sort-btn" id="cpSortDate" onclick="coilPanelSetSort('date')">📅 Date / M/C</button>
+        <span id="coilPanelCount"></span>
+      </div>
+      <div id="coilPanelWrap">
+        <table id="coilPanelTable">
+          <thead>
+            <tr>
+              <th class="cp-no">No.</th>
+              <th>Tag Vendor</th>
+              <th>Vendor</th>
+              <th>Coil No.</th>
+              <th style="text-align:center">Black Point</th>
+              <th style="text-align:center">L1</th>
+              <th style="text-align:center">L2</th>
+              <th style="text-align:center">Diff (L1-L2)</th>
+              <th style="text-align:center">A</th>
+              <th style="text-align:center">B</th>
+              <th style="text-align:center">Flatness%</th>
+              <th>Result</th>
+              <th>M/C</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="coilPanelBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- Admin PIN Modal -->
+<div id="adminPinOverlay" onclick="if(event.target===this)closeAdminPin()">
+  <div id="adminPinBox">
+    <div style="font-size:36px;margin-bottom:8px">🔐</div>
+    <h3>Admin — ใส่รหัสผ่าน</h3>
+    <p>กรุณาใส่รหัสก่อนเข้าหน้า Admin</p>
+    <input id="adminPinInput" type="password" maxlength="6" placeholder="••••••"
+      onkeydown="if(event.key==='Enter')checkAdminPin()">
+    <div id="adminPinErr"></div>
+    <div class="admin-pin-btns">
+      <button class="admin-pin-cancel" onclick="closeAdminPin()">ยกเลิก</button>
+      <button class="admin-pin-ok" onclick="checkAdminPin()">เข้าสู่ระบบ</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── Local date helper (ป้องกัน toISOString() ที่เป็น UTC ทำให้วันผิดช่วง 00:00-06:59 ICT) ──
+function _localDateStr(d) {
+  d = d || new Date();
+  const y  = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  const dy = String(d.getDate()).padStart(2,'0');
+  return y+'-'+mo+'-'+dy;
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let allRecords = [];
+let filtered   = [];
+let currentPage = 1;
+let PAGE_SIZE   = 10;
+
+// ─── Shift Logic ──────────────────────────────────────────────────────────────
+// Day   shift: 07:40 – 19:35
+// Night shift: 19:40 – 07:35 (ข้ามคืน)
+function getCurrentShift() {
+  const now  = new Date();
+  const hhmm = now.getHours() * 60 + now.getMinutes();
+  const day_start  = 7*60+40;   // 07:40
+  const day_end    = 19*60+35;  // 19:35
+  const night_start= 19*60+40;  // 19:40
+  if (hhmm >= day_start && hhmm <= day_end)    return 'day';
+  if (hhmm >= night_start || hhmm <= 7*60+35)  return 'night';
+  return 'day';
+}
+
+function getShiftStart() {
+  const now    = new Date();
+  const hhmm   = now.getHours() * 60 + now.getMinutes();
+  const shift  = getCurrentShift();
+  const start  = new Date(now);
+  if (shift === 'day') {
+    start.setHours(7, 40, 0, 0);
+  } else {
+    // night shift: ถ้าเลย เที่ยงคืน ให้ย้อนกลับไปเมื่อวาน 19:40
+    if (hhmm <= 7*60+35) {
+      start.setDate(start.getDate() - 1);
+    }
+    start.setHours(19, 40, 0, 0);
+  }
+  return start;
+}
+
+let _lastKnownShift = null;   // ตรวจจับการเปลี่ยน Shift
+
+function updateShiftBadge() {
+  const shift    = getCurrentShift();
+
+  // ── ตรวจจับการเปลี่ยน Shift → reset FP machine cards + reload ──
+  if (_lastKnownShift !== null && _lastKnownShift !== shift) {
+    // Shift เพิ่งเปลี่ยน — reset การ์ดเครื่องจักร FP ทันที
+    const fpGrid = document.getElementById('fpMachineGrid');
+    if (fpGrid) fpGrid.innerHTML = '<div class="no-machine">🔄 เปลี่ยน Shift — กำลังรีเซ็ต...</div>';
+    // โหลดข้อมูลใหม่ (จะ filter เฉพาะ Shift ใหม่)
+    if (typeof loadFP === 'function') loadFP();
+  }
+  _lastKnownShift = shift;
+
+  const badge    = document.getElementById('shiftBadge');
+  const label    = document.getElementById('shiftLabel');
+  const sLabel   = document.getElementById('sShiftLbl');
+  const shiftStart = getShiftStart();
+  const timeStr  = shiftStart.toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'});
+  if (shift === 'day') {
+    badge.textContent  = '🌤 Day Shift  07:40 – 19:35';
+    badge.style.color  = '#ffd54f';
+    badge.style.borderColor = '#ffd54f';
+    badge.style.background  = '#271d00';
+    label.textContent  = 'Day Shift (เริ่ม ' + timeStr + ')';
+    sLabel.textContent = 'Day Shift นี้';
+  } else {
+    badge.textContent  = '🌙 Night Shift  19:40 – 07:35';
+    badge.style.color  = '#90caf9';
+    badge.style.borderColor = '#90caf9';
+    badge.style.background  = '#0d1b2a';
+    label.textContent  = 'Night Shift (เริ่ม ' + timeStr + ')';
+    sLabel.textContent = 'Night Shift นี้';
+  }
+}
+
+function isInCurrentShift(r) {
+  if (!r.saved_at) return false;
+  const savedAt = new Date(r.saved_at);
+  return savedAt >= getShiftStart();
+}
+
+// ─── Date Filter Initialisation ───────────────────────────────────────────────
+function initDateFilters() {
+  const today = _localDateStr();   // 'yyyy-mm-dd'
+  ['fltDateFrom','fltDateTo',
+   'cutFltDateFrom','cutFltDateTo',
+   'hpFltDateFrom','hpFltDateTo',
+   'fpFltDateFrom','fpFltDateTo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = today;
+  });
+}
+
+// ─── Load All ─────────────────────────────────────────────────────────────────
+async function loadAll() {
+  initDateFilters();
+  try {
+    const res = await fetch('/expander/firstlot/api/records/all');
+    allRecords = await res.json();
+    updateShiftBadge();
+    updateSummary();
+    updateMachineCards();
+    populateMachineFilter();
+    filterLog();
+    document.getElementById('lastUpdate').textContent =
+      'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
+  } catch(e) {
+    showToast('❌ โหลดข้อมูลไม่ได้: ' + e.message);
+  }
+}
+
+// ─── Summary ──────────────────────────────────────────────────────────────────
+function updateSummary() {
+  const today = new Date().toLocaleDateString('en-GB'); // DD/MM/YYYY
+  const pass  = allRecords.filter(r => (r.status||'').includes('PASS')).length;
+  const fail  = allRecords.filter(r => (r.status||'').includes('FAIL')).length;
+  const tod   = allRecords.filter(r => (r.date||'') === today).length;
+  const shft  = allRecords.filter(isInCurrentShift).length;
+  const mach  = new Set(allRecords.map(r=>r.machine).filter(Boolean)).size;
+  document.getElementById('sTotal').textContent    = allRecords.length;
+  document.getElementById('sPass').textContent     = pass;
+  document.getElementById('sFail').textContent     = fail;
+  document.getElementById('sToday').textContent    = tod;
+  document.getElementById('sShift').textContent    = shft;
+  document.getElementById('sMachines').textContent = mach;
+}
+
+// ─── Machine Cards ────────────────────────────────────────────────────────────
+function updateMachineCards() {
+  // เฉพาะ records ใน Shift ปัจจุบันเท่านั้น — reset เมื่อเปลี่ยน Shift
+  const shiftRecords = allRecords.filter(isInCurrentShift);
+  const byMachine = {};
+  shiftRecords.forEach(r => {
+    if (!r.machine) return;
+    if (!byMachine[r.machine]) byMachine[r.machine] = { count: 0 };
+    byMachine[r.machine].count++;
+    if (!byMachine[r.machine].last || r.id > byMachine[r.machine].last.id) {
+      byMachine[r.machine].last = r;
+    }
+  });
+
+  const grid = document.getElementById('machineGrid');
+  const machines = Object.keys(byMachine).sort();
+  if (!machines.length) {
+    grid.innerHTML = '<div class="no-machine">ยังไม่มีข้อมูล</div>'; return;
+  }
+  grid.innerHTML = machines.map(m => {
+    const d = byMachine[m];
+    const r = d.last;
+    const st = (r.status||'');
+    const isPass = st.includes('PASS');
+    const isFail = st.includes('FAIL');
+    const cls = isPass ? 'pass' : (isFail ? 'fail' : '');
+    const stBadge = isPass
+      ? '<span class="mc-status pass">✓ PASS</span>'
+      : (isFail ? '<span class="mc-status fail">✗ FAIL</span>'
+                : '<span class="mc-status na">— —</span>');
+    return `
+    <div class="m-card ${cls}">
+      <div class="mc-count"><span class="n">${d.count}</span>Shift นี้</div>
+      <div class="mc-machine">🔧 ${esc(m)}</div>
+      ${stBadge}
+      <div class="mc-fg">${esc(r.item_fg||'—')}</div>
+      <div class="mc-row">Type: <span>${esc(r.item_type||'—')}</span></div>
+      <div class="mc-row">Checker: <span>${esc(r.checker||'—')}</span></div>
+      <div class="mc-row">Line: <span>${esc(r.line||'—')}</span> &nbsp;Seq: <span>${esc(r.seq||'—')}</span></div>
+      <div class="mc-row">Remark: <span>${esc(r.remark||'—')}</span></div>
+      <div class="mc-time">📅 ${esc(r.date||'—')} &nbsp;🕐 ${esc(r.time||'—')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Filter Options ───────────────────────────────────────────────────────────
+function populateMachineFilter() {
+  const sel = document.getElementById('fltMachine');
+  const cur = sel.value;
+  const machines = [...new Set(allRecords.map(r=>r.machine).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">เครื่องทั้งหมด</option>'
+    + machines.map(m=>`<option value="${esc(m)}" ${m===cur?'selected':''}>${esc(m)}</option>`).join('');
+}
+
+// ─── Log Filter ───────────────────────────────────────────────────────────────
+function filterLog() {
+  const q    = document.getElementById('searchBox').value.toLowerCase();
+  const mch  = document.getElementById('fltMachine').value;
+  const sts  = document.getElementById('fltStatus').value;
+  const shft = document.getElementById('fltShift').value;
+  const from = document.getElementById('fltDateFrom').value;   // yyyy-mm-dd
+  const to   = document.getElementById('fltDateTo').value;
+  const today = new Date().toLocaleDateString('en-GB');
+
+  filtered = allRecords.filter(r => {
+    if (mch && r.machine !== mch) return false;
+    if (sts && !(r.status||'').includes(sts)) return false;
+    if (shft === 'shift' && !isInCurrentShift(r)) return false;
+    if (shft === 'today' && (r.date||'') !== today) return false;
+    // Date range (uses saved_at ISO string, sliced to yyyy-mm-dd)
+    const rd = (r.saved_at||'').slice(0,10);
+    if (from && rd < from) return false;
+    if (to   && rd > to)   return false;
+    if (q) {
+      const hay = [r.item_fg,r.machine,r.checker,r.confirm_checker,r.remark,r.item_type,r.status]
+        .join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function clearFilter() {
+  const today = _localDateStr();
+  document.getElementById('searchBox').value = '';
+  document.getElementById('fltMachine').value = '';
+  document.getElementById('fltStatus').value = '';
+  document.getElementById('fltShift').value = 'shift';
+  document.getElementById('fltDateFrom').value = today;
+  document.getElementById('fltDateTo').value   = today;
+  filterLog();
+}
+
+function changePageSize() {
+  PAGE_SIZE = parseInt(document.getElementById('pageSize').value);
+  currentPage = 1;
+  renderTable();
+}
+
+// ─── Render Table ─────────────────────────────────────────────────────────────
+function renderTable() {
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  currentPage = Math.min(currentPage, pages);
+  const start = (currentPage-1)*PAGE_SIZE;
+  const slice = filtered.slice(start, start+PAGE_SIZE);
+
+  document.getElementById('recordCount').textContent = `(${total} records)`;
+  document.getElementById('pgInfo').textContent = `หน้า ${currentPage} / ${pages}`;
+  document.getElementById('pgPrev').disabled = currentPage <= 1;
+  document.getElementById('pgNext').disabled = currentPage >= pages;
+
+  const tbody = document.getElementById('logBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="23" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = slice.map((r,i) => {
+    const no = start + i + 1;
+    const st = (r.status||'');
+    const badge = st.includes('PASS')
+      ? `<span class="badge-pass">PASS</span>`
+      : (st.includes('FAIL') ? `<span class="badge-fail">FAIL</span>` : `<span class="badge-na">—</span>`);
+    return `<tr>
+      <td class="td-id">${r.id}</td>
+      <td>${esc(r.date||'')}</td>
+      <td>${esc(r.time||'')}</td>
+      <td class="td-machine">${esc(r.machine||'')}</td>
+      <td class="td-fg">${esc(r.item_fg||'')}</td>
+      <td>${esc(r.item_type||'')}</td>
+      <td>${esc(r.checker||'')}</td>
+      <td>${esc(r.confirm_checker||'')}</td>
+      <td>${esc(r.line||'')}</td>
+      <td>${esc(r.seq||'')}</td>
+      <td>${esc(r.qty||'')}</td>
+      <td style="font-weight:700">${avgFromStr(r.val_el)}</td>
+      <td style="font-weight:700">${avgFromStr(r.val_a)}</td>
+      <td style="font-weight:700">${avgFromStr(r.val_b)}</td>
+      <td>${esc(r.flat_pct||'')}</td>
+      <td>${esc(r.ap_hairpin||'')}</td>
+      <td>${esc(r.ap_fin||'')}</td>
+      <td>${esc(r.sp1||'')}</td>
+      <td>${esc(r.sp2||'')}</td>
+      <td>${esc(r.sp3||'')}</td>
+      <td>${esc(r.mark_color||'')}</td>
+      <td title="${esc(r.remark||'')}">${esc(r.remark||'')}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function changePage(d) {
+  currentPage += d;
+  renderTable();
+}
+
+// ─── Export CSV ───────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!filtered.length) { showToast('ไม่มีข้อมูลให้ Export'); return; }
+  const headers = ['No','ID','Date','Time','Machine','Item FG','Type','Checker','Confirm Checker',
+    'Line','Seq','Qty',
+    'EL (raw)','EL Avg','A (raw)','A Avg','B (raw)','B Avg',
+    'C','D','D%','Hairpin','FIN',
+    'SP1','SP2','SP3','Pitch','Hairpin Item','FIN Item',
+    'Mark Color','Mark Status','Remark','Status','Saved At'];
+  const rows = filtered.map((r,i) => [
+    i+1, r.id, r.date, r.time, r.machine, r.item_fg, r.item_type,
+    r.checker, r.confirm_checker, r.line, r.seq, r.qty,
+    r.val_el, avgFromStr(r.val_el),
+    r.val_a,  avgFromStr(r.val_a),
+    r.val_b,  avgFromStr(r.val_b),
+    r.val_c, r.val_d, r.flat_pct,
+    r.ap_hairpin, r.ap_fin,
+    r.sp1, r.sp2, r.sp3, r.pitch, r.hairpin_item, r.fin_item,
+    r.mark_color, r.mark_status, r.remark, r.status, r.saved_at
+  ].map(v => '"'+(String(v??'').replace(/"/g,'""'))+'"'));
+
+  const csv = '﻿' + [headers, ...rows].map(r=>r.join(',')).join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'expander_log_' + _localDateStr() + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✓ Export CSV สำเร็จ (${filtered.length} records)`);
+}
+
+// ─── Export Excel ─────────────────────────────────────────────────────────────
+async function exportExcel() {
+  showToast('⏳ กำลัง Export Excel...');
+  try {
+    const r = await fetch('/expander/firstlot/api/export');
+    const d = await r.json();
+    if (d.ok) showToast(`✓ Export Excel สำเร็จ (${d.rows} records) — ไฟล์: ${d.file}`);
+    else showToast('❌ Error: ' + d.error);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function avgFromStr(str) {
+  if (!str) return '—';
+  const nums = String(str).split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+  if (!nums.length) return '—';
+  return (nums.reduce((s, v) => s + v, 0) / nums.length).toFixed(2);
+}
+function showToast(msg, dur=3500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ─── Cutting Records ──────────────────────────────────────────────────────────
+let cutRecords = [], cutFiltered = [], cutPage = 1, cutPageSize = 10;
+
+function cutInShift(r) {
+  if (!r.saved_at) return false;
+  return new Date(r.saved_at) >= getShiftStart();
+}
+
+async function loadCutting() {
+  try {
+    const res = await fetch('/cutting/api/cutting-records');
+    cutRecords = await res.json();
+    cutUpdateSummary();
+    cutUpdateMachineCards();
+    cutPopulateMachineFilter();
+    cutFilterLog();
+  } catch(e) { console.warn('Cutting data not available:', e.message); }
+}
+
+function cutUpdateSummary() {
+  const today = _localDateStr();
+  const shift = getCurrentShift();
+  document.getElementById('cShiftLbl').textContent = shift === 'day' ? 'Day Shift นี้' : 'Night Shift นี้';
+  document.getElementById('cTotal').textContent = cutRecords.length;
+  document.getElementById('cOk').textContent    = cutRecords.filter(r=>r.status==='OK').length;
+  document.getElementById('cNg').textContent    = cutRecords.filter(r=>r.status==='NG').length;
+  document.getElementById('cShift').textContent = cutRecords.filter(cutInShift).length;
+  document.getElementById('cToday').textContent = cutRecords.filter(r=>(r.saved_at||'').startsWith(today)).length;
+}
+
+function cutUpdateMachineCards() {
+  const shiftRecs = cutRecords.filter(cutInShift);
+  const byLine = {};
+  shiftRecs.forEach(r => {
+    const key = r.mc_line || '—';
+    if (!byLine[key]) byLine[key] = { count: 0 };
+    byLine[key].count++;
+    if (!byLine[key].last || r.id > byLine[key].last.id) byLine[key].last = r;
+  });
+  const grid = document.getElementById('cutMachineGrid');
+  const lines = Object.keys(byLine).sort();
+  if (!lines.length) { grid.innerHTML = '<div class="no-machine">ยังไม่มีข้อมูล Shift นี้</div>'; return; }
+  grid.innerHTML = lines.map(m => {
+    const d = byLine[m]; const r = d.last;
+    const isOk = r.status === 'OK';
+    const cls  = isOk ? 'pass' : 'fail';
+    const dt   = r.saved_at ? new Date(r.saved_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    return `<div class="cut-mc-card ${cls}">
+      <div class="cmc-header">
+        <div class="cmc-name">✂ ${esc(m)}</div>
+        <div class="cmc-cnt">${d.count} <span style="font-size:9px;font-weight:400;color:var(--dim)">Shift</span></div>
+      </div>
+      <div class="cmc-mid">
+        <div class="cmc-stat ${cls}">${isOk?'✓ OK':'✗ NG'}</div>
+      </div>
+      <div class="cmc-detail">
+        <div class="cmc-fg">${esc(r.tag_fg_no1||'—')}</div>
+        <div class="cmc-row">Item: <span>${esc(r.item_insulation||'—')}</span></div>
+        <div class="cmc-row">Vendor: <span style="color:#80cbc4">${esc(r.vendor_insulation||'—')}</span></div>
+        <div class="cmc-row">Leader: <span>${esc(r.leader_confirm||'—')}</span></div>
+        <div class="cmc-time">🕐 ${esc(dt)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function cutPopulateMachineFilter() {
+  const sel = document.getElementById('cutFltMachine');
+  const cur = sel.value;
+  const machines = [...new Set(cutRecords.map(r => r.mc_line).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Machine ทั้งหมด</option>'
+    + machines.map(m => `<option value="${esc(m)}" ${m===cur?'selected':''}>${esc(m)}</option>`).join('');
+}
+
+function cutFilterLog() {
+  const q   = (document.getElementById('cutSearchBox')?.value||'').toLowerCase();
+  const shf = document.getElementById('cutFltShift')?.value;
+  const mc  = document.getElementById('cutFltMachine')?.value;
+  const from = document.getElementById('cutFltDateFrom')?.value || '';
+  const to   = document.getElementById('cutFltDateTo')?.value   || '';
+  const today = _localDateStr();
+  cutFiltered = cutRecords.filter(r => {
+    if (shf==='shift' && !cutInShift(r)) return false;
+    if (shf==='today' && !(r.saved_at||'').startsWith(today)) return false;
+    if (mc && r.mc_line !== mc) return false;
+    const rd = (r.saved_at||'').slice(0,10);
+    if (from && rd < from) return false;
+    if (to   && rd > to)   return false;
+    if (q) {
+      const hay = [r.id_card,r.mc_line,r.tag_fg_no1,r.item_insulation,
+                   r.vendor_insulation,r.item_type,r.leader_confirm,r.line].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  cutPage = 1;
+  cutRenderTable();
+}
+
+function cutClearFilter() {
+  const today = _localDateStr();
+  document.getElementById('cutSearchBox').value = '';
+  document.getElementById('cutFltShift').value = 'shift';
+  document.getElementById('cutFltMachine').value = '';
+  document.getElementById('cutFltDateFrom').value = today;
+  document.getElementById('cutFltDateTo').value   = today;
+  cutFilterLog();
+}
+
+function cutChangePageSize() {
+  cutPageSize = parseInt(document.getElementById('cutPageSize').value);
+  cutPage = 1; cutRenderTable();
+}
+
+function cutChangePage(d) { cutPage += d; cutRenderTable(); }
+
+function cutRenderTable() {
+  const total = cutFiltered.length;
+  const pages = Math.max(1, Math.ceil(total/cutPageSize));
+  cutPage = Math.min(cutPage, pages);
+  const start = (cutPage-1)*cutPageSize;
+  const slice = cutFiltered.slice(start, start+cutPageSize);
+  document.getElementById('cutRecordCount').textContent = `(${total} records)`;
+  document.getElementById('cutPgInfo').textContent = `หน้า ${cutPage} / ${pages}`;
+  document.getElementById('cutPgPrev').disabled = cutPage <= 1;
+  document.getElementById('cutPgNext').disabled = cutPage >= pages;
+  const tbody = document.getElementById('cutLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="21" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  function chkBadge(v) {
+    if (!v) return '<span style="color:var(--dim)">—</span>';
+    if (v==='OK') return '<span class="badge-pass" style="font-size:11px;padding:1px 7px">OK</span>';
+    if (v==='NG') return '<span class="badge-fail" style="font-size:11px;padding:1px 7px">NG</span>';
+    return '<span class="badge-na" style="font-size:11px;padding:1px 7px">NA</span>';
+  }
+  tbody.innerHTML = slice.map((r,i) => {
+    const dt = r.saved_at
+      ? new Date(r.saved_at).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
+      : '—';
+    const badge = r.status==='OK'
+      ? '<span class="badge-pass">OK</span>'
+      : '<span class="badge-fail">NG</span>';
+    return `<tr>
+      <td class="td-id">${start+i+1}</td>
+      <td>${esc(dt)}</td>
+      <td>${esc(r.id_card||'')}</td>
+      <td style="text-align:center">${esc(r.seq||'')}</td>
+      <td style="text-align:center">${esc(r.lot||'')}</td>
+      <td style="text-align:center">${esc(r.line||'')}</td>
+      <td>${esc(r.mc_line||'')}</td>
+      <td>${esc(r.item_type||'')}</td>
+      <td class="td-fg">${esc(r.tag_fg_no1||'')}</td>
+      <td>${esc(r.item_insulation||'')}</td>
+      <td>${esc(r.item_insulation_2||'')}</td>
+      <td style="color:#80cbc4;font-weight:600">${esc(r.vendor_insulation||'')}</td>
+      <td style="text-align:center">${chkBadge(r.check_laydown)}</td>
+      <td style="text-align:center">${chkBadge(r.check_burr)}</td>
+      <td style="text-align:center">${chkBadge(r.check_drawing)}</td>
+      <td style="text-align:center">${chkBadge(r.check_copper)}</td>
+      <td style="text-align:center">${chkBadge(r.check_apprence)}</td>
+      <td style="text-align:center">${String(r.lay_down_side)==='1'?'✓':''}</td>
+      <td style="text-align:center">${String(r.lay_down_middle)==='1'?'✓':''}</td>
+      <td>${esc(r.leader_confirm||'')}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+function cutExportCSV() {
+  if (!cutFiltered.length) { showToast('ไม่มีข้อมูลให้ Export'); return; }
+  const headers = ['No','Saved At','ID Card','MC/Line','Tag FG No.1',
+    'Item Insulation','Vendor Insulation','Type','Line','Seq','Lot',
+    'Lay Down','Burr','Drawing','Copper','Apprence',
+    'Insul.Qty','Cut.Pcs','Lay Side','Lay Mid','Leader Confirm','Status'];
+  const rows = cutFiltered.map((r,i) => {
+    const dt = r.saved_at ? new Date(r.saved_at).toLocaleString('th-TH') : '';
+    return [i+1,dt,r.id_card,r.mc_line,r.tag_fg_no1,
+      r.item_insulation,r.vendor_insulation||'',r.item_type,r.line,r.seq,r.lot,
+      r.check_laydown,r.check_burr,r.check_drawing,r.check_copper,r.check_apprence,
+      r.insulation_qty,r.cutting_pcs,
+      r.lay_down_side?'✓':'',r.lay_down_middle?'✓':'',
+      r.leader_confirm,r.status
+    ].map(v=>'"'+(String(v??'').replace(/"/g,'""'))+'"');
+  });
+  const csv = '﻿'+[headers,...rows].map(r=>r.join(',')).join('\r\n');
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download='cutting_log_'+_localDateStr()+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✓ Export CSV สำเร็จ (${cutFiltered.length} records)`);
+}
+
+async function cutExportExcel() {
+  showToast('⏳ กำลัง Export Excel...');
+  try {
+    const res = await fetch('/cutting/api/cutting-export-excel');
+    if (!res.ok) { const d=await res.json(); showToast('❌ Error: '+(d.error||res.status)); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download='cutting_log_'+_localDateStr()+'.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+    showToast(`✓ Export Excel สำเร็จ`);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ─── HP Records ───────────────────────────────────────────────────────────────
+let hpAllRecords = [], hpFiltered = [], hpPage = 1, hpPageSize = 10;
+
+async function loadHP() {
+  try {
+    const res = await fetch('/hp/api/records');
+    hpAllRecords = await res.json();
+    hpLoaded = true;
+    hpUpdateSummary();
+    hpUpdateMachineCards();
+    hpFilterLog();
+  } catch(e) { console.warn('HP data not available:', e.message); }
+}
+
+function hpUpdateSummary() {
+  const today = _localDateStr();
+  const shift = getCurrentShift();
+  const lbl   = shift === 'day' ? 'Day Shift นี้' : 'Night Shift นี้';
+  document.getElementById('hpShiftLbl').textContent = lbl;
+  document.getElementById('hpShiftLabel').textContent =
+    (shift === 'day' ? 'DAY SHIFT' : 'NIGHT SHIFT') +
+    ' (เริ่ม ' + getShiftStart().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) + ')';
+  document.getElementById('hpTotal').textContent    = hpAllRecords.length;
+  const hpIsPass = r => { const v=(r.result||'').toUpperCase(); return v==='OK'||v==='PASS'||v.includes('PASS'); };
+  const hpIsFail = r => { const v=(r.result||'').toUpperCase(); return v==='NG'||v==='FAIL'||v.includes('FAIL'); };
+  document.getElementById('hpPass').textContent     = hpAllRecords.filter(hpIsPass).length;
+  document.getElementById('hpFail').textContent     = hpAllRecords.filter(hpIsFail).length;
+  document.getElementById('hpShift').textContent    = hpAllRecords.filter(hpInShift).length;
+  document.getElementById('hpToday').textContent    = hpAllRecords.filter(r=>(r.saved_at||'').startsWith(today)).length;
+  document.getElementById('hpMachines').textContent = new Set(hpAllRecords.filter(hpInShift).map(r=>r.mc).filter(Boolean)).size;
+}
+
+function hpInShift(r) {
+  if (!r.saved_at && !r.ts) return false;
+  return new Date(r.saved_at || r.ts) >= getShiftStart();
+}
+
+function hpUpdateMachineCards() {
+  const shiftRecs = hpAllRecords.filter(hpInShift);
+  const byMC = {};
+  shiftRecs.forEach(r => {
+    if (!r.mc) return;
+    if (!byMC[r.mc]) byMC[r.mc] = { count: 0 };
+    byMC[r.mc].count++;
+    if (!byMC[r.mc].last || r.id > byMC[r.mc].last.id) byMC[r.mc].last = r;
+  });
+  const grid = document.getElementById('hpMachineGrid');
+  const mcs  = Object.keys(byMC).sort();
+  if (!mcs.length) { grid.innerHTML = '<div class="no-machine">ยังไม่มีข้อมูล Shift นี้</div>'; return; }
+  const fmt = v => (v != null && v !== '') ? v : '—';
+  grid.innerHTML = mcs.map(m => {
+    const d = byMC[m]; const r = d.last;
+    const resV = (r.result||'').toUpperCase();
+    const isPass = resV==='OK'||resV==='PASS'||resV.includes('PASS');
+    const isFail = resV==='NG'||resV==='FAIL'||resV.includes('FAIL');
+    const cls = isPass ? 'pass' : (isFail ? 'fail' : '');
+    const stBadge = isPass
+      ? '<span class="mc-status pass">✓ PASS</span>'
+      : (isFail ? '<span class="mc-status fail">✗ FAIL</span>' : '<span class="mc-status na">— —</span>');
+    const dt = r.saved_at || r.ts;
+    const dateStr = dt ? new Date(dt).toLocaleDateString('en-GB') : '—';
+    const timeStr = dt ? new Date(dt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : '—';
+    return `<div class="m-card ${cls}">
+      <div class="mc-count"><span class="n">${d.count}</span>Shift นี้</div>
+      <div class="mc-machine">🔩 ${esc(m)}</div>
+      ${stBadge}
+      <div class="mc-fg">${esc(r.item_fg||r.item||'—')}</div>
+      <div class="mc-row">Vendor: <span style="color:#80cbc4">${esc(r.vendor||'—')}</span></div>
+      <div class="mc-row">ผู้ลงบันทึก: <span>${esc(r.checker||'—')}</span></div>
+      <div class="mc-row">Line: <span>${esc(r.line||'—')}</span> &nbsp;Seq: <span>${esc(r.seq||'—')}</span></div>
+      <div class="mc-row">Coils: <span>${fmt(r.coils)}</span> &nbsp;Avg L1: <span>${fmt(r.avg_l1)}</span> &nbsp;Flat%: <span>${fmt(r.avg_flat)}</span></div>
+      <div class="mc-time">📅 ${esc(dateStr)} &nbsp;🕐 ${esc(timeStr)}</div>
+    </div>`;
+  }).join('');
+}
+
+function hpFilterLog() {
+  const q   = (document.getElementById('hpSearchBox')?.value||'').toLowerCase();
+  const shf = document.getElementById('hpFltResult')?.value;
+  const from = document.getElementById('hpFltDateFrom')?.value || '';
+  const to   = document.getElementById('hpFltDateTo')?.value   || '';
+  const today = _localDateStr();
+  hpFiltered = hpAllRecords.filter(r => {
+    if (shf==='shift' && !hpInShift(r)) return false;
+    if (shf==='today' && !(r.saved_at||r.ts||'').startsWith(today)) return false;
+    // Date range
+    const rd = (r.saved_at||r.ts||'').slice(0,10);
+    if (from && rd < from) return false;
+    if (to   && rd > to)   return false;
+    if (q) {
+      const hay = [r.item,r.item_fg,r.mc,r.checker,r.vendor,r.line,r.seq,r.confirm_by].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  hpPage = 1;
+  hpRenderTable();
+}
+
+function hpClearFilter() {
+  const today = _localDateStr();
+  document.getElementById('hpSearchBox').value = '';
+  document.getElementById('hpFltResult').value = 'shift';
+  document.getElementById('hpFltDateFrom').value = today;
+  document.getElementById('hpFltDateTo').value   = today;
+  hpFilterLog();
+}
+
+function hpChangePageSize() {
+  hpPageSize = parseInt(document.getElementById('hpPageSize').value);
+  hpPage = 1; hpRenderTable();
+}
+
+function hpRenderTable() {
+  const total = hpFiltered.length;
+  const pages = Math.max(1, Math.ceil(total/hpPageSize));
+  hpPage = Math.min(hpPage, pages);
+  const start = (hpPage-1)*hpPageSize;
+  const slice = hpFiltered.slice(start, start+hpPageSize);
+  document.getElementById('hpRecordCount').textContent = `(${total} records)`;
+  document.getElementById('hpPgInfo').textContent = `หน้า ${hpPage} / ${pages}`;
+  document.getElementById('hpPgPrev').disabled = hpPage <= 1;
+  document.getElementById('hpPgNext').disabled = hpPage >= pages;
+  const fmt = v => (v != null && v !== '') ? v : '—';
+  const tbody = document.getElementById('hpLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = slice.map((r, i) => {
+    const dt  = r.saved_at || r.ts;
+    const dateStr = dt ? new Date(dt).toLocaleDateString('en-GB') : '—';
+    const timeStr = dt ? new Date(dt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : '—';
+    const res = (r.result||'');
+    const resU = res.toUpperCase();
+    const badge = (resU==='OK'||resU==='PASS'||resU.includes('PASS')) ? '<span class="badge-pass">PASS</span>'
+      : ((resU==='NG'||resU==='FAIL'||resU.includes('FAIL')) ? '<span class="badge-fail">FAIL</span>' : `<span class="badge-na">${esc(res)||'—'}</span>`);
+    const globalIdx = start + i;
+    return `<tr>
+      <td class="td-id">${globalIdx+1}</td>
+      <td>${esc(dateStr)}</td>
+      <td>${esc(timeStr)}</td>
+      <td><strong>${esc(r.mc||'')}</strong></td>
+      <td>${esc(r.line||'')}</td>
+      <td style="font-family:var(--mono);color:var(--warn-light)">${esc(r.seq||'')}</td>
+      <td style="font-size:11px">${esc(r.item||'')}</td>
+      <td class="td-fg" style="font-size:11px">${esc(r.item_fg||'')}</td>
+      <td style="text-align:center">${fmt(r.coils)}</td>
+      <td style="color:#80cbc4">${esc(r.vendor||'')}</td>
+      <td style="font-weight:700">${fmt(r.avg_l1)}</td>
+      <td style="font-weight:700">${fmt(r.avg_l2)}</td>
+      <td>${fmt(r.avg_flat)}</td>
+      <td>${esc(r.checker||'')}</td>
+      <td>${esc(r.confirm_by||'')}</td>
+      <td>${badge}</td>
+      <td style="padding:4px 6px">
+        <button onclick="hpShowRecordCoils(${globalIdx})"
+          style="background:#1b5e20;color:#a5d6a7;border:1px solid #2e7d32;border-radius:5px;
+                 padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">
+          🔩 ${r.coils || 0}
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function hpChangePage(d) { hpPage += d; hpRenderTable(); }
+
+function hpExportCSV() {
+  if (!hpFiltered.length) { showToast('ไม่มีข้อมูลให้ Export'); return; }
+  const cv = v => '"' + String(v == null ? '' : v).replace(/"/g,'""') + '"';
+  const NUM = 14;
+  const mcName = mc => mc && mc.toUpperCase().startsWith('HB')
+    ? 'Hairpin Bender No.' + mc.slice(2) : (mc||'');
+
+  // Header row 1 (85 cols: 12 base + 28 coil/bp + 42 meas + 3 appearance)
+  const h1 = ['Date','Time','Line','Seq','Prod/month',
+               'Machine Hairpin Bender',
+               'Item Hairpin','Item FG','Type','Item Copper',
+               'Coil Size','Vender'];
+  for (let n = 1; n <= NUM; n++) h1.push(`Coil No. ${n}`, 'Black point');
+  for (let n = 1; n <= NUM; n++) h1.push(`Line ${n}`, '', 'Flatness');
+  h1.push('Apprence check', '', 'ผู้ลงบันทึก');
+
+  // Header row 2
+  const h2 = Array(12 + NUM * 2).fill('');
+  for (let i = 0; i < NUM; i++) h2.push('L1 ±1 mm. / L2 ±1 mm.', 'D (0-1mm)', '≤20% OK.');
+  h2.push('ไม่มีรอยขีดบริเวณโค้งท่อ', 'รอยย่นไม่เกิน limit กำหนด', '');
+
+  // Data rows — one row per inspection record
+  const dataRows = [];
+  hpFiltered.forEach(r => {
+    let mf = [], cd = [], vis = [];
+    try { mf  = JSON.parse(r.meas_full  || '[]'); } catch(e) {}
+    try { cd  = JSON.parse(r.coil_data  || '[]'); } catch(e) {}
+    try { vis = JSON.parse(r.visuals    || '[]'); } catch(e) {}
+    const ts = r.ts || r.saved_at || '';
+    const date = ts.slice(0, 10), time = ts.slice(11, 19);
+    const machine = mcName(r.mc);
+
+    const row = [date, time, r.line||'', r.seq||'', r.prod_month||'',
+                 machine,
+                 r.item||'', r.item_fg||'', r.item_type||'', r.cu_item||'',
+                 r.coil_size||'', r.vendor||''];
+
+    // 14 coil pairs (Coil No. + Black point)
+    for (let i = 0; i < NUM; i++) {
+      const c = cd[i] || null;
+      row.push(c ? (c.coilNo || '') : '');
+      row.push(c ? (c.blackPoint != null ? c.blackPoint : '') : '');
+    }
+
+    // 14 line measurement groups (L1/L2, D, Flatness%)
+    for (let i = 0; i < NUM; i++) {
+      const m = mf[i] || null;
+      const l1l2 = m ? `${m.l1 != null ? m.l1 : ''} / ${m.l2 != null ? m.l2 : ''}` : '';
+      const diff = m ? (m.diff != null ? m.diff : (m.a != null ? m.a : '')) : '';
+      const flat = m && m.flat != null ? m.flat : '';
+      row.push(l1l2, diff, flat);
+    }
+
+    // 3 appearance columns
+    row.push(vis[0] || '', vis[1] || '', r.checker || '');
+
+    dataRows.push(row.map(cv).join(','));
+  });
+
+  const csv = '﻿' + [h1.map(cv).join(','), h2.map(cv).join(','), ...dataRows].join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'hp_log_' + _localDateStr() + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`✓ Export CSV สำเร็จ (${hpFiltered.length} records)`);
+}
+
+async function hpExportExcel() {
+  showToast('⏳ กำลัง Export Excel...');
+  try {
+    const r = await fetch('/hp/api/export');
+    const d = await r.json();
+    if (d.ok) showToast(`✓ Export Excel สำเร็จ (${d.rows} records) — ไฟล์: ${d.file}`);
+    else showToast('❌ Error: ' + d.error);
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+// ─── Show coil detail for a single HP record row ──────────────────────────────
+let _coilRecordIdx = -1;  // currently displayed globalIdx in popup
+
+function hpShowRecordCoils(globalIdx) {
+  const r = hpFiltered[globalIdx];
+  if (!r) return;
+  _coilRecordIdx = globalIdx;
+
+  let cd = [];
+  try { cd = JSON.parse(r.coil_data || '[]'); } catch(e) {}
+  let mf = [];
+  try { mf = JSON.parse(r.meas_full || '[]'); } catch(e) {}
+
+  const ts = r.ts || r.saved_at || '';
+  const date = ts.slice(0, 10);
+
+  // Build entries for this single record — join coil_data[i] with meas_full[i]
+  _coilEntries = [];
+  cd.forEach((c, i) => {
+    if (!c) return;
+    const m = mf[i] || {};
+    const l1 = (m.l1 !== undefined && m.l1 !== null && m.l1 !== '') ? parseFloat(m.l1) : null;
+    const l2 = (m.l2 !== undefined && m.l2 !== null && m.l2 !== '') ? parseFloat(m.l2) : null;
+    const diff = (l1 !== null && l2 !== null) ? parseFloat((l1 - l2).toFixed(2)) : null;
+    _coilEntries.push({
+      slot: i + 1,
+      raw: c.raw || '',
+      vendor: c.vendor || '—',
+      coilNo: c.coilNo || '',
+      blackPoint: c.blackPoint != null ? c.blackPoint : 0,
+      l1, l2, diff,
+      a:  (m.a  !== undefined && m.a  !== null && m.a  !== '') ? parseFloat(m.a)  : null,
+      b:  (m.b  !== undefined && m.b  !== null && m.b  !== '') ? parseFloat(m.b)  : null,
+      flat: (m.flat !== undefined && m.flat !== null && m.flat !== '') ? parseFloat(m.flat) : null,
+      result: c.result || 'OK',
+      mc: r.mc || '',
+      date: date
+    });
+  });
+
+  _coilSort  = 'slot';
+  _coilQuery = '';
+  document.getElementById('coilPanelSearch').value = '';
+  document.getElementById('coilPanelTitle').textContent =
+    `🔩 Coil — ${esc(r.mc||'—')}  Seq.${esc(r.seq||'—')}  (${_coilEntries.length} coil)`;
+
+  document.getElementById('coilPanelCount').textContent = `(${_coilEntries.length} coil entries)`;
+
+  // Nav info & button states
+  const total = hpFiltered.length;
+  document.getElementById('coilNavInfo').textContent = `${globalIdx + 1} / ${total}`;
+  document.getElementById('coilNavPrev').disabled = globalIdx <= 0;
+  document.getElementById('coilNavNext').disabled = globalIdx >= total - 1;
+  document.getElementById('coilNavPrev').style.opacity = globalIdx <= 0 ? '0.35' : '1';
+  document.getElementById('coilNavNext').style.opacity = globalIdx >= total - 1 ? '0.35' : '1';
+
+  // Reset sort buttons to none active for single-record view
+  ['cpSortCoil','cpSortVendor','cpSortDate'].forEach(id =>
+    document.getElementById(id).classList.remove('active'));
+
+  let rows = '';
+  _coilEntries.forEach((e) => {
+    const bpColor = e.blackPoint >= 8 ? 'color:#ef9a9a' : (e.blackPoint >= 5 ? 'color:#ffe082' : 'color:#a5d6a7');
+    const resBadge = e.result === 'NG'
+      ? `<span class="cp-ng">NG</span>` : `<span class="cp-ok">OK</span>`;
+    const fmtNum  = v => v !== null ? v.toFixed(2) : '<span style="color:var(--dim)">—</span>';
+    const diffOK  = e.diff !== null && e.diff >= -1 && e.diff <= 1;
+    const diffColor = e.diff === null ? 'color:var(--dim)' : (diffOK ? 'color:#69ff47;font-weight:700' : 'color:#ff5252;font-weight:700');
+    const flatOK  = e.flat !== null && e.flat >= 0 && e.flat <= 20;
+    const flatColor = e.flat === null ? 'color:var(--dim)' : (flatOK ? 'color:#69ff47;font-weight:700' : 'color:#ff5252;font-weight:700');
+    const fmtFlat = e.flat !== null ? e.flat.toFixed(1) + '%' : '<span style="color:var(--dim)">—</span>';
+    rows += `<tr>
+      <td class="cp-no">${e.slot}</td>
+      <td class="cp-raw">${esc(e.raw.substring(0, 22))}</td>
+      <td class="cp-vendor">${esc(e.vendor)}</td>
+      <td class="cp-coilno">${esc(e.coilNo)}</td>
+      <td class="cp-bp" style="${bpColor};text-align:center">${e.blackPoint}</td>
+      <td style="text-align:center;font-family:var(--mono)">${fmtNum(e.l1)}</td>
+      <td style="text-align:center;font-family:var(--mono)">${fmtNum(e.l2)}</td>
+      <td style="text-align:center;font-family:var(--mono);${diffColor}">${fmtNum(e.diff)}</td>
+      <td style="text-align:center;font-family:var(--mono)">${fmtNum(e.a)}</td>
+      <td style="text-align:center;font-family:var(--mono)">${fmtNum(e.b)}</td>
+      <td style="text-align:center;font-family:var(--mono);${flatColor}">${fmtFlat}</td>
+      <td>${resBadge}</td>
+      <td class="cp-mc">${esc(e.mc)}</td>
+      <td style="color:var(--dim);font-size:11px">${esc(e.date)}</td>
+    </tr>`;
+  });
+  if (!rows) rows = `<tr><td colspan="14" style="text-align:center;color:var(--dim);padding:24px">ไม่พบข้อมูล Coil</td></tr>`;
+  document.getElementById('coilPanelBody').innerHTML = rows;
+
+  document.getElementById('coilPanelOverlay').style.display = 'flex';
+}
+
+function hpNavCoilRecord(dir) {
+  const next = _coilRecordIdx + dir;
+  if (next < 0 || next >= hpFiltered.length) return;
+  hpShowRecordCoils(next);
+}
+
+// ─── Coil Panel ───────────────────────────────────────────────────────────────
+let _coilEntries = [];   // master list of all coil entries from hpFiltered
+let _coilSort = 'coilNo';
+let _coilQuery = '';
+
+function _buildCoilEntries() {
+  _coilEntries = [];
+  hpFiltered.forEach(r => {
+    let cd = [];
+    try { cd = JSON.parse(r.coil_data || '[]'); } catch(e) {}
+    const ts = r.ts || r.saved_at || '';
+    const date = ts.slice(0, 10);
+    cd.forEach((c, i) => {
+      if (!c) return;
+      _coilEntries.push({
+        slot: i + 1,
+        raw: c.raw || '',
+        vendor: c.vendor || '—',
+        coilNo: c.coilNo || '',
+        blackPoint: c.blackPoint != null ? c.blackPoint : 0,
+        result: c.result || 'OK',
+        mc: r.mc || '',
+        date: date
+      });
+    });
+  });
+}
+
+function openCoilPanel(sortBy) {
+  _coilSort = sortBy || 'coilNo';
+  _coilQuery = '';
+  document.getElementById('coilPanelSearch').value = '';
+  _buildCoilEntries();
+  _renderCoilPanel();
+  document.getElementById('coilPanelOverlay').style.display = 'flex';
+}
+
+function closeCoilPanel() {
+  document.getElementById('coilPanelOverlay').style.display = 'none';
+}
+
+function coilPanelSetSort(s) {
+  _coilSort = s;
+  const idMap = { coilNo:'cpSortCoil', vendor:'cpSortVendor', date:'cpSortDate' };
+  Object.keys(idMap).forEach(k => {
+    document.getElementById(idMap[k]).classList.toggle('active', k === s);
+  });
+  _renderCoilPanel();
+}
+
+function coilPanelFilter() {
+  _coilQuery = (document.getElementById('coilPanelSearch').value || '').toLowerCase();
+  _renderCoilPanel();
+}
+
+function _renderCoilPanel() {
+  // Filter
+  let list = _coilEntries.filter(e => {
+    if (!_coilQuery) return true;
+    return (e.coilNo + ' ' + e.vendor + ' ' + e.mc + ' ' + e.raw).toLowerCase().includes(_coilQuery);
+  });
+
+  // Sort
+  if (_coilSort === 'vendor') {
+    list.sort((a, b) => (a.vendor||'').localeCompare(b.vendor||'') || (a.coilNo||'').localeCompare(b.coilNo||''));
+  } else if (_coilSort === 'date') {
+    list.sort((a, b) => (a.date||'').localeCompare(b.date||'') || (a.mc||'').localeCompare(b.mc||'') || a.slot - b.slot);
+  } else {
+    list.sort((a, b) => (a.coilNo||'').localeCompare(b.coilNo||'') || (a.vendor||'').localeCompare(b.vendor||''));
+  }
+
+  // Title
+  const titles = { coilNo: '🔢 Coil No. — รายการทั้งหมด', vendor: '🏷 Vendor — รายการทั้งหมด', date: '📅 วันที่ / เครื่อง — รายการทั้งหมด' };
+  document.getElementById('coilPanelTitle').textContent = titles[_coilSort] || titles.coilNo;
+  document.getElementById('coilPanelCount').textContent = `(${list.length} coil entries)`;
+
+  // Build rows with group separators
+  const tbody = document.getElementById('coilPanelBody');
+  let lastGroup = null;
+  let rows = '';
+  let rowNo = 0;
+
+  list.forEach(e => {
+    const group = _coilSort === 'vendor' ? e.vendor
+                : _coilSort === 'date'   ? (e.date + ' — ' + e.mc)
+                : e.coilNo.charAt(0).toUpperCase() || '#';
+
+    if (group !== lastGroup) {
+      const groupLabel = _coilSort === 'vendor' ? `🏷 ${esc(group)}`
+                       : _coilSort === 'date'   ? `📅 ${esc(group)}`
+                       : `🔢 ${esc(group)}`;
+      rows += `<tr class="cp-sep"><td colspan="14">${groupLabel}</td></tr>`;
+      lastGroup = group;
+    }
+
+    rowNo++;
+    const bpColor = e.blackPoint >= 8 ? 'color:#ef9a9a' : (e.blackPoint >= 5 ? 'color:#ffe082' : 'color:#a5d6a7');
+    const resBadge = e.result === 'NG'
+      ? `<span class="cp-ng">NG</span>`
+      : `<span class="cp-ok">OK</span>`;
+
+    rows += `<tr>
+      <td class="cp-no">${rowNo}</td>
+      <td class="cp-raw">${esc(e.raw.substring(0, 22))}</td>
+      <td class="cp-vendor">${esc(e.vendor)}</td>
+      <td class="cp-coilno">${esc(e.coilNo)}</td>
+      <td class="cp-bp" style="${bpColor}">${e.blackPoint}</td>
+      <td>${resBadge}</td>
+      <td class="cp-mc">${esc(e.mc)}</td>
+      <td style="color:var(--dim);font-size:11px">${esc(e.date)}</td>
+    </tr>`;
+  });
+
+  if (!rows) rows = `<tr><td colspan="14" style="text-align:center;color:var(--dim);padding:24px">ไม่พบข้อมูล</td></tr>`;
+  tbody.innerHTML = rows;
+}
+
+// ─── Process Select Screen ────────────────────────────────────────────────────
+function enterProcess(tab) {
+  document.getElementById('processSelect').style.display = 'none';
+  document.getElementById('processTabs').style.display   = '';
+  document.querySelector('.page').style.display          = '';
+  switchProcess(tab);
+  loadAll();
+  startAutoRefresh();
+}
+
+// ─── Process Tab Switch ───────────────────────────────────────────────────────
+const PROC_TABS = {
+  exp:'active-exp', cut:'active-cut', hp:'active-hp', fp:'active-fp',
+  hins:'active-hp', oven:'active-exp', abz:'active-exp'
+};
+const PROC_TITLES = {
+  exp:  '⚙ <span>EXPANDER</span> — FIRST LOT CHECK',
+  cut:  '✂ <span>CUTTING</span> — FIRST LOT CHECK',
+  hp:   '🔩 <span>HAIRPIN BENDER</span> — FIRST LOT CHECK',
+  fp:   '🔧 <span>FIN PRESS</span> — FP FIRST LOT CONFIRMATION',
+  hins: '🔗 <span>HAIRPIN INSERT</span> — FIRST LOT CHECK',
+  oven: '🔥 <span>OVEN</span> — FIRST LOT CHECK',
+  abz:  '🔥 <span>AUTO BRAZING</span> — FIRST LOT CHECK',
+};
+const ALL_PROCS = ['exp','cut','hp','fp','hins','oven','abz'];
+
+function switchProcess(tab) {
+  ALL_PROCS.forEach(t => {
+    const sec = document.getElementById('proc-'+t);
+    if (sec) sec.style.display = t === tab ? '' : 'none';
+    const btn = document.getElementById('ptab-'+t);
+    if (btn) btn.className = 'proc-tab' + (t === tab ? ' ' + (PROC_TABS[t]||'active-exp') : '');
+  });
+  document.querySelector('#topbar h1').innerHTML = PROC_TITLES[tab] || tab;
+  if (tab === 'cut'  && !cutRecords.length) loadCutting();
+  if (tab === 'hp'   && !hpLoaded)         loadHP();
+  if (tab === 'fp'   && !fpLoaded)         loadFP();
+}
+
+let hpLoaded = false;
+let fpLoaded = false;
+
+// ─── Auto Refresh ─────────────────────────────────────────────────────────────
+updateShiftBadge();
+// loadAll() จะถูกเรียกจาก enterProcess() เมื่อเลือก Process
+const AUTO_REFRESH_MS = 10 * 60 * 1000;  // 10 minutes
+
+let _autoRefresh = null;
+function startAutoRefresh() {
+  if (_autoRefresh) return;
+  _autoRefresh = setInterval(() => {
+    loadAll();
+    if (cutRecords.length) loadCutting();
+    if (hpLoaded)          loadHP();
+    if (fpLoaded)          loadFP();
+  }, AUTO_REFRESH_MS);
+}
+setInterval(updateShiftBadge, 60000);
+
+// ── Instant refresh เมื่อ process ใดก็ตามบันทึกข้อมูล ────────────────────────
+(function() {
+  function _onProcessSaved() { loadAll(); }
+  // BroadcastChannel (same-origin multi-window)
+  try {
+    const bc = new BroadcastChannel('dash_refresh');
+    bc.onmessage = _onProcessSaved;
+  } catch(e) {}
+  // localStorage fallback (cross-window storage event)
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'dash_refresh') _onProcessSaved();
+  });
+})();
+
+// ── Smart window opener — ไม่เปิดซ้ำถ้ามี window ชื่อเดิมอยู่แล้ว ─────────────
+function openFPProgram() {
+  const url = '/fp/firstlot';
+  const win = 'win_fp';
+  const w = window.open('', win);
+  if (w && !w.closed) {
+    try {
+      if (w.location.href && w.location.href !== 'about:blank') {
+        w.focus(); return;
+      }
+    } catch(e) {}
+  }
+  window.open(url, win);
+}
+
+// ════════════════════════════════════════════════════════════════
+// FP FIRST LOT CONFIRMATION
+// ════════════════════════════════════════════════════════════════
+let fpAllRecords  = [];
+let fpFiltered    = [];
+let fpCurrentPage = 1;
+let fpPageSize    = 10;
+
+async function loadFP() {
+  initDateFilters();
+  try {
+    const res = await fetch('/fp/api/records?limit=9999&page=1');
+    const data = await res.json();
+    // store flat record list
+    fpAllRecords = (data.records || []);
+    fpLoaded = true;
+    // populate machine dropdown
+    const _fpMCSel = document.getElementById('fpFltMC');
+    if (_fpMCSel) {
+      const _fpMCs = [...new Set(fpAllRecords.map(r => r.mc).filter(Boolean))].sort();
+      const _fpCur = _fpMCSel.value;
+      _fpMCSel.innerHTML = '<option value="">เครื่องทั้งหมด</option>' +
+        _fpMCs.map(m => `<option value="${esc(m)}"${m===_fpCur?' selected':''}>${esc(m)}</option>`).join('');
+    }
+    // update KPIs from server summary
+    document.getElementById('fpTotal').textContent    = data.total_all ?? '—';
+    document.getElementById('fpOK').textContent       = data.ok_all    ?? '—';
+    document.getElementById('fpNG').textContent       = data.ng_all    ?? '—';
+    document.getElementById('fpToday').textContent    = data.today     ?? '—';
+    document.getElementById('fpMachines').textContent = data.mc_active ?? '—';
+    // คำนวณ mc_status จาก fpAllRecords (records เรียง DESC → ตัวแรกคือล่าสุด)
+    // ใช้แบบนี้เพื่อให้ได้ครบทุก field: line, seq, type, checker, saved_at
+    const _mcMap = {};
+    fpAllRecords.forEach(r => {
+      if (r.mc && !_mcMap[r.mc]) _mcMap[r.mc] = r;
+    });
+    fpUpdateMachineCards(Object.values(_mcMap));
+    fpFilterLog();
+    document.getElementById('lastUpdate').textContent =
+      'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
+  } catch(e) { showToast('❌ โหลดข้อมูล FP ไม่ได้: ' + e.message); }
+}
+
+function fpUpdateMachineCards(mcStatus) {
+  const grid = document.getElementById('fpMachineGrid');
+
+  // ── กรองเฉพาะ record ที่อยู่ใน Shift ปัจจุบัน ──────────────
+  const shiftStart = getShiftStart();
+  const inShift = mcStatus.filter(r => {
+    // ใช้ saved_at ก่อน ถ้าไม่มีให้ใช้ date+time
+    const dtStr = r.saved_at || (r.date && r.time ? r.date + 'T' + r.time : null);
+    if (!dtStr) return false;
+    return new Date(dtStr) >= shiftStart;
+  });
+
+  if (!inShift.length) {
+    grid.innerHTML = '<div class="no-machine">ยังไม่มีข้อมูล Shift นี้</div>'; return;
+  }
+  grid.innerHTML = inShift.map(r => {
+    const isOK = (r.final||'') === 'OK';
+    const isNG = (r.final||'') === 'NG';
+    const cls  = isOK ? 'pass' : (isNG ? 'fail' : '');
+    const badge = isOK
+      ? '<span class="mc-status pass">✓ OK</span>'
+      : (isNG ? '<span class="mc-status fail">✗ NG</span>'
+              : '<span class="mc-status na">— —</span>');
+    return `<div class="m-card ${cls}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="mc-machine">🔧 ${esc(r.mc||'—')}</div>
+        ${badge}
+      </div>
+      <div class="mc-fg">${esc(r.item||'—')}</div>
+      <div class="mc-row">Type: <span>${esc(r.type||'—')}</span></div>
+      <div class="mc-row">Line: <span>${esc(r.line||'—')}</span> &nbsp;|&nbsp; Seq: <span>${esc(r.seq||'—')}</span></div>
+      <div class="mc-row">Checker: <span>${esc(r.checker||'—')}</span></div>
+      <div class="mc-time">📅 ${esc(r.date||'—')} &nbsp;🕐 ${esc(r.time||'—')}</div>
+    </div>`;
+  }).join('');
+}
+
+function fpFilterLog() {
+  const q    = (document.getElementById('fpSearchBox').value || '').toLowerCase();
+  const mc   = document.getElementById('fpFltMC').value;
+  const from = document.getElementById('fpFltDateFrom').value;
+  const to_  = document.getElementById('fpFltDateTo').value;
+
+  fpFiltered = fpAllRecords.filter(r => {
+    if (mc && r.mc !== mc) return false;
+    const rd = (r.date || '');
+    if (from && rd < from) return false;
+    if (to_  && rd > to_)  return false;
+    if (q) {
+      const hay = [r.mc,r.item,r.lot,r.checker,r.confirmer,r.type,r.final]
+        .join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  fpCurrentPage = 1;
+  fpRenderTable();
+}
+
+function fpClearFilter() {
+  const today = _localDateStr();
+  document.getElementById('fpSearchBox').value   = '';
+  document.getElementById('fpFltMC').value       = '';
+  document.getElementById('fpFltDateFrom').value = today;
+  document.getElementById('fpFltDateTo').value   = today;
+  fpFilterLog();
+}
+
+function fpChangePageSize() {
+  fpPageSize = parseInt(document.getElementById('fpPageSize').value);
+  fpCurrentPage = 1;
+  fpRenderTable();
+}
+
+function fpChangePage(d) { fpCurrentPage += d; fpRenderTable(); }
+
+function fpRenderTable() {
+  const total = fpFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / fpPageSize));
+  fpCurrentPage = Math.min(fpCurrentPage, pages);
+  const start = (fpCurrentPage-1)*fpPageSize;
+  const slice = fpFiltered.slice(start, start + fpPageSize);
+
+  document.getElementById('fpRecordCount').textContent = `(${total} records)`;
+  document.getElementById('fpPgInfo').textContent = `หน้า ${fpCurrentPage} / ${pages}`;
+  document.getElementById('fpPgPrev').disabled = fpCurrentPage <= 1;
+  document.getElementById('fpPgNext').disabled = fpCurrentPage >= pages;
+
+  const tbody = document.getElementById('fpLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="21" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = slice.map((r, i) => {
+    const no  = start + i + 1;
+    const fin = r.final || '';
+    const badge = fin === 'OK'
+      ? '<span class="badge-pass">OK</span>'
+      : (fin === 'NG' ? '<span class="badge-fail">NG</span>' : '<span class="badge-na">—</span>');
+    const apBadge = r.result_appear
+      ? (r.result_appear.toUpperCase().includes('OK')
+          ? `<span class="badge-pass">${esc(r.result_appear)}</span>`
+          : `<span class="badge-fail">${esc(r.result_appear)}</span>`)
+      : '<span class="badge-na">—</span>';
+    return `<tr>
+      <td class="td-id">${no}</td>
+      <td>${esc(r.date||'')}</td>
+      <td>${esc(r.time||'')}</td>
+      <td class="td-machine">${esc(r.mc||'')}</td>
+      <td class="td-fg">${esc(r.item||'')}</td>
+      <td>${esc(r.type||'')}</td>
+      <td>${esc(r.lot||'')}</td>
+      <td>${esc(r.line||'')}</td>
+      <td>${esc(r.seq||'')}</td>
+      <td>${esc(r.vendor||'')}</td>
+      <td>${esc(r.mat_type||'')}</td>
+      <td>${esc(r.oil||'')}</td>
+      <td>${apBadge}</td>
+      <td style="font-weight:700">${esc(r.fp_avg||'—')}</td>
+      <td style="font-weight:700">${esc(r.ff_avg||'—')}</td>
+      <td>${esc(r.qty_fin||'')}</td>
+      <td>${r.result_qty ? (r.result_qty.toUpperCase().includes('OK') ? '<span class="badge-pass">OK</span>' : '<span class="badge-fail">NG</span>') : '<span class="badge-na">—</span>'}</td>
+      <td>${esc(r.checker||'')}</td>
+      <td>${esc(r.confirmer||'')}</td>
+      <td>${badge}</td>
+      <td style="text-align:center"><button class="detail-btn" onclick="openFpDetail(${start+i})">🔍 Detail</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function fpExportExcel() {
+  if (!fpFiltered.length) { showToast('ไม่มีข้อมูลให้ Export'); return; }
+  showToast('⏳ กำลังสร้าง Excel...', '#555');
+  try {
+    // ส่ง id list ของ records ที่กรองแล้วไปยัง server
+    const ids = fpFiltered.map(r => r.no);
+    const res = await fetch('/fp/api/export-excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: fpFiltered.map(r => r) })
+    });
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'fp_firstlot_' + _localDateStr() + '.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ Export Excel สำเร็จ', '#006600');
+  } catch(e) { showToast('❌ Export ไม่ได้: ' + e.message); }
+}
+
+// ── FP Detail Modal ───────────────────────────────────────────────────────────
+function openFpDetail(idx) {
+  const r = fpFiltered[idx];
+  if (!r) return;
+
+  document.getElementById('fpDetTitle').innerHTML =
+    `📋 FP Detail &nbsp;·&nbsp; <span style="color:#fdba74">${esc(r.mc||'—')}</span>`+
+    ` &nbsp;|&nbsp; <span style="color:#93c5fd;font-family:var(--mono)">${esc(r.item||'—')}</span>`+
+    ` &nbsp;|&nbsp; ${esc(r.date||'')} ${esc(r.time||'')}`;
+
+  const fmt  = v => (v !== '' && v != null) ? String(v) : '—';
+  const res  = (v,good='OK') => {
+    if (!v || v==='' || v==='—') return '<span class="badge-na">—</span>';
+    return v.toUpperCase().includes(good)
+      ? '<span class="badge-pass">OK</span>'
+      : '<span class="badge-fail">NG</span>';
+  };
+  const cell = (lbl, val, cls='') =>
+    `<div class="fp-det-cell"><span class="fp-det-lbl">${lbl}</span><span class="fp-det-val ${cls}">${esc(fmt(val))}</span></div>`;
+
+  const measBlock = (label, p1, p2, p3, p4, avg, result, extra='') => `
+    <div class="fp-det-section">
+      <div class="fp-det-sec-hdr">${label}</div>
+      <div class="fp-det-grid">
+        ${cell('Point 1', p1)} ${cell('Point 2', p2)}
+        ${cell('Point 3', p3)} ${cell('Point 4', p4)}
+      </div>
+      <div class="fp-det-avg-row">
+        <span class="fp-det-avg-lbl">Average${extra}</span>
+        <span class="fp-det-avg-val">${esc(fmt(avg))}</span>
+        ${res(result)}
+      </div>
+    </div>`;
+
+  const html = `
+    <!-- Info Row -->
+    <div class="fp-det-section">
+      <div class="fp-det-sec-hdr">ข้อมูลทั่วไป</div>
+      <div class="fp-det-grid g5">
+        ${cell('วันที่', r.date)} ${cell('เวลา', r.time)}
+        ${cell('เครื่อง', r.mc)} ${cell('Type', r.type)}
+        ${cell('Lot', r.lot)}
+        ${cell('Line', r.line)} ${cell('Seq', r.seq)}
+        ${cell('Vendor', r.vendor)} ${cell('Mat Type', r.mat_type)}
+        ${cell('Oil Type', r.oil)}
+      </div>
+    </div>
+
+    <!-- FIN Pitch -->
+    ${measBlock('🔵 FIN Pitch (mm)', r.fp1, r.fp2, r.fp3, r.fp4, r.fp_avg, r.result_fp,
+      r.spec_pitch ? ` &nbsp;<span style="font-size:11px;color:var(--dim)">Spec: ${esc(r.spec_pitch)}</span>` : '')}
+
+    <!-- FIN Flare -->
+    ${measBlock('🟢 FIN Flare (mm)', r.ff1, r.ff2, r.ff3, r.ff4, r.ff_avg, r.result_ff)}
+
+    <!-- SC (Scan 13) -->
+    ${measBlock('🟡 SC Measurement', r.sc1, r.sc2, r.sc3, r.sc4, r.sc_avg, r.result_sc)}
+
+    <!-- Appearance + Qty -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="fp-det-section">
+        <div class="fp-det-sec-hdr">Appearance Check</div>
+        <div class="fp-det-grid g3">
+          ${cell('Coil', r.appear_coil)} ${cell('SC Appear', r.sc_appear)}
+          ${cell('Appear Result', '')}
+        </div>
+        <div class="fp-det-avg-row">
+          <span class="fp-det-avg-lbl">Appear Result</span>
+          <span></span>
+          ${res(r.result_appear)}
+        </div>
+      </div>
+      <div class="fp-det-section">
+        <div class="fp-det-sec-hdr">Q\'ty Fin &amp; Final</div>
+        <div class="fp-det-grid g2">
+          ${cell("Q'ty Fin", r.qty_fin)} ${cell("Q'ty Result", '')}
+          ${cell('Checker', r.checker)} ${cell('Confirmer', r.confirmer)}
+        </div>
+        <div class="fp-det-avg-row">
+          <span class="fp-det-avg-lbl">Q'ty Result</span>
+          <span></span>
+          ${res(r.result_qty)}
+        </div>
+        <div style="padding:8px 12px;display:flex;align-items:center;gap:10px;border-top:1px solid var(--border)">
+          <span style="font-size:12px;font-weight:700;color:var(--dim)">FINAL</span>
+          ${r.final==='OK'
+            ? '<span class="badge-pass" style="font-size:15px;padding:4px 18px">OK</span>'
+            : (r.final==='NG'
+              ? '<span class="badge-fail" style="font-size:15px;padding:4px 18px">NG</span>'
+              : '<span class="badge-na" style="font-size:15px;padding:4px 18px">—</span>')}
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('fpDetBody').innerHTML = html;
+  document.getElementById('fpDetailOverlay').style.display = 'flex';
+}
+
+function closeFpDetail() {
+  document.getElementById('fpDetailOverlay').style.display = 'none';
+}
+
+function fpExportCSV() {
+  if (!fpFiltered.length) { showToast('ไม่มีข้อมูลให้ Export'); return; }
+  const h = ['No','Date','Time','MC','Item FG','Type','Lot','Line','Seq',
+             'Vendor','Mat Type','Oil Type','Appear','FP Avg',
+             'FF Avg',"Q'ty","Q'ty Result",
+             'Checker','Confirmer','Final'];
+  const rows = fpFiltered.map((r,i) => [
+    i+1, r.date, r.time, r.mc, r.item, r.type, r.lot, r.line, r.seq,
+    r.vendor, r.mat_type, r.oil, r.result_appear,
+    r.fp_avg, r.ff_avg,
+    r.qty_fin, r.result_qty, r.checker, r.confirmer, r.final
+  ].map(v => '"'+(String(v??'').replace(/"/g,'""'))+'"'));
+  const csv = '﻿' + [h, ...rows].map(r=>r.join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'fp_firstlot_' + _localDateStr() + '.csv';
+  a.click();
+}
+
+// ── Admin PIN ─────────────────────────────────────────────────────────────────
+const _ADMIN_PIN = '23031';
+
+function openAdminPin() {
+  document.getElementById('adminPinInput').value = '';
+  document.getElementById('adminPinErr').textContent = '';
+  document.getElementById('adminPinOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('adminPinInput').focus(), 100);
+}
+
+function closeAdminPin() {
+  document.getElementById('adminPinOverlay').classList.remove('open');
+}
+
+function checkAdminPin() {
+  const val = document.getElementById('adminPinInput').value;
+  if (val === _ADMIN_PIN) {
+    closeAdminPin();
+    window.open('http://10.235.117.215:3001/expander/firstlot/admin', 'win_admin');
+  } else {
+    const errEl = document.getElementById('adminPinErr');
+    errEl.textContent = '❌ รหัสไม่ถูกต้อง';
+    document.getElementById('adminPinInput').value = '';
+    document.getElementById('adminPinInput').focus();
+    setTimeout(() => { errEl.textContent = ''; }, 2000);
+  }
+}
+
+</script>
+</body>
+</html>

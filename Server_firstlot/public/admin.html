@@ -1,0 +1,1735 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Expander First Lot Check</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#1f2937;
+  --border:#30363d;--text:#e6edf3;--dim:#8b949e;
+  --ok:#2ea043;--ok-bg:#0d2818;--ok-light:#a5d6a7;
+  --ng:#da3633;--ng-bg:#2d0f0f;--ng-light:#ef9a9a;
+  --warn:#d29922;--warn-bg:#271d00;--warn-light:#ffe082;
+  --accent:#1f6feb;--accent2:#388bfd;
+  --mono:'Consolas','Courier New',monospace;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
+
+/* ── Lock Screen ─────────────────────────────────────── */
+#lockScreen{
+  position:fixed;inset:0;background:var(--bg);z-index:999;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px
+}
+#lockScreen h2{font-size:20px;color:var(--text)}
+#lockScreen p{font-size:13px;color:var(--dim)}
+#pinBox{
+  display:flex;gap:8px;margin-top:8px
+}
+#pinInput{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:10px 16px;font-size:20px;letter-spacing:8px;
+  width:160px;text-align:center;outline:none
+}
+#pinInput:focus{border-color:var(--accent)}
+#pinBtn{
+  background:var(--accent);color:#fff;border:none;border-radius:8px;
+  padding:10px 20px;font-size:15px;cursor:pointer;font-weight:700
+}
+#pinBtn:hover{background:var(--accent2)}
+#pinErr{color:var(--ng-light);font-size:13px;min-height:20px;text-align:center}
+
+/* ── Top Bar ─────────────────────────────────────────── */
+#topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:10px 20px;display:flex;align-items:center;gap:12px;
+  position:sticky;top:0;z-index:100
+}
+#topbar h1{font-size:16px;font-weight:700}
+#topbar h1 span{color:#f85149}
+.tb-sep{flex:1}
+.tb-btn{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer;
+  text-decoration:none;display:inline-flex;align-items:center;gap:5px
+}
+.tb-btn:hover{background:var(--border)}
+#logoutBtn{background:var(--ng-bg);color:var(--ng-light);border-color:var(--ng)}
+
+/* ── Page ───────────────────────────────────────────── */
+.page{padding:16px 20px;max-width:1400px;margin:0 auto}
+.section-title{font-size:13px;font-weight:700;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px}
+
+/* ── Filter ─────────────────────────────────────────── */
+#filterRow{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.flt{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:6px 10px;font-size:13px;outline:none
+}
+.flt:focus{border-color:var(--accent)}
+.flt-btn{
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:6px;padding:6px 14px;font-size:13px;cursor:pointer
+}
+.flt-btn:hover{background:var(--border)}
+#recCount{font-size:12px;color:var(--dim)}
+
+/* ── Table ───────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px;max-height:65vh;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{
+  background:var(--surface2);color:var(--dim);padding:8px 10px;
+  text-align:left;font-weight:600;white-space:nowrap;
+  border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2
+}
+tbody tr{border-bottom:1px solid var(--border)}
+tbody tr:hover{background:rgba(31,111,235,.08)}
+tbody td{padding:6px 10px;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.badge-pass{background:var(--ok-bg);color:var(--ok-light);border:1px solid var(--ok);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700}
+.badge-fail{background:var(--ng-bg);color:var(--ng-light);border:1px solid var(--ng);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700}
+.badge-na{background:var(--surface2);color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:1px 7px;font-size:11px}
+.td-id{color:var(--dim);width:36px}
+.td-fg{font-family:var(--mono);color:var(--accent2)}
+.act-btn{
+  border:none;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600;margin-right:3px
+}
+.btn-edit{background:var(--warn-bg);color:var(--warn-light);border:1px solid var(--warn)}
+.btn-edit:hover{opacity:.8}
+.btn-del{background:var(--ng-bg);color:var(--ng-light);border:1px solid var(--ng)}
+.btn-del:hover{opacity:.8}
+
+/* ── Pagination ──────────────────────────────────────── */
+#pagRow{display:flex;align-items:center;gap:8px;margin-top:10px;justify-content:flex-end}
+.pg-btn{background:var(--surface);border:1px solid var(--border);color:var(--text);
+  border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px}
+.pg-btn:disabled{opacity:.3;cursor:default}
+#pgInfo{font-size:12px;color:var(--dim)}
+
+/* ── Modal ───────────────────────────────────────────── */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;
+  display:none;align-items:center;justify-content:center;padding:16px
+}
+.modal-bg.open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:720px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden
+}
+.modal-hdr{
+  background:var(--surface2);padding:14px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px
+}
+.modal-hdr h2{font-size:15px;font-weight:700;flex:1}
+.modal-close{background:none;border:none;color:var(--dim);font-size:20px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.modal-close:hover{color:var(--text);background:var(--border)}
+.modal-body{padding:16px 20px;overflow-y:auto;flex:1}
+.modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* Form Grid */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group select,.form-group textarea{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  border-radius:6px;padding:7px 10px;font-size:13px;outline:none;width:100%
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+.form-group textarea{resize:vertical;min-height:60px;font-family:inherit}
+.fg-sep{grid-column:1/-1;border:none;border-top:1px solid var(--border);margin:4px 0}
+
+.btn-save{background:var(--ok);color:#fff;border:none;border-radius:7px;padding:8px 22px;font-size:14px;cursor:pointer;font-weight:700}
+.btn-save:hover{opacity:.85}
+.btn-cancel{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px 18px;font-size:14px;cursor:pointer}
+.btn-cancel:hover{background:var(--border)}
+
+/* Delete modal */
+#delModal .modal{max-width:420px}
+.del-warn{color:var(--ng-light);font-size:14px;line-height:1.6;padding:4px 0}
+.btn-del-confirm{background:var(--ng);color:#fff;border:none;border-radius:7px;padding:8px 22px;font-size:14px;cursor:pointer;font-weight:700}
+.btn-del-confirm:hover{opacity:.85}
+
+/* ── Checkbox col ────────────────────────────────────── */
+.td-chk{width:32px;text-align:center;padding:4px 6px!important}
+.td-chk input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--accent)}
+thead .td-chk input[type=checkbox]{accent-color:#fff}
+
+/* ── Bulk Action Bar ─────────────────────────────────── */
+.bulk-bar{
+  display:none;align-items:center;gap:10px;
+  background:#1a2535;border:1px solid #1f6feb55;border-radius:8px;
+  padding:8px 14px;margin-bottom:8px;
+}
+.bulk-bar.show{display:flex}
+.bulk-count{font-size:13px;color:#58a6ff;font-weight:700}
+.bulk-del-btn{
+  background:var(--ng-bg);color:var(--ng-light);border:1px solid var(--ng);
+  border-radius:6px;padding:5px 16px;font-size:13px;cursor:pointer;font-weight:700
+}
+.bulk-del-btn:hover{opacity:.8}
+.bulk-clear-btn{
+  background:var(--surface2);color:var(--dim);border:1px solid var(--border);
+  border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer
+}
+.bulk-clear-btn:hover{background:var(--border)}
+
+/* Confirm Bulk Delete Modal */
+#bulkDelModal .modal{max-width:440px}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:#323232;color:#fff;padding:10px 22px;border-radius:8px;
+  font-size:13px;opacity:0;transition:all .3s;z-index:999;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- Lock Screen -->
+<div id="lockScreen">
+  <div style="font-size:40px">🔐</div>
+  <h2>Admin — ระบบแก้ไขข้อมูล</h2>
+  <p>กรุณาใส่รหัสผ่านก่อนเข้าใช้งาน</p>
+  <div id="pinBox">
+    <input id="pinInput" type="password" maxlength="6" placeholder="••••••"
+      onkeydown="if(event.key==='Enter')checkPin()">
+    <button id="pinBtn" onclick="checkPin()">เข้าสู่ระบบ</button>
+  </div>
+  <div id="pinErr"></div>
+</div>
+
+<!-- Main App (hidden until logged in) -->
+<div id="mainApp" style="display:none">
+
+<!-- Top Bar -->
+<div id="topbar">
+  <h1>🔧 Admin — <span>แก้ไขข้อมูล</span></h1>
+  <div class="tb-sep"></div>
+  <a class="tb-btn" href="/dashboard/firstlot" target="win_dashboard">📊 Dashboard</a>
+  <a class="tb-btn" href="/Layout_HEI?edit=1" target="win_layout"
+     style="background:#0d2535;color:#80deea;border-color:#00838F;">🗺️ แก้ไข Layout HEI</a>
+<button class="tb-btn" onclick="reloadMaster()" style="background:#1b5e20;color:#a5d6a7;border-color:#2e7d32">📥 Reload Master</button>
+  <button class="tb-btn" id="logoutBtn" onclick="logout()">🔒 ออกจากระบบ</button>
+</div>
+
+<div class="page">
+  <!-- Tabs -->
+  <div style="display:flex;gap:8px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0">
+    <button id="tab-exp" onclick="switchTab('exp')"
+      style="padding:8px 20px;border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;font-size:13px">
+      ⚙ Expander First Lot
+    </button>
+    <button id="tab-cut" onclick="switchTab('cut')"
+      style="padding:8px 20px;border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;background:var(--surface2);color:var(--dim);font-weight:700;cursor:pointer;font-size:13px">
+      ✂ Cutting Check
+    </button>
+    <button id="tab-hp" onclick="switchTab('hp')"
+      style="padding:8px 20px;border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;background:var(--surface2);color:var(--dim);font-weight:700;cursor:pointer;font-size:13px">
+      🔩 HP Check
+    </button>
+    <button id="tab-fp" onclick="switchTab('fp')"
+      style="padding:8px 20px;border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;background:var(--surface2);color:var(--dim);font-weight:700;cursor:pointer;font-size:13px">
+      🔧 Fin Press
+    </button>
+    <button id="tab-hins" onclick="switchTab('hins')"
+      style="padding:8px 20px;border:1px solid var(--border);border-bottom:none;border-radius:6px 6px 0 0;background:var(--surface2);color:var(--dim);font-weight:700;cursor:pointer;font-size:13px">
+      📌 Hairpin Insert
+    </button>
+  </div>
+
+  <!-- ══ EXPANDER SECTION ══ -->
+  <div id="section-exp">
+  <div class="section-title">จัดการข้อมูลการบันทึก — Expander</div>
+  <div id="filterRow">
+    <input id="searchBox" class="flt" type="text" placeholder="🔍 ค้นหา FG / Machine / Checker..." oninput="filterLog()" style="min-width:220px">
+    <select id="fltMachine" class="flt" onchange="filterLog()"><option value="">เครื่องทั้งหมด</option></select>
+    <select id="fltStatus" class="flt" onchange="filterLog()">
+      <option value="">Status ทั้งหมด</option>
+      <option value="PASS">PASS</option>
+      <option value="FAIL">FAIL</option>
+    </select>
+    <input id="fltDate" class="flt" type="date" onchange="filterLog()">
+    <button class="flt-btn" onclick="clearFilter()">✕ ล้าง</button>
+    <span id="recCount"></span>
+  </div>
+
+  <div class="bulk-bar" id="expBulkBar">
+    <span class="bulk-count" id="expBulkCount">0 รายการที่เลือก</span>
+    <button class="bulk-del-btn" onclick="openBulkDelete('exp')">🗑️ ลบที่เลือก</button>
+    <button class="bulk-clear-btn" onclick="clearSelection('exp')">✕ ยกเลิก</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="td-chk"><input type="checkbox" id="expChkAll" onchange="toggleSelectAll('exp')"></th>
+          <th class="td-id">ID</th>
+          <th>วันที่</th><th>เวลา</th>
+          <th>เครื่อง</th>
+          <th>Item FG</th><th>Type</th>
+          <th>Checker</th><th>Confirm</th>
+          <th>Line</th><th>Seq</th><th>Qty</th>
+          <th>Status</th>
+          <th>Remark</th>
+          <th style="min-width:120px">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+  <div id="pagRow">
+    <button class="pg-btn" id="pgPrev" onclick="changePage(-1)">◀</button>
+    <span id="pgInfo">หน้า 1 / 1</span>
+    <button class="pg-btn" id="pgNext" onclick="changePage(1)">▶</button>
+  </div>
+  </div><!-- /section-exp -->
+
+  <!-- ══ CUTTING SECTION ══ -->
+  <div id="section-cut" style="display:none">
+  <div class="section-title">จัดการข้อมูลการบันทึก — Cutting Check</div>
+  <div id="cutFilterRow" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+    <input id="cutSearchBox" class="flt" type="text" placeholder="🔍 ค้นหา FG / MC / Checker..." oninput="cutFilterLog()" style="min-width:220px">
+    <select id="cutFltMachine" class="flt" onchange="cutFilterLog()"><option value="">เครื่องทั้งหมด</option></select>
+    <input id="cutFltDate" class="flt" type="date" onchange="cutFilterLog()">
+    <button class="flt-btn" onclick="cutClearFilter()">✕ ล้าง</button>
+    <span id="cutRecCount"></span>
+  </div>
+  <div class="bulk-bar" id="cutBulkBar">
+    <span class="bulk-count" id="cutBulkCount">0 รายการที่เลือก</span>
+    <button class="bulk-del-btn" onclick="openBulkDelete('cut')">🗑️ ลบที่เลือก</button>
+    <button class="bulk-clear-btn" onclick="clearSelection('cut')">✕ ยกเลิก</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="td-chk"><input type="checkbox" id="cutChkAll" onchange="toggleSelectAll('cut')"></th>
+          <th class="td-id">ID</th>
+          <th>วันที่-เวลา</th>
+          <th>ID Card</th><th>MC/Line</th>
+          <th>Tag FG No.1</th><th>Item Insul.</th>
+          <th>Type</th><th>Leader</th>
+          <th>Lay Side</th><th>Lay Mid</th>
+          <th>Status</th>
+          <th style="min-width:120px">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="cutLogBody"></tbody>
+    </table>
+  </div>
+  <div id="cutPagRow" style="display:flex;align-items:center;gap:10px;margin-top:12px">
+    <button class="pg-btn" id="cutPgPrev" onclick="cutChangePage(-1)">◀</button>
+    <span id="cutPgInfo">หน้า 1 / 1</span>
+    <button class="pg-btn" id="cutPgNext" onclick="cutChangePage(1)">▶</button>
+  </div>
+  </div><!-- /section-cut -->
+
+  <!-- ══ HP SECTION ══ -->
+  <div id="section-hp" style="display:none">
+  <div class="section-title">จัดการข้อมูลการบันทึก — HP Check</div>
+  <div id="hpFilterRow" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+    <input id="hpSearchBox" class="flt" type="text" placeholder="🔍 ค้นหา Item / M/C / Checker..." oninput="hpFilterLog()" style="min-width:220px">
+    <select id="hpFltMachine" class="flt" onchange="hpFilterLog()"><option value="">เครื่องทั้งหมด</option></select>
+    <input id="hpFltDate" class="flt" type="date" onchange="hpFilterLog()">
+    <button class="flt-btn" onclick="hpClearFilter()">✕ ล้าง</button>
+    <span id="hpRecCount"></span>
+  </div>
+  <div class="bulk-bar" id="hpBulkBar">
+    <span class="bulk-count" id="hpBulkCount">0 รายการที่เลือก</span>
+    <button class="bulk-del-btn" onclick="openBulkDelete('hp')">🗑️ ลบที่เลือก</button>
+    <button class="bulk-clear-btn" onclick="clearSelection('hp')">✕ ยกเลิก</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="td-chk"><input type="checkbox" id="hpChkAll" onchange="toggleSelectAll('hp')"></th>
+          <th class="td-id">ID</th>
+          <th>วันที่-เวลา</th>
+          <th>M/C</th><th>Line</th><th>Seq</th>
+          <th>Item HP</th><th>Item FG</th>
+          <th>Coils</th><th>Vendor</th>
+          <th>Avg L1</th><th>Avg L2</th><th>Avg Flat%</th>
+          <th>ผู้ลงบันทึก</th><th>Confirm</th>
+          <th>Result</th>
+          <th style="min-width:120px">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="hpLogBody"></tbody>
+    </table>
+  </div>
+  <div id="hpPagRow" style="display:flex;align-items:center;gap:10px;margin-top:12px">
+    <button class="pg-btn" id="hpPgPrev" onclick="hpChangePage(-1)">◀</button>
+    <span id="hpPgInfo">หน้า 1 / 1</span>
+    <button class="pg-btn" id="hpPgNext" onclick="hpChangePage(1)">▶</button>
+  </div>
+  </div><!-- /section-hp -->
+
+  <!-- ══ FP SECTION ══ -->
+  <div id="section-fp" style="display:none">
+  <div class="section-title">จัดการข้อมูลการบันทึก — Fin Press</div>
+  <div id="fpAdminFilterRow" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+    <input id="fpAdminSearch" class="flt" type="text" placeholder="🔍 ค้นหา Item / MC / Checker..." oninput="fpAdminFilter()" style="min-width:220px">
+    <select id="fpAdminFltMC" class="flt" onchange="fpAdminFilter()"><option value="">เครื่องทั้งหมด</option></select>
+    <input id="fpAdminFltDate" class="flt" type="date" onchange="fpAdminFilter()">
+    <button class="flt-btn" onclick="fpAdminClearFilter()">✕ ล้าง</button>
+    <span id="fpAdminRecCount"></span>
+  </div>
+  <div class="bulk-bar" id="fpBulkBar">
+    <span class="bulk-count" id="fpBulkCount">0 รายการที่เลือก</span>
+    <button class="bulk-del-btn" onclick="openBulkDelete('fp')">🗑️ ลบที่เลือก</button>
+    <button class="bulk-clear-btn" onclick="clearSelection('fp')">✕ ยกเลิก</button>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="td-chk"><input type="checkbox" id="fpChkAll" onchange="toggleSelectAll('fp')"></th>
+          <th class="td-id">ID</th>
+          <th>วันที่</th><th>เวลา</th>
+          <th>เครื่อง</th>
+          <th>Item FG</th><th>Type</th>
+          <th>Lot</th><th>Line</th><th>Seq</th>
+          <th>Vendor</th><th>Oil</th>
+          <th>FP Avg</th><th>FF Avg</th>
+          <th>Q'ty</th>
+          <th>Checker</th><th>Confirmer</th>
+          <th>Final</th>
+          <th style="min-width:120px">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="fpAdminLogBody"></tbody>
+    </table>
+  </div>
+  <div id="fpAdminPagRow" style="display:flex;align-items:center;gap:10px;margin-top:12px">
+    <button class="pg-btn" id="fpAdminPgPrev" onclick="fpAdminChangePage(-1)">◀</button>
+    <span id="fpAdminPgInfo">หน้า 1 / 1</span>
+    <button class="pg-btn" id="fpAdminPgNext" onclick="fpAdminChangePage(1)">▶</button>
+  </div>
+  </div><!-- /section-fp -->
+
+  <!-- ══ HAIRPIN INSERT SECTION ══ -->
+  <div id="section-hins" style="display:none">
+  <div class="section-title">จัดการข้อมูลการบันทึก — Hairpin Insert</div>
+  <div id="hinsFilterRow" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+    <input id="hinsSearch" class="flt" type="text" placeholder="🔍 ค้นหา Item WIP / Insert No. / Checker..." oninput="hinsFilter()" style="min-width:240px">
+    <select id="hinsFltMC" class="flt" onchange="hinsFilter()"><option value="">เครื่องทั้งหมด</option></select>
+    <select id="hinsFltVerify" class="flt" onchange="hinsFilter()">
+      <option value="">Verify ทั้งหมด</option>
+      <option value="1">✔ ตรวจแล้ว</option>
+      <option value="0">ยังไม่ตรวจ</option>
+    </select>
+    <input id="hinsFltDate" class="flt" type="date" onchange="hinsFilter()">
+    <button class="flt-btn" onclick="hinsClearFilter()">✕ ล้าง</button>
+    <span id="hinsRecCount"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="td-id">ID</th>
+          <th>วันที่</th><th>เวลา</th>
+          <th>Insert No.</th>
+          <th>Item WIP</th><th>Prod.Type</th>
+          <th>Line</th><th>Seq</th><th>Lot</th>
+          <th>Checker</th><th>Confirm</th>
+          <th>Final</th><th>Verify</th>
+          <th style="min-width:180px">จัดการ</th>
+        </tr>
+      </thead>
+      <tbody id="hinsLogBody"></tbody>
+    </table>
+  </div>
+  <div id="hinsPagRow" style="display:flex;align-items:center;gap:10px;margin-top:12px">
+    <button class="pg-btn" id="hinsPgPrev" onclick="hinsChangePage(-1)">◀</button>
+    <span id="hinsPgInfo">หน้า 1 / 1</span>
+    <button class="pg-btn" id="hinsPgNext" onclick="hinsChangePage(1)">▶</button>
+  </div>
+  </div><!-- /section-hins -->
+
+</div>
+
+</div><!-- /mainApp -->
+
+<!-- Edit Modal -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>✏️ แก้ไข Record #<span id="editId"></span></h2>
+      <button class="modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>วันที่ (YYYY-MM-DD)</label><input id="e_date" type="date"></div>
+        <div class="form-group"><label>เวลา (HH:MM:SS)</label><input id="e_time" type="time" step="1"></div>
+        <div class="form-group"><label>Checker (ชื่อ)</label><input id="e_checker" type="text"></div>
+        <div class="form-group"><label>Checker ID</label><input id="e_checker_id" type="text"></div>
+        <div class="form-group"><label>Confirm Checker</label><input id="e_confirm_checker" type="text"></div>
+        <div class="form-group"><label>เครื่องจักร (Machine)</label><input id="e_machine" type="text"></div>
+        <div class="form-group"><label>Line</label><input id="e_line" type="text"></div>
+        <div class="form-group"><label>Seq</label><input id="e_seq" type="text"></div>
+        <div class="form-group"><label>Qty</label><input id="e_qty" type="text"></div>
+        <div class="form-group"><label>Item FG</label><input id="e_item_fg" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Type</label><input id="e_item_type" type="text"></div>
+        <hr class="fg-sep">
+        <div class="form-group"><label>SP1</label><input id="e_sp1" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>SP2</label><input id="e_sp2" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>SP3</label><input id="e_sp3" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>EL (ค่าวัด)</label><input id="e_val_el" type="text"></div>
+        <div class="form-group"><label>A (ค่าวัด)</label><input id="e_val_a" type="text"></div>
+        <div class="form-group"><label>B (ค่าวัด)</label><input id="e_val_b" type="text"></div>
+        <div class="form-group"><label>C (ค่าวัด)</label><input id="e_val_c" type="text"></div>
+        <div class="form-group"><label>D (ค่าวัด)</label><input id="e_val_d" type="text"></div>
+        <div class="form-group"><label>D% Flatness</label><input id="e_flat_pct" type="text"></div>
+        <div class="form-group"><label>Hairpin Appearance</label>
+          <select id="e_ap_hairpin"><option value="">—</option><option value="OK">OK</option><option value="NG">NG</option></select>
+        </div>
+        <div class="form-group"><label>FIN Appearance</label>
+          <select id="e_ap_fin"><option value="">—</option><option value="OK">OK</option><option value="NG">NG</option></select>
+        </div>
+        <div class="form-group"><label>Pitch</label><input id="e_pitch" type="text"></div>
+        <div class="form-group"><label>Hairpin Item</label><input id="e_hairpin_item" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>FIN Item</label><input id="e_fin_item" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Mark Color</label><input id="e_mark_color" type="text"></div>
+        <div class="form-group"><label>Mark Status</label>
+          <select id="e_mark_status"><option value="">—</option><option value="OK">OK</option><option value="NG">NG</option></select>
+        </div>
+        <hr class="fg-sep">
+        <div class="form-group"><label>Status (ผลรวม)</label>
+          <select id="e_status">
+            <option value="">—</option>
+            <option value="✓ PASS">✓ PASS</option>
+            <option value="✗ FAIL">✗ FAIL</option>
+          </select>
+        </div>
+        <div class="form-group full"><label>Remark / หมายเหตุ</label>
+          <textarea id="e_remark" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeEdit()">ยกเลิก</button>
+      <button class="btn-save" onclick="saveEdit()">💾 บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-bg" id="delModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>🗑️ ยืนยันการลบ</h2>
+      <button class="modal-close" onclick="closeDelete()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn">
+        ต้องการลบ Record <strong>#<span id="delId"></span></strong> ใช่หรือไม่?<br>
+        <span style="color:var(--dim);font-size:12px" id="delDesc"></span><br><br>
+        <span style="color:var(--ng-light)">⚠ การลบไม่สามารถกู้คืนได้</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeDelete()">ยกเลิก</button>
+      <button class="btn-del-confirm" onclick="confirmDelete()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cutting Edit Modal -->
+<div class="modal-bg" id="cutEditModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>✏️ แก้ไข Cutting Record #<span id="cutEditId"></span></h2>
+      <button class="modal-close" onclick="closeCutEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>ID Card (ชื่อพนักงาน)</label><input id="ce_id_card" type="text"></div>
+        <div class="form-group"><label>MC/Line (เครื่อง)</label><input id="ce_mc_line" type="text"></div>
+        <div class="form-group"><label>Tag FG No.1</label><input id="ce_tag_fg_no1" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Tag FG No.2</label><input id="ce_tag_fg_no2" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Item Insulation</label><input id="ce_item_insulation" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Type</label><input id="ce_item_type" type="text"></div>
+        <div class="form-group"><label>Line</label><input id="ce_line" type="text"></div>
+        <div class="form-group"><label>Seq</label><input id="ce_seq" type="text"></div>
+        <div class="form-group"><label>Lot</label><input id="ce_lot" type="text"></div>
+        <div class="form-group"><label>Leader Confirm</label><input id="ce_leader_confirm" type="text"></div>
+        <div class="form-group"><label>Status</label>
+          <select id="ce_status">
+            <option value="OK">OK</option>
+            <option value="NG">NG</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeCutEdit()">ยกเลิก</button>
+      <button class="btn-save" onclick="saveCutEdit()">💾 บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cutting Delete Modal -->
+<div class="modal-bg" id="cutDelModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h2>🗑️ ยืนยันการลบ Cutting</h2>
+      <button class="modal-close" onclick="closeCutDelete()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn">
+        ต้องการลบ Record <strong>#<span id="cutDelId"></span></strong> ใช่หรือไม่?<br>
+        <span style="color:var(--dim);font-size:12px" id="cutDelDesc"></span><br><br>
+        <span style="color:var(--ng-light)">⚠ การลบไม่สามารถกู้คืนได้</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeCutDelete()">ยกเลิก</button>
+      <button class="btn-del-confirm" onclick="confirmCutDelete()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- HP Edit Modal -->
+<div class="modal-bg" id="hpEditModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>✏️ แก้ไข HP Record #<span id="hpEditId"></span></h2>
+      <button class="modal-close" onclick="closeHPEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>M/C</label><input id="he_mc" type="text"></div>
+        <div class="form-group"><label>Line</label><input id="he_line" type="text"></div>
+        <div class="form-group"><label>Seq</label><input id="he_seq" type="text"></div>
+        <div class="form-group"><label>Checker</label><input id="he_checker" type="text"></div>
+        <div class="form-group"><label>Confirm By</label><input id="he_confirm_by" type="text"></div>
+        <div class="form-group"><label>Item HP</label><input id="he_item" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Item FG</label><input id="he_item_fg" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Type</label><input id="he_item_type" type="text"></div>
+        <div class="form-group"><label>Cu Item</label><input id="he_cu_item" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Die (Coil Size P)</label><input id="he_die" type="text"></div>
+        <div class="form-group"><label>Vendor</label><input id="he_vendor" type="text"></div>
+        <div class="form-group"><label>Coil Size</label><input id="he_coil_size" type="text"></div>
+        <hr class="fg-sep">
+        <div class="form-group"><label>Result</label>
+          <select id="he_result">
+            <option value="">—</option>
+            <option value="✅ PASS">✅ PASS</option>
+            <option value="❌ FAIL">❌ FAIL</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeHPEdit()">ยกเลิก</button>
+      <button class="btn-save" onclick="saveHPEdit()">💾 บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- HP Delete Modal -->
+<div class="modal-bg" id="hpDelModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h2>🗑️ ยืนยันการลบ HP Record</h2>
+      <button class="modal-close" onclick="closeHPDelete()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn">
+        ต้องการลบ Record <strong>#<span id="hpDelId"></span></strong> ใช่หรือไม่?<br>
+        <span style="color:var(--dim);font-size:12px" id="hpDelDesc"></span><br><br>
+        <span style="color:var(--ng-light)">⚠ การลบไม่สามารถกู้คืนได้</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeHPDelete()">ยกเลิก</button>
+      <button class="btn-del-confirm" onclick="confirmHPDelete()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- FP Edit Modal -->
+<div class="modal-bg" id="fpEditModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>✏️ แก้ไข FP Record #<span id="fpEditId"></span></h2>
+      <button class="modal-close" onclick="closeFPEdit()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>วันที่</label><input id="fe_date" type="date"></div>
+        <div class="form-group"><label>เวลา</label><input id="fe_time" type="time" step="60"></div>
+        <div class="form-group"><label>เครื่อง (MC)</label><input id="fe_mc" type="text"></div>
+        <div class="form-group"><label>Type</label><input id="fe_type" type="text"></div>
+        <div class="form-group"><label>Item FG</label><input id="fe_item" type="text" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>Lot</label><input id="fe_lot" type="text"></div>
+        <div class="form-group"><label>Line</label><input id="fe_line" type="text"></div>
+        <div class="form-group"><label>Seq</label><input id="fe_seq" type="text"></div>
+        <div class="form-group"><label>Vendor</label><input id="fe_vendor" type="text"></div>
+        <div class="form-group"><label>Oil Type</label><input id="fe_oil" type="text"></div>
+        <div class="form-group"><label>Checker</label><input id="fe_checker" type="text"></div>
+        <div class="form-group"><label>Confirmer</label><input id="fe_confirmer" type="text"></div>
+        <hr class="fg-sep">
+        <div class="form-group"><label>Final</label>
+          <select id="fe_final">
+            <option value="">—</option>
+            <option value="OK">OK</option>
+            <option value="NG">NG</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeFPEdit()">ยกเลิก</button>
+      <button class="btn-save" onclick="saveFPEdit()">💾 บันทึกการแก้ไข</button>
+    </div>
+  </div>
+</div>
+
+<!-- FP Delete Modal -->
+<div class="modal-bg" id="fpDelModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h2>🗑️ ยืนยันการลบ FP Record</h2>
+      <button class="modal-close" onclick="closeFPDelete()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn">
+        ต้องการลบ Record <strong>#<span id="fpDelId"></span></strong> ใช่หรือไม่?<br>
+        <span style="color:var(--dim);font-size:12px" id="fpDelDesc"></span><br><br>
+        <span style="color:var(--ng-light)">⚠ การลบไม่สามารถกู้คืนได้</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeFPDelete()">ยกเลิก</button>
+      <button class="btn-del-confirm" onclick="confirmFPDelete()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hairpin Insert Delete Modal -->
+<div class="modal-bg" id="hinsDelModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h2>🗑️ ยืนยันการลบ Hairpin Insert</h2>
+      <button class="modal-close" onclick="closeHInsDelete()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn">
+        ต้องการลบ Record <strong>#<span id="hinsDelId"></span></strong> ใช่หรือไม่?<br>
+        <span style="color:var(--dim);font-size:12px" id="hinsDelDesc"></span><br><br>
+        <span style="color:var(--ng-light)">⚠ การลบไม่สามารถกู้คืนได้</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeHInsDelete()">ยกเลิก</button>
+      <button class="btn-del-confirm" onclick="confirmHInsDelete()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Delete Confirm Modal -->
+<div class="modal-bg" id="bulkDelModal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h2>🗑️ ยืนยันการลบหลายรายการ</h2>
+      <button class="modal-close" onclick="closeBulkDelete()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="del-warn">
+        ต้องการลบ <strong><span id="bulkDelCount">0</span> รายการ</strong> ที่เลือกใช่หรือไม่?<br><br>
+        <span style="color:var(--ng-light)">⚠ การลบไม่สามารถกู้คืนได้</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeBulkDelete()">ยกเลิก</button>
+      <button class="btn-del-confirm" id="bulkDelConfirmBtn" onclick="confirmBulkDelete()">🗑️ ลบถาวร</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── PIN ───────────────────────────────────────────────────────────────────────
+const ADMIN_PIN = '23031';   // ← เปลี่ยนรหัสผ่านได้ที่นี่
+
+function checkPin() {
+  const v = document.getElementById('pinInput').value;
+  if (v === ADMIN_PIN) {
+    sessionStorage.setItem('admin_ok','1');
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    loadAll();
+  } else {
+    document.getElementById('pinErr').textContent = '❌ รหัสไม่ถูกต้อง';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+    setTimeout(()=>document.getElementById('pinErr').textContent='', 2000);
+  }
+}
+function logout() {
+  sessionStorage.removeItem('admin_ok');
+  location.reload();
+}
+// Auto-unlock if session exists
+if (sessionStorage.getItem('admin_ok') === '1') {
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+}
+
+// ── Bulk Selection State ──────────────────────────────────────────────────────
+const _sel = { exp: new Set(), cut: new Set(), hp: new Set(), fp: new Set() };
+
+const _bulkCfg = {
+  exp: { bar:'expBulkBar', count:'expBulkCount', chkAll:'expChkAll',
+         url:'/expander/firstlot/api/records/bulk-delete', reload: ()=>loadAll() },
+  cut: { bar:'cutBulkBar', count:'cutBulkCount', chkAll:'cutChkAll',
+         url:'/cutting/api/cutting-records/bulk-delete',  reload: ()=>loadCutting() },
+  hp:  { bar:'hpBulkBar',  count:'hpBulkCount',  chkAll:'hpChkAll',
+         url:'/hp/api/records/bulk-delete',               reload: ()=>loadHP() },
+  fp:  { bar:'fpBulkBar',  count:'fpBulkCount',  chkAll:'fpChkAll',
+         url:'/fp/api/records/bulk-delete',               reload: ()=>loadFPAdmin() },
+};
+
+function _updateBulkBar(tab) {
+  const cfg = _bulkCfg[tab];
+  const n   = _sel[tab].size;
+  const bar = document.getElementById(cfg.bar);
+  const cnt = document.getElementById(cfg.count);
+  if (bar) bar.classList.toggle('show', n > 0);
+  if (cnt) cnt.textContent = n + ' รายการที่เลือก';
+}
+
+function toggleRow(tab, id, checked) {
+  if (checked) _sel[tab].add(id); else _sel[tab].delete(id);
+  _updateBulkBar(tab);
+}
+
+function toggleSelectAll(tab) {
+  const cfg   = _bulkCfg[tab];
+  const chk   = document.getElementById(cfg.chkAll);
+  const boxes = document.querySelectorAll(`.chk-row-${tab}`);
+  boxes.forEach(b => {
+    b.checked = chk.checked;
+    const id = parseInt(b.dataset.id);
+    if (chk.checked) _sel[tab].add(id); else _sel[tab].delete(id);
+  });
+  _updateBulkBar(tab);
+}
+
+function clearSelection(tab) {
+  _sel[tab].clear();
+  const cfg = _bulkCfg[tab];
+  const chk = document.getElementById(cfg.chkAll);
+  if (chk) chk.checked = false;
+  document.querySelectorAll(`.chk-row-${tab}`).forEach(b => b.checked = false);
+  _updateBulkBar(tab);
+}
+
+// ── Bulk Delete Modal ─────────────────────────────────────────────────────────
+let _bulkDelTab = null;
+
+function openBulkDelete(tab) {
+  if (_sel[tab].size === 0) return;
+  _bulkDelTab = tab;
+  document.getElementById('bulkDelCount').textContent = _sel[tab].size;
+  document.getElementById('bulkDelModal').classList.add('open');
+}
+function closeBulkDelete() {
+  document.getElementById('bulkDelModal').classList.remove('open');
+  _bulkDelTab = null;
+}
+async function confirmBulkDelete() {
+  const tab = _bulkDelTab;
+  if (!tab) return;
+  const cfg = _bulkCfg[tab];
+  const ids = [..._sel[tab]];
+  try {
+    const res = await fetch(cfg.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    const d = await res.json();
+    if (d.ok) {
+      showToast(`🗑️ ลบ ${d.deleted} รายการสำเร็จ`);
+      _sel[tab].clear();
+      closeBulkDelete();
+      await cfg.reload();
+    } else {
+      showToast('❌ Error: ' + d.error);
+    }
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+document.getElementById('bulkDelModal').addEventListener('click', function(e){ if(e.target===this) closeBulkDelete(); });
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+let allRecords = [], filtered = [], currentPage = 1;
+const PAGE_SIZE = 50;
+
+async function reloadMaster() {
+  showToast('⏳ กำลัง Reload Master Data ทั้ง 3 ไฟล์...');
+  try {
+    const r = await fetch('/api/reload-master');
+    const d = await r.json();
+    if (d.ok) {
+      // แสดงผลแต่ละไฟล์
+      const lines = Object.values(d.results || {}).join('\n');
+      showToast('✅ ' + d.message + '\n' + lines, 6000);
+    } else {
+      const errLines = (d.errors || []).join('\n');
+      showToast('⚠ ' + d.message + '\n' + errLines, 6000);
+    }
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
+async function loadAll() {
+  try {
+    const res = await fetch('/expander/firstlot/api/records/all');
+    allRecords = await res.json();
+    populateFilter();
+    filterLog();
+  } catch(e) { showToast('❌ โหลดข้อมูลไม่ได้: '+e.message); }
+}
+
+function populateFilter() {
+  const sel = document.getElementById('fltMachine');
+  const cur = sel.value;
+  const machines = [...new Set(allRecords.map(r=>r.machine).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">เครื่องทั้งหมด</option>'
+    + machines.map(m=>`<option value="${esc(m)}" ${m===cur?'selected':''}>${esc(m)}</option>`).join('');
+}
+
+function filterLog() {
+  const q   = document.getElementById('searchBox').value.toLowerCase();
+  const mch = document.getElementById('fltMachine').value;
+  const sts = document.getElementById('fltStatus').value;
+  const dt  = document.getElementById('fltDate').value;
+  filtered = allRecords.filter(r => {
+    if (mch && r.machine !== mch) return false;
+    if (sts && !(r.status||'').includes(sts)) return false;
+    if (dt  && r.date !== dt) return false;
+    if (q) {
+      const hay = [r.item_fg,r.machine,r.checker,r.confirm_checker,r.remark,r.item_type,r.status,r.id]
+        .join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  currentPage = 1;
+  renderTable();
+}
+
+function clearFilter() {
+  document.getElementById('searchBox').value = '';
+  document.getElementById('fltMachine').value = '';
+  document.getElementById('fltStatus').value = '';
+  document.getElementById('fltDate').value = '';
+  filterLog();
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function renderTable() {
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total/PAGE_SIZE));
+  currentPage = Math.min(currentPage, pages);
+  const start = (currentPage-1)*PAGE_SIZE;
+  const slice = filtered.slice(start, start+PAGE_SIZE);
+  document.getElementById('recCount').textContent = `(${total} records)`;
+  document.getElementById('pgInfo').textContent   = `หน้า ${currentPage} / ${pages}`;
+  document.getElementById('pgPrev').disabled = currentPage <= 1;
+  document.getElementById('pgNext').disabled = currentPage >= pages;
+
+  const tbody = document.getElementById('logBody');
+  if (!slice.length) {
+    tbody.innerHTML='<tr><td colspan="14" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  // sync header checkbox
+  const _expChkAll = document.getElementById('expChkAll');
+  if (_expChkAll) _expChkAll.checked = false;
+
+  tbody.innerHTML = slice.map(r => {
+    const st = (r.status||'');
+    const badge = st.includes('PASS') ? `<span class="badge-pass">PASS</span>`
+      : (st.includes('FAIL') ? `<span class="badge-fail">FAIL</span>`
+      : `<span class="badge-na">—</span>`);
+    const chked = _sel.exp.has(r.id) ? 'checked' : '';
+    return `<tr>
+      <td class="td-chk"><input type="checkbox" class="chk-row-exp" data-id="${r.id}" ${chked} onchange="toggleRow('exp',${r.id},this.checked)"></td>
+      <td class="td-id">${r.id}</td>
+      <td>${esc(r.date||'')}</td>
+      <td>${esc(r.time||'')}</td>
+      <td><strong>${esc(r.machine||'')}</strong></td>
+      <td class="td-fg">${esc(r.item_fg||'')}</td>
+      <td>${esc(r.item_type||'')}</td>
+      <td>${esc(r.checker||'')}</td>
+      <td>${esc(r.confirm_checker||'')}</td>
+      <td>${esc(r.line||'')}</td>
+      <td>${esc(r.seq||'')}</td>
+      <td>${esc(r.qty||'')}</td>
+      <td>${badge}</td>
+      <td title="${esc(r.remark||'')}">${esc(r.remark||'')}</td>
+      <td>
+        <button class="act-btn btn-edit" onclick="openEdit(${r.id})">✏️ แก้ไข</button>
+        <button class="act-btn btn-del"  onclick="openDelete(${r.id})">🗑️ ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function changePage(d) { currentPage += d; renderTable(); }
+
+// ── Edit ──────────────────────────────────────────────────────────────────────
+let editingId = null;
+
+function openEdit(id) {
+  const r = allRecords.find(x => x.id === id);
+  if (!r) return;
+  editingId = id;
+  document.getElementById('editId').textContent = id;
+
+  const fields = ['date','time','checker','checker_id','confirm_checker',
+    'machine','line','seq','qty','item_fg','item_type',
+    'sp1','sp2','sp3','val_el','val_a','val_b','val_c','val_d','flat_pct',
+    'ap_hairpin','ap_fin','pitch','hairpin_item','fin_item',
+    'mark_color','mark_status','status','remark'];
+  fields.forEach(f => {
+    const el = document.getElementById('e_'+f);
+    if (el) el.value = r[f] || '';
+  });
+  document.getElementById('editModal').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('editModal').classList.remove('open');
+  editingId = null;
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const fields = ['date','time','checker','checker_id','confirm_checker',
+    'machine','line','seq','qty','item_fg','item_type',
+    'sp1','sp2','sp3','val_el','val_a','val_b','val_c','val_d','flat_pct',
+    'ap_hairpin','ap_fin','pitch','hairpin_item','fin_item',
+    'mark_color','mark_status','status','remark'];
+  const data = {};
+  fields.forEach(f => {
+    const el = document.getElementById('e_'+f);
+    if (el) data[f] = el.value;
+  });
+  try {
+    const res = await fetch('/expander/firstlot/api/record/'+editingId, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    });
+    const d = await res.json();
+    if (d.ok) {
+      showToast('✓ บันทึกการแก้ไข Record #'+editingId+' สำเร็จ');
+      closeEdit();
+      await loadAll();
+    } else {
+      showToast('❌ Error: '+d.error);
+    }
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+let deletingId = null;
+
+function openDelete(id) {
+  const r = allRecords.find(x => x.id === id);
+  if (!r) return;
+  deletingId = id;
+  document.getElementById('delId').textContent = id;
+  document.getElementById('delDesc').textContent =
+    `${r.date||''} ${r.time||''} | ${r.machine||''} | ${r.item_fg||''} | ${r.status||''}`;
+  document.getElementById('delModal').classList.add('open');
+}
+
+function closeDelete() {
+  document.getElementById('delModal').classList.remove('open');
+  deletingId = null;
+}
+
+async function confirmDelete() {
+  if (!deletingId) return;
+  try {
+    const res = await fetch('/expander/firstlot/api/record/'+deletingId, { method:'DELETE' });
+    const d = await res.json();
+    if (d.ok) {
+      showToast('🗑️ ลบ Record #'+deletingId+' สำเร็จ');
+      closeDelete();
+      await loadAll();
+    } else {
+      showToast('❌ Error: '+d.error);
+    }
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// Close modal on bg click
+['editModal','delModal'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) {
+      if (id === 'editModal') closeEdit(); else closeDelete();
+    }
+  });
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showToast(msg, dur=4000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+// ── Cutting Records ───────────────────────────────────────────────────────────
+let cutAllRecords = [], cutFiltered = [], cutCurrentPage = 1;
+const CUT_PAGE = 50;
+
+async function loadCutting() {
+  try {
+    const res = await fetch('/cutting/api/cutting-records');
+    cutAllRecords = await res.json();
+    // populate machine dropdown
+    const sel = document.getElementById('cutFltMachine');
+    const cur = sel.value;
+    const mcs = [...new Set(cutAllRecords.map(r => r.mc_line).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">เครื่องทั้งหมด</option>' +
+      mcs.map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+    cutFilterLog();
+  } catch(e) { showToast('❌ โหลด Cutting ไม่ได้: ' + e.message); }
+}
+
+function cutFilterLog() {
+  const q  = document.getElementById('cutSearchBox').value.toLowerCase();
+  const mc = document.getElementById('cutFltMachine').value;
+  const dt = document.getElementById('cutFltDate').value;
+  cutFiltered = cutAllRecords.filter(r => {
+    if (mc && r.mc_line !== mc) return false;
+    if (dt && !(r.saved_at||'').startsWith(dt)) return false;
+    if (q) {
+      const hay = [r.id_card,r.mc_line,r.tag_fg_no1,r.item_insulation,r.item_type,r.leader_confirm].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  cutCurrentPage = 1;
+  renderCutTable();
+}
+
+function cutClearFilter() {
+  document.getElementById('cutSearchBox').value = '';
+  document.getElementById('cutFltMachine').value = '';
+  document.getElementById('cutFltDate').value = '';
+  cutFilterLog();
+}
+
+function renderCutTable() {
+  const total = cutFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / CUT_PAGE));
+  cutCurrentPage = Math.min(cutCurrentPage, pages);
+  const start = (cutCurrentPage-1)*CUT_PAGE;
+  const slice = cutFiltered.slice(start, start+CUT_PAGE);
+  document.getElementById('cutRecCount').textContent = `(${total} records)`;
+  document.getElementById('cutPgInfo').textContent = `หน้า ${cutCurrentPage} / ${pages}`;
+  document.getElementById('cutPgPrev').disabled = cutCurrentPage <= 1;
+  document.getElementById('cutPgNext').disabled = cutCurrentPage >= pages;
+
+  const tbody = document.getElementById('cutLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  const _cutChkAll = document.getElementById('cutChkAll');
+  if (_cutChkAll) _cutChkAll.checked = false;
+
+  tbody.innerHTML = slice.map((r, i) => {
+    const dt = r.saved_at ? new Date(r.saved_at).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+    const badge = r.status==='OK'
+      ? `<span class="badge-pass">OK</span>`
+      : `<span class="badge-fail">NG</span>`;
+    const chked = _sel.cut.has(r.id) ? 'checked' : '';
+    return `<tr>
+      <td class="td-chk"><input type="checkbox" class="chk-row-cut" data-id="${r.id}" ${chked} onchange="toggleRow('cut',${r.id},this.checked)"></td>
+      <td class="td-id">${r.id}</td>
+      <td>${esc(dt)}</td>
+      <td>${esc(r.id_card||'')}</td>
+      <td>${esc(r.mc_line||'')}</td>
+      <td>${esc(r.tag_fg_no1||'')}</td>
+      <td>${esc(r.item_insulation||'')}</td>
+      <td>${esc(r.item_type||'')}</td>
+      <td>${esc(r.leader_confirm||'')}</td>
+      <td style="text-align:center">${String(r.lay_down_side)==='1'?'✓':''}</td>
+      <td style="text-align:center">${String(r.lay_down_middle)==='1'?'✓':''}</td>
+      <td>${badge}</td>
+      <td>
+        <button class="act-btn btn-edit" onclick="openCutEdit(${r.id})">✏️ แก้ไข</button>
+        <button class="act-btn btn-del"  onclick="openCutDelete(${r.id})">🗑️ ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function cutChangePage(d) { cutCurrentPage += d; renderCutTable(); }
+
+// ── Cutting Edit ──────────────────────────────────────────────────────────────
+let cutEditingId = null;
+
+function openCutEdit(id) {
+  const r = cutAllRecords.find(x => x.id === id);
+  if (!r) return;
+  cutEditingId = id;
+  document.getElementById('cutEditId').textContent = id;
+  ['id_card','mc_line','tag_fg_no1','tag_fg_no2','item_insulation',
+   'item_type','line','seq','lot','leader_confirm','status'].forEach(f => {
+    const el = document.getElementById('ce_'+f);
+    if (el) el.value = r[f] || '';
+  });
+  document.getElementById('cutEditModal').classList.add('open');
+}
+
+function closeCutEdit() {
+  document.getElementById('cutEditModal').classList.remove('open');
+  cutEditingId = null;
+}
+
+async function saveCutEdit() {
+  if (!cutEditingId) return;
+  const fields = ['id_card','mc_line','tag_fg_no1','tag_fg_no2','item_insulation',
+    'item_type','line','seq','lot','leader_confirm','status'];
+  const data = {};
+  fields.forEach(f => { const el=document.getElementById('ce_'+f); if(el) data[f]=el.value; });
+  try {
+    const res = await fetch('/cutting/api/cutting-record/'+cutEditingId, {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+    });
+    const d = await res.json();
+    if (d.ok) { showToast('✓ แก้ไข Cutting Record #'+cutEditingId+' สำเร็จ'); closeCutEdit(); await loadCutting(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── Cutting Delete ────────────────────────────────────────────────────────────
+let cutDeletingId = null;
+
+function openCutDelete(id) {
+  const r = cutAllRecords.find(x => x.id === id);
+  if (!r) return;
+  cutDeletingId = id;
+  document.getElementById('cutDelId').textContent = id;
+  const dt = r.saved_at ? new Date(r.saved_at).toLocaleString('th-TH') : '—';
+  document.getElementById('cutDelDesc').textContent = `${dt} | ${r.mc_line||''} | ${r.tag_fg_no1||''} | ${r.status||''}`;
+  document.getElementById('cutDelModal').classList.add('open');
+}
+
+function closeCutDelete() {
+  document.getElementById('cutDelModal').classList.remove('open');
+  cutDeletingId = null;
+}
+
+async function confirmCutDelete() {
+  if (!cutDeletingId) return;
+  try {
+    const res = await fetch('/cutting/api/cutting-record/'+cutDeletingId, { method:'DELETE' });
+    const d = await res.json();
+    if (d.ok) { showToast('🗑️ ลบ Cutting Record #'+cutDeletingId+' สำเร็จ'); closeCutDelete(); await loadCutting(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+document.getElementById('cutEditModal').addEventListener('click', function(e){ if(e.target===this) closeCutEdit(); });
+document.getElementById('cutDelModal').addEventListener('click', function(e){ if(e.target===this) closeCutDelete(); });
+
+// ── Tab Switch ────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['exp','cut','hp','fp','hins'].forEach(t => {
+    document.getElementById('section-'+t).style.display = tab===t ? '' : 'none';
+    const btn = document.getElementById('tab-'+t);
+    btn.style.background = tab===t ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = tab===t ? '#fff' : 'var(--dim)';
+  });
+  if (tab==='cut'  && !cutAllRecords.length) loadCutting();
+  if (tab==='hp'   && !hpAllRecords.length)  loadHP();
+  if (tab==='fp'   && !fpAdminAll.length)    loadFPAdmin();
+  if (tab==='hins' && !hinsAll.length)       loadHIns();
+}
+
+// ── HP Records ────────────────────────────────────────────────────────────────
+let hpAllRecords = [], hpFiltered = [], hpCurrentPage = 1;
+const HP_PAGE = 50;
+
+async function loadHP() {
+  try {
+    const res = await fetch('/hp/api/records');
+    hpAllRecords = await res.json();
+    // populate machine dropdown
+    const sel = document.getElementById('hpFltMachine');
+    const cur = sel.value;
+    const mcs = [...new Set(hpAllRecords.map(r => r.mc).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">เครื่องทั้งหมด</option>' +
+      mcs.map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+    hpFilterLog();
+  } catch(e) { showToast('❌ โหลด HP ไม่ได้: ' + e.message); }
+}
+
+function hpFilterLog() {
+  const q  = document.getElementById('hpSearchBox').value.toLowerCase();
+  const mc = document.getElementById('hpFltMachine').value;
+  const dt = document.getElementById('hpFltDate').value;
+  hpFiltered = hpAllRecords.filter(r => {
+    if (mc && r.mc !== mc) return false;
+    if (dt && !(r.saved_at||'').startsWith(dt)) return false;
+    if (q) {
+      const hay = [r.item,r.item_fg,r.mc,r.checker,r.vendor,r.line,r.seq,r.confirm_by].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  hpCurrentPage = 1;
+  renderHPTable();
+}
+
+function hpClearFilter() {
+  document.getElementById('hpSearchBox').value = '';
+  document.getElementById('hpFltMachine').value = '';
+  document.getElementById('hpFltDate').value = '';
+  hpFilterLog();
+}
+
+function renderHPTable() {
+  const total = hpFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / HP_PAGE));
+  hpCurrentPage = Math.min(hpCurrentPage, pages);
+  const start = (hpCurrentPage-1)*HP_PAGE;
+  const slice = hpFiltered.slice(start, start+HP_PAGE);
+  document.getElementById('hpRecCount').textContent = `(${total} records)`;
+  document.getElementById('hpPgInfo').textContent = `หน้า ${hpCurrentPage} / ${pages}`;
+  document.getElementById('hpPgPrev').disabled = hpCurrentPage <= 1;
+  document.getElementById('hpPgNext').disabled = hpCurrentPage >= pages;
+
+  const tbody = document.getElementById('hpLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  const _hpChkAll = document.getElementById('hpChkAll');
+  if (_hpChkAll) _hpChkAll.checked = false;
+
+  tbody.innerHTML = slice.map(r => {
+    const dt = r.saved_at
+      ? new Date(r.saved_at).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})
+      : (r.ts ? new Date(r.ts).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}) : '—');
+    const res = (r.result||'');
+    const badge = res.includes('PASS') ? `<span class="badge-pass">PASS</span>`
+      : (res.includes('FAIL') ? `<span class="badge-fail">FAIL</span>` : `<span class="badge-na">${esc(res)||'—'}</span>`);
+    const fmt = v => (v != null && v !== '') ? v : '—';
+    const chked = _sel.hp.has(r.id) ? 'checked' : '';
+    return `<tr>
+      <td class="td-chk"><input type="checkbox" class="chk-row-hp" data-id="${r.id}" ${chked} onchange="toggleRow('hp',${r.id},this.checked)"></td>
+      <td class="td-id">${r.id}</td>
+      <td>${esc(dt)}</td>
+      <td><strong>${esc(r.mc||'')}</strong></td>
+      <td>${esc(r.line||'')}</td>
+      <td style="font-family:var(--mono)">${esc(r.seq||'')}</td>
+      <td class="td-fg" style="font-size:11px">${esc(r.item||'')}</td>
+      <td class="td-fg" style="font-size:11px">${esc(r.item_fg||'')}</td>
+      <td style="text-align:center">${fmt(r.coils)}</td>
+      <td style="color:#80cbc4">${esc(r.vendor||'')}</td>
+      <td style="font-weight:700">${fmt(r.avg_l1)}</td>
+      <td style="font-weight:700">${fmt(r.avg_l2)}</td>
+      <td>${fmt(r.avg_flat)}</td>
+      <td>${esc(r.checker||'')}</td>
+      <td>${esc(r.confirm_by||'')}</td>
+      <td>${badge}</td>
+      <td>
+        <button class="act-btn btn-edit" onclick="openHPEdit(${r.id})">✏️ แก้ไข</button>
+        <button class="act-btn btn-del"  onclick="openHPDelete(${r.id})">🗑️ ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function hpChangePage(d) { hpCurrentPage += d; renderHPTable(); }
+
+// ── HP Edit ───────────────────────────────────────────────────────────────────
+let hpEditingId = null;
+
+function openHPEdit(id) {
+  const r = hpAllRecords.find(x => x.id === id);
+  if (!r) return;
+  hpEditingId = id;
+  document.getElementById('hpEditId').textContent = id;
+  ['line','seq','mc','checker','item','item_fg','item_type',
+   'cu_item','die','vendor','coil_size','result','confirm_by'].forEach(f => {
+    const el = document.getElementById('he_'+f);
+    if (el) el.value = r[f] != null ? r[f] : '';
+  });
+  document.getElementById('hpEditModal').classList.add('open');
+}
+
+function closeHPEdit() {
+  document.getElementById('hpEditModal').classList.remove('open');
+  hpEditingId = null;
+}
+
+async function saveHPEdit() {
+  if (!hpEditingId) return;
+  const fields = ['line','seq','mc','checker','item','item_fg','item_type',
+                  'cu_item','die','vendor','coil_size','result','confirm_by'];
+  const data = {};
+  fields.forEach(f => { const el=document.getElementById('he_'+f); if(el) data[f]=el.value; });
+  try {
+    const res = await fetch('/hp/api/record/'+hpEditingId, {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+    });
+    const d = await res.json();
+    if (d.ok) { showToast('✓ แก้ไข HP Record #'+hpEditingId+' สำเร็จ'); closeHPEdit(); await loadHP(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// ── HP Delete ─────────────────────────────────────────────────────────────────
+let hpDeletingId = null;
+
+function openHPDelete(id) {
+  const r = hpAllRecords.find(x => x.id === id);
+  if (!r) return;
+  hpDeletingId = id;
+  document.getElementById('hpDelId').textContent = id;
+  const dt = r.saved_at ? new Date(r.saved_at).toLocaleString('th-TH') : '—';
+  document.getElementById('hpDelDesc').textContent = `${dt} | ${r.mc||''} | ${r.item||''} | ${r.result||''}`;
+  document.getElementById('hpDelModal').classList.add('open');
+}
+
+function closeHPDelete() {
+  document.getElementById('hpDelModal').classList.remove('open');
+  hpDeletingId = null;
+}
+
+async function confirmHPDelete() {
+  if (!hpDeletingId) return;
+  try {
+    const res = await fetch('/hp/api/record/'+hpDeletingId, { method:'DELETE' });
+    const d = await res.json();
+    if (d.ok) { showToast('🗑️ ลบ HP Record #'+hpDeletingId+' สำเร็จ'); closeHPDelete(); await loadHP(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+document.getElementById('hpEditModal').addEventListener('click', function(e){ if(e.target===this) closeHPEdit(); });
+document.getElementById('hpDelModal').addEventListener('click', function(e){ if(e.target===this) closeHPDelete(); });
+
+// ── FP Admin ──────────────────────────────────────────────────────────────────
+let fpAdminAll = [], fpAdminFiltered = [], fpAdminPage = 1;
+const FP_PAGE = 50;
+
+async function loadFPAdmin() {
+  try {
+    const res = await fetch('/fp/api/records/all');
+    fpAdminAll = await res.json();
+    // populate machine dropdown
+    const sel = document.getElementById('fpAdminFltMC');
+    const cur = sel.value;
+    const mcs = [...new Set(fpAdminAll.map(r => r.mc).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">เครื่องทั้งหมด</option>' +
+      mcs.map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+    fpAdminFilter();
+  } catch(e) { showToast('❌ โหลด FP ไม่ได้: ' + e.message); }
+}
+
+function fpAdminFilter() {
+  const q  = document.getElementById('fpAdminSearch').value.toLowerCase();
+  const mc = document.getElementById('fpAdminFltMC').value;
+  const dt = document.getElementById('fpAdminFltDate').value;
+  fpAdminFiltered = fpAdminAll.filter(r => {
+    if (mc && r.mc !== mc) return false;
+    if (dt && r.date !== dt) return false;
+    if (q) {
+      const hay = [r.item,r.mc,r.lot,r.vendor,r.checker,r.confirmer,r.type,r.oil].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  fpAdminPage = 1;
+  renderFPAdminTable();
+}
+
+function fpAdminClearFilter() {
+  document.getElementById('fpAdminSearch').value = '';
+  document.getElementById('fpAdminFltMC').value = '';
+  document.getElementById('fpAdminFltDate').value = '';
+  fpAdminFilter();
+}
+
+function renderFPAdminTable() {
+  const total = fpAdminFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / FP_PAGE));
+  fpAdminPage = Math.min(fpAdminPage, pages);
+  const start = (fpAdminPage-1)*FP_PAGE;
+  const slice = fpAdminFiltered.slice(start, start+FP_PAGE);
+  document.getElementById('fpAdminRecCount').textContent = `(${total} records)`;
+  document.getElementById('fpAdminPgInfo').textContent = `หน้า ${fpAdminPage} / ${pages}`;
+  document.getElementById('fpAdminPgPrev').disabled = fpAdminPage <= 1;
+  document.getElementById('fpAdminPgNext').disabled = fpAdminPage >= pages;
+
+  const tbody = document.getElementById('fpAdminLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="18" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  const _fpChkAll = document.getElementById('fpChkAll');
+  if (_fpChkAll) _fpChkAll.checked = false;
+
+  tbody.innerHTML = slice.map(r => {
+    const fin = r.final || '';
+    const badge = fin==='OK' ? '<span class="badge-pass">OK</span>'
+      : (fin==='NG' ? '<span class="badge-fail">NG</span>' : '<span class="badge-na">—</span>');
+    const chked = _sel.fp.has(r.id) ? 'checked' : '';
+    return `<tr>
+      <td class="td-chk"><input type="checkbox" class="chk-row-fp" data-id="${r.id}" ${chked} onchange="toggleRow('fp',${r.id},this.checked)"></td>
+      <td class="td-id">${r.id}</td>
+      <td>${esc(r.date||'')}</td>
+      <td>${esc(r.time||'')}</td>
+      <td><strong>${esc(r.mc||'')}</strong></td>
+      <td class="td-fg" style="font-size:11px">${esc(r.item||'')}</td>
+      <td>${esc(r.type||'')}</td>
+      <td>${esc(r.lot||'')}</td>
+      <td>${esc(r.line||'')}</td>
+      <td>${esc(r.seq||'')}</td>
+      <td>${esc(r.vendor||'')}</td>
+      <td>${esc(r.oil||'')}</td>
+      <td style="font-weight:700">${esc(r.fp_avg||'—')}</td>
+      <td style="font-weight:700">${esc(r.ff_avg||'—')}</td>
+      <td>${esc(r.qty_fin||'')}</td>
+      <td>${esc(r.checker||'')}</td>
+      <td>${esc(r.confirmer||'')}</td>
+      <td>${badge}</td>
+      <td>
+        <button class="act-btn btn-edit" onclick="openFPEdit(${r.id})">✏️ แก้ไข</button>
+        <button class="act-btn btn-del"  onclick="openFPDelete(${r.id})">🗑️ ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function fpAdminChangePage(d) { fpAdminPage += d; renderFPAdminTable(); }
+
+// FP Edit
+let fpEditingId = null;
+
+function openFPEdit(id) {
+  const r = fpAdminAll.find(x => x.id === id);
+  if (!r) return;
+  fpEditingId = id;
+  document.getElementById('fpEditId').textContent = id;
+  ['date','time','mc','type','item','lot','line','seq','vendor','oil','checker','confirmer','final'].forEach(f => {
+    const el = document.getElementById('fe_'+f);
+    if (el) el.value = r[f] != null ? r[f] : '';
+  });
+  document.getElementById('fpEditModal').classList.add('open');
+}
+
+function closeFPEdit() {
+  document.getElementById('fpEditModal').classList.remove('open');
+  fpEditingId = null;
+}
+
+async function saveFPEdit() {
+  if (!fpEditingId) return;
+  const fields = ['date','time','mc','type','item','lot','line','seq','vendor','oil','checker','confirmer','final'];
+  const data = {};
+  fields.forEach(f => { const el=document.getElementById('fe_'+f); if(el) data[f]=el.value; });
+  try {
+    const res = await fetch('/fp/api/record/'+fpEditingId, {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)
+    });
+    const d = await res.json();
+    if (d.ok) { showToast('✓ แก้ไข FP Record #'+fpEditingId+' สำเร็จ'); closeFPEdit(); await loadFPAdmin(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// FP Delete
+let fpDeletingId = null;
+
+function openFPDelete(id) {
+  const r = fpAdminAll.find(x => x.id === id);
+  if (!r) return;
+  fpDeletingId = id;
+  document.getElementById('fpDelId').textContent = id;
+  document.getElementById('fpDelDesc').textContent =
+    `${r.date||''} ${r.time||''} | ${r.mc||''} | ${r.item||''} | Final: ${r.final||'—'}`;
+  document.getElementById('fpDelModal').classList.add('open');
+}
+
+function closeFPDelete() {
+  document.getElementById('fpDelModal').classList.remove('open');
+  fpDeletingId = null;
+}
+
+async function confirmFPDelete() {
+  if (!fpDeletingId) return;
+  try {
+    const res = await fetch('/fp/api/record/'+fpDeletingId, { method:'DELETE' });
+    const d = await res.json();
+    if (d.ok) { showToast('🗑️ ลบ FP Record #'+fpDeletingId+' สำเร็จ'); closeFPDelete(); await loadFPAdmin(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+document.getElementById('fpEditModal').addEventListener('click', function(e){ if(e.target===this) closeFPEdit(); });
+document.getElementById('fpDelModal').addEventListener('click', function(e){ if(e.target===this) closeFPDelete(); });
+
+// ── Hairpin Insert Records ────────────────────────────────────────────────────
+let hinsAll = [], hinsFiltered = [], hinsPage = 1;
+const HINS_PAGE = 50;
+
+async function loadHIns() {
+  try {
+    const res = await fetch('/hp_insert/api/records');
+    hinsAll = await res.json();
+    const sel = document.getElementById('hinsFltMC');
+    const cur = sel.value;
+    const mcs = [...new Set(hinsAll.map(r => r.machine_finpress).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="">เครื่องทั้งหมด</option>' +
+      mcs.map(m => `<option value="${esc(m)}"${m===cur?' selected':''}>${esc(m)}</option>`).join('');
+    hinsFilter();
+  } catch(e) { showToast('❌ โหลด Hairpin Insert ไม่ได้: ' + e.message); }
+}
+
+function hinsFilter() {
+  const q  = document.getElementById('hinsSearch').value.toLowerCase();
+  const mc = document.getElementById('hinsFltMC').value;
+  const vf = document.getElementById('hinsFltVerify').value;
+  const dt = document.getElementById('hinsFltDate').value;
+  hinsFiltered = hinsAll.filter(r => {
+    if (mc && r.machine_finpress !== mc) return false;
+    if (dt && r.rec_date !== dt) return false;
+    if (vf === '1' && String(r.verified) !== '1') return false;
+    if (vf === '0' && String(r.verified) === '1') return false;
+    if (q) {
+      const hay = [r.item_wip,r.machine_finpress,r.machine_bender,r.prod_type,
+                   r.line,r.seq,r.lot,r.name_checker,r.name_confirm].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  hinsPage = 1;
+  renderHInsTable();
+}
+
+function hinsClearFilter() {
+  document.getElementById('hinsSearch').value = '';
+  document.getElementById('hinsFltMC').value = '';
+  document.getElementById('hinsFltVerify').value = '';
+  document.getElementById('hinsFltDate').value = '';
+  hinsFilter();
+}
+
+function renderHInsTable() {
+  const total = hinsFiltered.length;
+  const pages = Math.max(1, Math.ceil(total / HINS_PAGE));
+  hinsPage = Math.min(hinsPage, pages);
+  const start = (hinsPage-1)*HINS_PAGE;
+  const slice = hinsFiltered.slice(start, start+HINS_PAGE);
+  document.getElementById('hinsRecCount').textContent = `(${total} records)`;
+  document.getElementById('hinsPgInfo').textContent = `หน้า ${hinsPage} / ${pages}`;
+  document.getElementById('hinsPgPrev').disabled = hinsPage <= 1;
+  document.getElementById('hinsPgNext').disabled = hinsPage >= pages;
+
+  const tbody = document.getElementById('hinsLogBody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--dim);padding:20px">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = slice.map(r => {
+    const fin = r.final_check || '';
+    const badge = fin==='OK' ? '<span class="badge-pass">OK</span>'
+      : (fin==='NG' ? '<span class="badge-fail">NG</span>' : '<span class="badge-na">—</span>');
+    const isV = String(r.verified) === '1';
+    const vBadge = isV ? '<span class="badge-pass">✔ ตรวจแล้ว</span>' : '<span class="badge-na">—</span>';
+    const vBtn = isV
+      ? `<button class="act-btn btn-edit" onclick="hinsVerify(${r.id},0)">↺ ยกเลิกตรวจ</button>`
+      : `<button class="act-btn" style="background:var(--ok-bg);color:var(--ok-light);border:1px solid var(--ok)" onclick="hinsVerify(${r.id},1)">✔ Verify</button>`;
+    return `<tr>
+      <td class="td-id">${r.id}</td>
+      <td>${esc(r.rec_date||'')}</td>
+      <td>${esc(r.rec_time||'')}</td>
+      <td><strong>${esc(r.machine_finpress||'')}</strong></td>
+      <td class="td-fg">${esc(r.item_wip||'')}</td>
+      <td>${esc(r.prod_type||'')}</td>
+      <td>${esc(r.line||'')}</td>
+      <td>${esc(r.seq||'')}</td>
+      <td>${esc(r.lot||'')}</td>
+      <td>${esc(r.name_checker||'')}</td>
+      <td>${esc(r.name_confirm||'')}</td>
+      <td>${badge}</td>
+      <td>${vBadge}</td>
+      <td>
+        ${vBtn}
+        <button class="act-btn btn-del" onclick="openHInsDelete(${r.id})">🗑️ ลบ</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function hinsChangePage(d) { hinsPage += d; renderHInsTable(); }
+
+async function hinsVerify(id, value) {
+  try {
+    const res = await fetch(`/hp_insert/api/records/verify?id=${id}&value=${value}`);
+    const d = await res.json();
+    if (d.ok) {
+      showToast(value ? '✔ ยืนยันการตรวจ Record #'+id : '↺ ยกเลิกการตรวจ Record #'+id);
+      const r = hinsAll.find(x => x.id === id);
+      if (r) r.verified = value ? '1' : '';
+      renderHInsTable();
+    } else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+// Hairpin Insert Delete
+let hinsDeletingId = null;
+
+function openHInsDelete(id) {
+  const r = hinsAll.find(x => x.id === id);
+  if (!r) return;
+  hinsDeletingId = id;
+  document.getElementById('hinsDelId').textContent = id;
+  document.getElementById('hinsDelDesc').textContent =
+    `${r.rec_date||''} ${r.rec_time||''} | ${r.machine_finpress||''} | ${r.item_wip||''} | Final: ${r.final_check||'—'}`;
+  document.getElementById('hinsDelModal').classList.add('open');
+}
+
+function closeHInsDelete() {
+  document.getElementById('hinsDelModal').classList.remove('open');
+  hinsDeletingId = null;
+}
+
+async function confirmHInsDelete() {
+  if (!hinsDeletingId) return;
+  try {
+    const res = await fetch('/hp_insert/api/records/delete?id='+hinsDeletingId);
+    const d = await res.json();
+    if (d.ok) { showToast('🗑️ ลบ Hairpin Insert Record #'+hinsDeletingId+' สำเร็จ'); closeHInsDelete(); await loadHIns(); }
+    else showToast('❌ Error: '+d.error);
+  } catch(e) { showToast('❌ '+e.message); }
+}
+
+document.getElementById('hinsDelModal').addEventListener('click', function(e){ if(e.target===this) closeHInsDelete(); });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+if (sessionStorage.getItem('admin_ok') === '1') loadAll();
+document.getElementById('pinInput').focus();
+</script>
+</body>
+</html>

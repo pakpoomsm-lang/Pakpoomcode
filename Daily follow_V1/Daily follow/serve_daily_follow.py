@@ -32,8 +32,13 @@ import build_daily_follow as bdf
 # ---------------------------------------------------------------------------
 # Configuration  (edit these to match your machine)
 # ---------------------------------------------------------------------------
-HOST = "127.0.0.1"
-PORT = 8059
+# BIND_HOST = "0.0.0.0" makes the server reachable from other PCs on the LAN
+# (e.g. http://10.235.117.215:8059). Override with the DAILY_FOLLOW_HOST /
+# DAILY_FOLLOW_PORT environment variables (set DAILY_FOLLOW_HOST=127.0.0.1 to
+# restrict access back to this machine only).
+HOST = "127.0.0.1"                                    # local URL for the browser on this PC
+BIND_HOST = os.environ.get("DAILY_FOLLOW_HOST", "0.0.0.0")
+PORT = int(os.environ.get("DAILY_FOLLOW_PORT", "8059"))
 ROOT = bdf.ROOT
 OUTPUT_FILE = bdf.OUTPUT_FILE
 PROGRESS_FILE = bdf.PROGRESS_FILE          # ZPP0059.xlsx — still kept for fallback
@@ -99,10 +104,31 @@ session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").setFocus
 session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").caretPosition = 3
 session.findById("wnd[0]").sendVKey 8
 session.findById("wnd[0]").sendVKey 33
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").setCurrentCell 10,"TEXT"
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").firstVisibleRow = 3
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").selectedRows = "10"
-session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell").clickCurrentCell
+' Choose the FULL layout "/PP ASSY ALL" by name instead of by row position.
+' Row numbers shift whenever SAP layouts are added/removed (the recording
+' happened to land on row 10 = "/TPP&PAINT", the short layout). We scan the
+' layout list, match the technical name first, then the description, and only
+' fall back to a fixed row if neither is found.
+Dim lShell, lRow, lFound, lName, lText
+Set lShell = session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell")
+lFound = -1
+On Error Resume Next
+For lRow = 0 To lShell.RowCount - 1
+   lName = ""
+   lText = ""
+   lName = Trim(lShell.GetCellValue(lRow, "VARIANT"))
+   lText = Trim(lShell.GetCellValue(lRow, "TEXT"))
+   If lName = "/PP ASSY ALL" Or lText = "PP ASSY ALL LINE (Defalt)" Then
+      lFound = lRow
+      Exit For
+   End If
+Next
+On Error GoTo 0
+If lFound = -1 Then lFound = 2
+lShell.setCurrentCell lFound,"TEXT"
+lShell.firstVisibleRow = lFound
+lShell.selectedRows = CStr(lFound)
+lShell.clickCurrentCell
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").setCurrentCell 5,"PSMNG"
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").selectedRows = "5"
 session.findById("wnd[0]/usr/cntlGRID1/shellcont/shell").contextMenu
@@ -142,7 +168,20 @@ START_TRANSACTION = "ZPP0059"
 START_TRANSACTION_0022 = "ZPP0022"
 PROGRESS_0022_FILE     = ROOT / "ZPP0022.xlsx"   # latest export, served to the page
 ZPP0022_TABLE          = "zpp0022_raw"
-SAP_EXPORT_DIR_0022    = str(Path(r"J:\7.541_HEI\Database follow\ZPP0022"))
+
+# AS/400 network-share base folder that SAP exports into. The mapped DRIVE
+# LETTER differs per PC (some map it as J:, the shop-floor PC maps it as Y:).
+# Override per machine with the SAP_EXPORT_BASE environment variable, e.g.
+#     set SAP_EXPORT_BASE=J:\7.541_HEI\Database follow
+SAP_EXPORT_BASE        = os.environ.get("SAP_EXPORT_BASE", r"Y:\7.541_HEI\Database follow")
+SAP_EXPORT_DIR_0022    = str(Path(SAP_EXPORT_BASE) / "ZPP0022")
+
+# --- OT program bridge -------------------------------------------------------
+# The OT recording app (Flask) runs on the same PC. We proxy its working-hours
+# API server-side so the Daily Follow page can read per-shift hours without
+# running into cross-origin (CORS) restrictions. Override with the OT_APP_URL
+# environment variable if the OT app uses a different host/port.
+OT_APP_URL = os.environ.get("OT_APP_URL", "http://127.0.0.1:5000")
 
 
 # SAP opens the exported file in Excel automatically. When True, the workbook
@@ -153,8 +192,11 @@ CLOSE_EXCEL_AFTER = True
 # Folders watched for the file SAP exports (searched in order, newest file wins).
 HOME = Path(os.path.expanduser("~"))
 EXPORT_DIRS = [
-    Path(r"J:\7.541_HEI\Database follow\ZPP0059"),  # shared drive (primary)
-    Path(r"J:\7.541_HEI\Database follow\ZPP0022"),  # ZPP0022 order export
+    Path(SAP_EXPORT_BASE) / "ZPP0059",              # network share (primary)
+    Path(SAP_EXPORT_BASE) / "ZPP0022",              # ZPP0022 order export
+    # Also scan the J: variant in case a PC maps the same share as J:.
+    Path(r"J:\7.541_HEI\Database follow\ZPP0059"),
+    Path(r"J:\7.541_HEI\Database follow\ZPP0022"),
     Path(r"C:\TEMP"),                               # SAP default save dir
     ROOT,
     HOME / "Documents" / "SAP" / "SAP GUI",
@@ -164,7 +206,7 @@ EXPORT_DIRS = [
 ]
 # Target directory for SAP to save the export file into.
 # Must match one of the EXPORT_DIRS entries above.
-SAP_EXPORT_DIR = str(Path(r"J:\7.541_HEI\Database follow\ZPP0059"))
+SAP_EXPORT_DIR = str(Path(SAP_EXPORT_BASE) / "ZPP0059")
 
 # Business key columns — a row is considered duplicate when ALL of these match.
 # If any column is missing from the export, falls back to SHA-256 of the whole row.
@@ -547,9 +589,15 @@ Next
         pass
 
 
-def _newest_export(since: float) -> Path | None:
+def _newest_export(since: float, dirs: list[Path] | None = None) -> Path | None:
+    # When the caller knows exactly where SAP just saved the export (e.g. the
+    # ZPP0022 order folder), search only that folder. Otherwise the globally
+    # newest file across EXPORT_DIRS could be from a *different* transaction
+    # (e.g. a ZPP0059 stock export), which then gets handed back as the wrong
+    # file and rejected downstream by the header check.
+    search_dirs = dirs if dirs is not None else EXPORT_DIRS
     best, best_mtime = None, since - 2
-    for d in EXPORT_DIRS:
+    for d in search_dirs:
         try:
             if not d.is_dir():
                 continue
@@ -684,9 +732,18 @@ def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
         msg = (proc.stderr or proc.stdout or "").strip()
         raise RuntimeError(_friendly_sap_error(msg))
 
+    # Prefer the folder SAP was told to save into, so we never pick up a newer
+    # file produced by a different transaction (e.g. a ZPP0059 stock export
+    # landing in its own folder while we're running ZPP0022). Only fall back to
+    # scanning every EXPORT_DIRS if nothing showed up there (SAP may have used a
+    # default save location like C:\TEMP when the network drive was unwritable).
+    target_dir = Path(export_dir_win)
     export = None
     for _ in range(20):
-        export = _newest_export(started)
+        if target_dir.is_dir():
+            export = _newest_export(started, dirs=[target_dir])
+        if not export:
+            export = _newest_export(started)
         if export:
             break
         time.sleep(0.5)
@@ -923,6 +980,28 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return
+        if path == "api/ot-working-hours":
+            # Proxy the OT app's per-shift working hours (server-side, no CORS).
+            import urllib.request
+            from urllib.error import URLError, HTTPError
+            req_date = (query.get("date", [""])[0] or "").strip()
+            if not req_date:
+                return self._send(400, json.dumps(
+                    {"success": False, "error": "missing date"}))
+            url = f"{OT_APP_URL}/api/working-hours?work_date={req_date}"
+            try:
+                # Bypass any HTTP proxy for the local OT app.
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(url, timeout=5) as resp:
+                    body = resp.read()
+                self._send(200, body)
+            except (URLError, HTTPError, OSError) as exc:
+                self._send(200, json.dumps({
+                    "success": False,
+                    "error": f"เชื่อมต่อโปรแกรม OT ไม่ได้ ({OT_APP_URL}). "
+                             f"ตรวจสอบว่าโปรแกรม OT เปิดอยู่. [{exc}]"
+                }))
+            return
         target = (ROOT / path).resolve()
         if ROOT.resolve() not in target.parents and target != ROOT.resolve():
             return self._send(403, "forbidden", "text/plain")
@@ -938,6 +1017,23 @@ class Handler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+def _detect_lan_ip():
+    """Best-effort: find this PC's LAN IP (the address other PCs would use).
+    Opens a dummy UDP socket — no packets are actually sent."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return None
+    finally:
+        s.close()
+
+
 def main():
     # Pre-populate DB from the existing ZPP0059.xlsx if the DB is new.
     if PROGRESS_FILE.exists():
@@ -958,8 +1054,14 @@ def main():
     bdf.main()
 
     url = f"http://{HOST}:{PORT}/{OUTPUT_FILE.name}"
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"Daily Follow server: {url}")
+    server = ThreadingHTTPServer((BIND_HOST, PORT), Handler)
+    print(f"Daily Follow server (this PC): {url}")
+    if BIND_HOST == "0.0.0.0":
+        lan_ip = _detect_lan_ip()
+        if lan_ip:
+            print(f"Daily Follow server (LAN):     http://{lan_ip}:{PORT}/{OUTPUT_FILE.name}")
+        print("(เครื่องอื่นเข้าผ่าน IP ของเครื่องนี้ได้ — เปิด Firewall ขาเข้า"
+              f" TCP {PORT} ด้วย)")
     print(f"SQLite database:     {DB_FILE}")
     print("Press Ctrl+C to stop.")
     try:

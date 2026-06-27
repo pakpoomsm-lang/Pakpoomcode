@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+
+{% block title %}บันทึก OT | OT Control{% endblock %}
+
+{% block content %}
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Daily OT Operation</p>
+        <h1>บันทึกการทำงานและ OT</h1>
+        <p class="hero-copy">เลือกวัน กรองทีม แล้วบันทึกสถานะพนักงานได้จากตารางเดียว เหมาะกับการใช้งานหน้างานที่ต้องเร็วและแม่นยำ</p>
+    </div>
+    <div class="hero-actions">
+        <button type="button" class="btn btn-danger-subtle" id="resetBtn" onclick="toggleResetMode()">
+            <i class="bi bi-x-circle"></i> Reset
+        </button>
+        <button type="button" class="btn btn-outline-danger" onclick="openResetAllModal()">
+            <i class="bi bi-trash3"></i> ล้างข้อมูลทั้งหมด
+        </button>
+    </div>
+</section>
+
+<section class="control-panel">
+    <div class="section-title">
+        <i class="bi bi-sliders"></i>
+        <div>
+            <h2>ตัวกรองการทำงาน</h2>
+            <p>ตั้งค่าข้อมูลก่อนบันทึกสถานะ</p>
+        </div>
+    </div>
+    <div class="row g-3">
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="workDate">วันที่ทำงาน</label>
+            <input type="date" class="form-control" id="workDate" value="">
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="shiftFilter">Shift</label>
+            <select class="form-select" id="shiftFilter">
+                <option value="All">ทั้งหมด</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="D">D</option>
+            </select>
+        </div>
+        <div class="col-lg-4 col-md-6">
+            <label class="form-label" for="glFilter">หัวหน้างาน</label>
+            <select class="form-select" id="glFilter">
+                <option value="All">ทั้งหมด</option>
+            </select>
+        </div>
+    </div>
+</section>
+
+<section class="metric-grid">
+    <div class="metric-card metric-work">
+        <span class="metric-icon"><i class="bi bi-check-circle-fill"></i></span>
+        <div class="metric-content">
+            <div class="metric-topline">
+                <span>มาทำงาน</span>
+                <strong id="summaryWorkPercent">0%</strong>
+            </div>
+            <div class="metric-value">
+                <strong id="summaryWork">0</strong>
+                <span>/<b class="summaryTotal">0</b> คน</span>
+            </div>
+            <div class="metric-progress" aria-hidden="true"><span id="summaryWorkBar"></span></div>
+        </div>
+    </div>
+    <div class="metric-card metric-leave clickable-card" onclick="showLeaveDetailsModal()" title="คลิกเพื่อดูรายละเอียดพนักงานที่ลางาน">
+        <span class="metric-icon"><i class="bi bi-calendar-x-fill"></i></span>
+        <div class="metric-content">
+            <div class="metric-topline">
+                <span>ลางาน</span>
+                <strong id="summaryLeavePercent">0%</strong>
+            </div>
+            <div class="metric-value">
+                <strong id="summaryLeave">0</strong>
+                <span>/<b class="summaryTotal">0</b> คน</span>
+            </div>
+            <div class="metric-progress" aria-hidden="true"><span id="summaryLeaveBar"></span></div>
+        </div>
+    </div>
+    <div class="metric-card metric-ot">
+        <span class="metric-icon"><i class="bi bi-stopwatch-fill"></i></span>
+        <div class="metric-content">
+            <div class="metric-topline">
+                <span>ทำ OT</span>
+                <strong id="summaryOTPercent">0%</strong>
+            </div>
+            <div class="metric-value">
+                <strong id="summaryOT">0</strong>
+                <span>/<b class="summaryTotal">0</b> คน</span>
+            </div>
+            <div class="metric-progress" aria-hidden="true"><span id="summaryOTBar"></span></div>
+        </div>
+    </div>
+</section>
+
+<section class="shift-hours-panel">
+    <div class="shift-hours-panel-header">
+        <div class="section-title">
+            <i class="bi bi-clock-history"></i>
+            <div>
+                <h2>ชั่วโมงการทำงานแต่ละ Shift</h2>
+                <p>มาทำงาน × 8.16 ชม. + OT × 2.32 ชม.</p>
+            </div>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openExclusionModal()">
+            <i class="bi bi-person-dash"></i> ยกเว้นการคิดชั่วโมง
+            <span class="badge bg-secondary ms-1" id="exclusionCountBadge" style="display:none">0</span>
+        </button>
+    </div>
+    <div class="shift-hours-grid" id="shiftHoursGrid">
+        <div class="empty-cell compact"><i class="bi bi-arrow-repeat"></i> กำลังคำนวณข้อมูล...</div>
+    </div>
+</section>
+
+<section class="leader-summary-panel" id="leaderSummaryPanel">
+    <div class="leader-summary-header">
+        <div class="section-title">
+            <i class="bi bi-person-lines-fill"></i>
+            <div>
+                <h2>สรุปตามหัวหน้างาน</h2>
+                <p id="leaderSummaryCaption">เปรียบเทียบจำนวนที่บันทึกกับพนักงานทั้งหมดในเงื่อนไขที่เลือก</p>
+            </div>
+        </div>
+    </div>
+    <div class="leader-summary-grid" id="leaderSummaryGrid">
+        <div class="empty-cell compact">
+            <i class="bi bi-arrow-repeat"></i> กำลังคำนวณข้อมูล...
+        </div>
+    </div>
+</section>
+
+<section class="data-panel">
+    <div class="data-panel-header">
+        <div class="section-title">
+            <i class="bi bi-people"></i>
+            <div>
+                <h2>รายชื่อพนักงาน</h2>
+                <p>กดปุ่มสถานะเพื่อบันทึกหรือยกเลิกทันที</p>
+            </div>
+        </div>
+        <div class="toolbar">
+            <button type="button" class="btn btn-success btn-sm d-none" id="markAllWorkBtn" onclick="markAllForSelectedLeader('work')">
+                <i class="bi bi-check2-circle"></i> มาทำงานครบ
+            </button>
+            <button type="button" class="btn btn-primary btn-sm d-none" id="markAllOTBtn" onclick="markAllForSelectedLeader('ot')" disabled>
+                <i class="bi bi-stopwatch"></i> ทำ OT ทุกคน
+            </button>
+            <button type="button" class="btn btn-outline-danger btn-sm d-none" id="confirmDeleteBtn" onclick="confirmDeleteSelected()">
+                <i class="bi bi-trash"></i> ลบที่เลือก
+            </button>
+        </div>
+    </div>
+    <div class="table-responsive app-table-wrap">
+        <table class="table table-hover align-middle app-table">
+            <thead>
+                <tr>
+                    <th width="50" class="checkbox-column d-none">
+                        <input type="checkbox" class="form-check-input" id="selectAllEmployees" onchange="toggleSelectAll()">
+                    </th>
+                    <th width="72">รหัส</th>
+                    <th>ชื่อ-นามสกุล</th>
+                    <th width="80">ประเภท</th>
+                    <th width="70">Shift</th>
+                    <th width="160">จุดงาน OT</th>
+                    <th width="360">สถานะการทำงาน</th>
+                </tr>
+            </thead>
+            <tbody id="employeeTable">
+                <tr>
+                    <td colspan="7" class="empty-cell">
+                        <i class="bi bi-arrow-repeat"></i> กำลังโหลดข้อมูล...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div class="modal fade" id="resetModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-danger">
+                <h6 class="modal-title"><i class="bi bi-x-circle"></i> Reset การบันทึก - วันที่ <span id="resetDate"></span></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>คำเตือน:</strong> เลือกพนักงานที่ต้องการลบการบันทึกทั้งหมดของวันที่เลือก
+                </div>
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="selectAllReset">
+                        <label class="form-check-label fw-bold" for="selectAllReset">เลือกทั้งหมด</label>
+                    </div>
+                    <hr>
+                </div>
+                <div id="resetEmployeeList" class="modal-scroll"></div>
+                <div id="noRecordsMessage" class="empty-state" style="display: none;">
+                    <i class="bi bi-inbox"></i>
+                    <p>ไม่มีพนักงานที่มีการบันทึก</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="button" class="btn btn-danger" onclick="confirmReset()">
+                    <i class="bi bi-trash"></i> ลบการบันทึกที่เลือก
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header modal-primary">
+                <h6 class="modal-title"><i class="bi bi-clock-history"></i> ประวัติการบันทึก - วันที่ <span id="historyDate"></span></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="metric-grid compact">
+                    <div class="metric-card metric-work"><strong id="workCount">0</strong><span>มาทำงาน</span></div>
+                    <div class="metric-card metric-leave"><strong id="leaveCount">0</strong><span>ลางาน</span></div>
+                    <div class="metric-card metric-ot"><strong id="otCount">0</strong><span>ทำ OT</span></div>
+                </div>
+                <ul class="nav nav-pills app-tabs" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" id="work-tab" data-bs-toggle="tab" data-bs-target="#work-panel" type="button">มาทำงาน (<span id="workTabCount">0</span>)</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="leave-tab" data-bs-toggle="tab" data-bs-target="#leave-panel" type="button">ลางาน (<span id="leaveTabCount">0</span>)</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="ot-tab" data-bs-toggle="tab" data-bs-target="#ot-panel" type="button">OT (<span id="otTabCount">0</span>)</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" id="all-tab" data-bs-toggle="tab" data-bs-target="#all-panel" type="button">ทั้งหมด (<span id="allTabCount">0</span>)</button></li>
+                </ul>
+                <div class="tab-content mt-3">
+                    {% for panel_id, table_id, status_col in [
+                        ('work-panel', 'workTableBody', false),
+                        ('leave-panel', 'leaveTableBody', false),
+                        ('ot-panel', 'otTableBody', false),
+                        ('all-panel', 'allTableBody', true)
+                    ] %}
+                    <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="{{ panel_id }}">
+                        <div class="table-responsive app-table-wrap modal-table">
+                            <table class="table table-hover align-middle app-table">
+                                <thead>
+                                    <tr>
+                                        <th width="64">ลำดับ</th>
+                                        <th width="100">รหัส</th>
+                                        <th>ชื่อ-นามสกุล</th>
+                                        <th width="160">สถานที่ทำงาน</th>
+                                        <th width="120">Group</th>
+                                        <th width="90">ประเภท</th>
+                                        <th width="70">Shift</th>
+                                        {% if status_col %}<th width="110">สถานะ</th>{% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody id="{{ table_id }}"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="otSubstituteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-warning">
+                <h6 class="modal-title"><i class="bi bi-arrow-left-right"></i> เลือก Group สำหรับทำ OT แทน</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-bold">พนักงาน</label>
+                <p id="otSubEmpInfo" class="text-muted"></p>
+                <label class="form-label fw-bold">Group ปกติ</label>
+                <p id="otSubOriginalProcess" class="text-muted"></p>
+                <label for="otSubProcessSelect" class="form-label fw-bold">Group ที่จะไปทำแทน</label>
+                <select class="form-select" id="otSubProcessSelect" onchange="toggleOtherReasonInput()">
+                    <option value="">-- เลือก Group --</option>
+                </select>
+                <div id="otOtherReasonContainer" style="display: none; margin-top: 12px;">
+                    <label for="otOtherReasonInput" class="form-label fw-bold">กรุณาระบุเหตุผล</label>
+                    <textarea class="form-control" id="otOtherReasonInput" rows="3" placeholder="ระบุเหตุผลที่ต้องทำ OT แทน..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="button" class="btn btn-warning" onclick="confirmOTSubstitute()">
+                    <i class="bi bi-check-circle"></i> ยืนยัน OT แทน
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset All Data Modal -->
+<div class="modal fade" id="resetAllModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#dc3545;color:#fff">
+                <h6 class="modal-title"><i class="bi bi-trash3-fill"></i> ล้างข้อมูลการบันทึกทั้งหมด</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger mb-3">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <strong>คำเตือน:</strong> การดำเนินการนี้จะลบ<strong>ข้อมูลการบันทึกการมาทำงาน OT และลางานทั้งหมด</strong>ออกจากระบบ <u>ไม่สามารถกู้คืนได้</u>
+                </div>
+                <div class="mb-3">
+                    <div class="reset-all-scope">
+                        <i class="bi bi-check2 text-danger"></i> ข้อมูล attendance_records ทั้งหมด
+                    </div>
+                    <div class="reset-all-scope">
+                        <i class="bi bi-x text-success"></i> ข้อมูลพนักงาน (ไม่ถูกลบ)
+                    </div>
+                </div>
+                <label class="form-label fw-bold">กรอกรหัสยืนยันเพื่อดำเนินการ</label>
+                <div class="input-group">
+                    <input type="password" class="form-control" id="resetAllPin"
+                           placeholder="รหัสยืนยัน" oninput="checkResetAllPin()" autocomplete="off">
+                    <button class="btn btn-outline-secondary" type="button" onclick="toggleResetAllPin()">
+                        <i class="bi bi-eye" id="resetAllPinEye"></i>
+                    </button>
+                </div>
+                <div id="resetAllPinFeedback" class="form-text mt-1"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="button" class="btn btn-danger" id="confirmResetAllBtn"
+                        onclick="confirmResetAll()" disabled>
+                    <i class="bi bi-trash3"></i> ยืนยัน ล้างข้อมูลทั้งหมด
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="leaveOptionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header modal-leave">
+                <h6 class="modal-title"><i class="bi bi-calendar-x"></i> เลือกช่วงเวลาลางาน</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="leave-person-box">
+                    <span>พนักงาน</span>
+                    <strong id="leaveEmpInfo">-</strong>
+                </div>
+                <div class="leave-option-grid" id="leaveOptionGrid"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leave Details Modal -->
+<div class="modal fade" id="leaveDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header modal-leave">
+                <h6 class="modal-title"><i class="bi bi-calendar-x-fill"></i> รายละเอียดพนักงานที่ลางาน</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="leave-details-summary">
+                    <div class="leave-summary-item">
+                        <span>วันที่</span>
+                        <strong id="leaveDetailsDate">-</strong>
+                    </div>
+                    <div class="leave-summary-item">
+                        <span>จำนวนพนักงานลางาน</span>
+                        <strong id="leaveDetailsCount">0 คน</strong>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th width="10%">ลำดับ</th>
+                                <th width="15%">รหัสพนักงาน</th>
+                                <th width="25%">ชื่อ-นามสกุล</th>
+                                <th width="20%">จุดงาน</th>
+                                <th width="15%">ช่วงเวลาลา</th>
+                                <th width="15%">เวลา</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaveDetailsTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 40px; color: var(--muted);">
+                                    <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
+                                    ไม่มีข้อมูลพนักงานที่ลางาน
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Shift D Detail Modal (กะเช้า รวม Shift D) -->
+<div class="modal fade" id="shiftDDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-primary">
+                <h6 class="modal-title"><i class="bi bi-clock-history"></i> <span id="shiftDDetailTitle">ชั่วโมงการทำงาน</span></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size:0.85rem">
+                    <i class="bi bi-info-circle"></i> Shift D เข้ากะเช้าตลอด จึงนำชั่วโมงไปรวมกับกะเช้าของอาทิตย์นี้
+                </p>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Shift</th>
+                                <th class="text-center">มาทำงาน (คน)</th>
+                                <th class="text-center">OT (คน)</th>
+                                <th class="text-end">ชั่วโมง</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shiftDDetailBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hour Exclusion Modal -->
+<div class="modal fade" id="exclusionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header" style="background:#475467;color:#fff">
+                <h6 class="modal-title"><i class="bi bi-person-dash"></i> ยกเว้นการคิดชั่วโมงการทำงาน</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-secondary">
+                    <i class="bi bi-info-circle-fill"></i>
+                    พนักงานในรายการนี้จะ<strong>ไม่ถูกนำมาคิดชั่วโมงการทำงาน</strong>ในทุกวัน จนกว่าจะกดยกเลิก
+                </div>
+                <label class="form-label fw-bold">เพิ่มรหัสพนักงานที่ต้องการยกเว้น</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                    <input type="text" class="form-control" id="exclusionEmpIdInput"
+                           placeholder="กรอกรหัสพนักงาน" autocomplete="off"
+                           oninput="lookupExclusionName()"
+                           onkeydown="if(event.key==='Enter'){event.preventDefault();addExclusion();}">
+                    <button class="btn btn-secondary" type="button" id="addExclusionBtn" onclick="addExclusion()" disabled>
+                        <i class="bi bi-plus-lg"></i> เพิ่ม
+                    </button>
+                </div>
+                <div id="exclusionLookupFeedback" class="form-text mt-1" style="min-height:20px"></div>
+
+                <hr>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong>รายชื่อที่ยกเว้นอยู่ (<span id="exclusionListCount">0</span>)</strong>
+                </div>
+                <div class="table-responsive app-table-wrap modal-table">
+                    <table class="table table-hover align-middle app-table">
+                        <thead>
+                            <tr>
+                                <th width="120">รหัส</th>
+                                <th>ชื่อ-นามสกุล</th>
+                                <th width="70">Shift</th>
+                                <th width="160">จุดงาน</th>
+                                <th width="90"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="exclusionTableBody">
+                            <tr><td colspan="5" class="empty-cell"><i class="bi bi-inbox"></i> ยังไม่มีรายการยกเว้น</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">ปิด</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}
