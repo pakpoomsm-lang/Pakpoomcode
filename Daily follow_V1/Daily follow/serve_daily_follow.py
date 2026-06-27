@@ -569,6 +569,57 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
     return mat_out, lot_out
 
 
+def actual_production_by_date(date_iso):
+    """Final-op qty (Brazing->auto, Cutting->cutting) produced on one working day,
+    grouped by shift D/N and by line|month|seq|material key."""
+    conn = _get_db()
+    col_map = {r[1]: r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
+    c = _col_name
+    needed = ["Production Line", "Production Month", "Sequence", "Material",
+              "Operation Short Text", "Posted Quantity", "Shift D/N"]
+    if any(c(x) not in col_map for x in needed):
+        conn.close(); return {"D": {}, "N": {}}
+    date_col = c("Working day") if c("Working day") in col_map else (
+        c("Posting Date") if c("Posting Date") in col_map else None)
+    if not date_col:
+        conn.close(); return {"D": {}, "N": {}}
+    where = [f'"{date_col}" LIKE ?']
+    params = [date_iso + "%"]
+    for name in ("Deletion Flag", "Cancel Date"):
+        cc = c(name)
+        if cc in col_map:
+            where.append(f'IFNULL("{cc}", "") = ""')
+    sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", "{c("Sequence")}", '
+           f'"{c("Material")}", "{c("Operation Short Text")}", "{c("Posted Quantity")}", '
+           f'"{c("Shift D/N")}" FROM zpp0059_raw WHERE ' + " AND ".join(where))
+    op_field = {"Brazing": "auto", "Cutting": "cutting"}
+    out = {"D": {}, "N": {}}
+    for line, month_raw, seq_raw, mat, op, qty_raw, dn in conn.execute(sql, params):
+        if not line:
+            continue
+        field = op_field.get((op or "").strip())
+        if not field:
+            continue
+        dn = (dn or "").strip().upper()
+        if dn not in ("D", "N"):
+            continue
+        try:
+            qty = float(qty_raw) if qty_raw else 0.0
+        except ValueError:
+            qty = 0.0
+        key = f"{line}|{bdf.month_display(month_raw)}|{bdf.seq_key(seq_raw)}|{mat}"
+        bucket = out[dn].setdefault(key, {"auto": 0.0, "cutting": 0.0})
+        bucket[field] += qty
+    conn.close()
+    def rnd(v):
+        return int(v) if float(v).is_integer() else round(v, 3)
+    for dn in out:
+        for k in out[dn]:
+            for f in out[dn][k]:
+                out[dn][k][f] = rnd(out[dn][k][f])
+    return out
+
+
 def db_stats(conn: sqlite3.Connection, table: str = "zpp0059_raw") -> dict:
     total = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
     newest = conn.execute(
@@ -1203,6 +1254,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps(data))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/actual-production":
+            req_date = (query.get("date", [""])[0] or "").strip()
+            if not req_date:
+                return self._send(400, json.dumps({"success": False, "error": "missing date"}))
+            try:
+                by_shift = actual_production_by_date(req_date)
+                self._send(200, json.dumps({"success": True, "byShift": by_shift}, ensure_ascii=False))
+            except Exception as exc:
+                self._send(200, json.dumps({"success": False, "error": str(exc)}))
             return
         if path == "api/ot-working-hours":
             # Proxy the OT app's per-shift working hours (server-side, no CORS).

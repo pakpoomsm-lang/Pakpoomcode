@@ -1289,9 +1289,10 @@
             </div>
           </div>
         </div>
-        <div class="sim-panel actual-prod-panel" id="actualProdPanel" title="คลิกเพื่อดู Lead Time Summary · Actual Productivity = ผลรวม Actual Unit Rate (TS x จำนวน FG ที่ผลิตจริง) ของงานที่ผลิตจริงในมุมมองปัจจุบัน (ตาม filter) หารด้วยชั่วโมงทำงาน (OT) — ไม่เกี่ยวกับการติ๊กใน Simulator">
+        <div class="sim-panel actual-prod-panel" id="actualProdPanel" title="Actual Productivity = ผลผลิตจริง ณ วันที่เลือก (แยกกะตาม Shift A/B ของ Simulator) หารด้วยชั่วโมงทำงาน OT ของวันนั้น">
           <div class="sim-panel-head">
             <span class="sim-panel-title">Actual Productivity</span>
+            <input id="actProdDate" class="sim-date" type="date" title="เลือกวันที่ดูผลผลิตจริง ณ วันนั้น">
           </div>
           <div class="sim">
             <div class="sim-cell">
@@ -1626,6 +1627,7 @@
       simTabs: document.getElementById('simTabs'), simPlanDate: document.getElementById('simPlanDate'),
       simPullOt: document.getElementById('simPullOt'), simOtInfo: document.getElementById('simOtInfo'),
       simWorkTitle: document.getElementById('simWorkTitle'),
+      actProdDate: document.getElementById('actProdDate'),
       actRateBadge: document.getElementById('actRateBadge'),
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
@@ -1695,6 +1697,9 @@
     let simShifts = { A: { sel: new Set(), wh: '', manual: false }, B: { sel: new Set(), wh: '', manual: false } };
     let selected = simShifts[activeSimShift].sel;
     let simPlanDate = todayISO();
+    let actProdDate = todayISO();
+    let actProd = { D: {}, N: {} };   // production by shift for actProdDate (from server)
+    let actOt = null;                 // { shifts:{A,B}, morning_shift } for actProdDate
     let byId = new Map();
     let fillSource = null;
     let fillDragging = false;
@@ -1969,6 +1974,8 @@
       indexRows(currentRows);
       simPlanDate = todayISO();
       if (els.simPlanDate) els.simPlanDate.value = simPlanDate;
+      actProdDate = todayISO();
+      if (els.actProdDate) els.actProdDate.value = actProdDate;
       restoreSelected();
       refreshFilters();
       // Reflect the saved active shift on the tabs + Working label.
@@ -1979,6 +1986,7 @@
       updateSimShiftLabel();
       // Pull OT hours now, then keep them live with the 5s auto-refresh poll.
       pullOtHours(true, false);
+      loadActualProduction();
       startSimPoll();
       // Refresh immediately when the user returns to the tab (poll was idle).
       document.addEventListener('visibilitychange', () => {
@@ -2052,6 +2060,10 @@
       if (els.simTabs) els.simTabs.addEventListener('click', (e) => {
         const btn = e.target.closest('.sim-tab');
         if (btn && btn.dataset.shift) setActiveSimShift(btn.dataset.shift);
+      });
+      if (els.actProdDate) els.actProdDate.addEventListener('change', () => {
+        actProdDate = els.actProdDate.value || todayISO();
+        loadActualProduction();
       });
       if (els.simPlanDate) els.simPlanDate.addEventListener('change', () => {
         const date = els.simPlanDate.value || todayISO();
@@ -2302,7 +2314,7 @@
       });
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
-      if (els.actualProdPanel) els.actualProdPanel.addEventListener('click', openDashboard);
+      if (els.actualProdPanel) els.actualProdPanel.addEventListener('click', (e) => { if (e.target !== els.actProdDate) openDashboard(); });
       if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
       if (els.dbClose) els.dbClose.addEventListener('click', () => { els.dbOverlay.hidden = true; });
       if (els.dbOverlay) els.dbOverlay.addEventListener('click', (e) => { if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; });
@@ -2952,6 +2964,7 @@
         }
         DATA.progressMat = res.mat || {};
         DATA.progressLot = res.lot || {};
+        loadActualProduction();
         applyProgressToRows();
         progressCleared = false;
         localStorage.removeItem('dailyFollowProgCleared');
@@ -3247,10 +3260,59 @@
     async function simPollTick() {
       if (document.hidden) { scheduleSimPoll(SIM_POLL_BASE); return; }   // idle while not viewed
       const ok = await pullOtHours(true, true);
+      loadActualProduction();
       simPollDelay = ok ? SIM_POLL_BASE : Math.min(simPollDelay * 2, SIM_POLL_MAX);
       scheduleSimPoll(simPollDelay);
     }
     function startSimPoll() { simPollDelay = SIM_POLL_BASE; scheduleSimPoll(SIM_POLL_BASE); }
+    // Fetch real production + OT working hours for the Actual Productivity date.
+    async function loadActualProduction() {
+      if (location.protocol === 'file:') return;   // needs the server DB / OT proxy
+      const date = actProdDate || todayISO();
+      try {
+        const [prodRes, otRes] = await Promise.all([
+          fetch('api/actual-production?date=' + encodeURIComponent(date)).then(r => r.json()).catch(() => null),
+          fetch('api/ot-working-hours?date=' + encodeURIComponent(date)).then(r => r.json()).catch(() => null),
+        ]);
+        actProd = (prodRes && prodRes.success && prodRes.byShift) ? prodRes.byShift : { D: {}, N: {} };
+        actOt = (otRes && otRes.success) ? { shifts: otRes.shifts || {}, morning_shift: otRes.morning_shift } : null;
+      } catch (e) { actProd = { D: {}, N: {} }; actOt = null; }
+      updateActualReadout();
+    }
+    // Actual Productivity readout: production on actProdDate for the active shift.
+    function updateActualReadout() {
+      const shift = activeSimShift;                       // A / B (shared with simulator)
+      const morning = actOt && actOt.morning_shift;       // which label is the day shift
+      // Map active A/B shift to the ZPP0059 D/N bucket. If morning unknown, merge both.
+      let byKey;
+      if (morning) {
+        byKey = actProd[(shift === morning) ? 'D' : 'N'] || {};
+      } else {
+        byKey = Object.assign({}, actProd.N || {}, actProd.D || {});
+      }
+      let rate = 0, n = 0, pcs = 0;
+      for (const row of filtered) {
+        if (isHairPin(row)) continue;
+        const ts = valueOf(row, 'ts');
+        if (ts === '' || ts === null || ts === undefined) continue;
+        const prod = byKey[`${row.line}|${row.month}|${seqKey(row.seq)}|${row.item}`];
+        if (!prod) continue;
+        const a = String(row.attribute || '').trim().toUpperCase();
+        const fg = a.endsWith('-BZ') ? num(prod.auto) : a.endsWith('-CT') ? num(prod.cutting) : 0;
+        if (!fg) continue;
+        rate += (num(ts) / 0.5916) * fg;
+        n += 1; pcs += fg;
+      }
+      const wh = (actOt && actOt.shifts && actOt.shifts[shift]) ? num(actOt.shifts[shift].hours) : 0;
+      if (els.actRateBadge) els.actRateBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
+      if (els.actRateSub) els.actRateSub.textContent = n.toLocaleString() + ' rows · ' + pcs.toLocaleString() + ' pcs';
+      if (els.actWorkBadge) els.actWorkBadge.textContent = (Math.round(wh * 100) / 100).toLocaleString();
+      const prodVal = rate > 0 ? wh / rate : 0;
+      if (els.actProdBadge) {
+        els.actProdBadge.textContent = (Math.round(prodVal * 100) / 100).toLocaleString();
+        els.actProdBadge.classList.toggle('danger', prodVal > 0.89);
+      }
+    }
     function updateSimReadout() {
       // Simulator: planned unit rate from the rows the user ticked.
       let rate = 0, qty = 0, n = 0;
@@ -3261,32 +3323,12 @@
         qty += num(row.assyOrder);
         n += 1;
       }
-      // Actual Productivity: real production only \u2014 sums the actual unit rate of
-      // every row currently shown (respects the Line/Month/Status/Search filter),
-      // independent of the simulator ticks.
-      let actRate = 0, actN = 0, actPcs = 0;
-      for (const row of filtered) {
-        const ur = computeActualUnitRate(row);
-        if (ur === '' || ur === 0) continue;
-        actRate += num(ur);
-        actN += 1;
-        actPcs += num(valueOf(row, 'stockFg'));
-      }
       els.simBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       els.simSub.textContent = n.toLocaleString() + ' rows \u00B7 ' + qty.toLocaleString() + ' pcs';
       const wh = num(els.workHour.value);
       const prod = rate > 0 ? wh / rate : 0;
       els.prodBadge.textContent = (Math.round(prod * 100) / 100).toLocaleString();
       els.prodBadge.classList.toggle('danger', prod > 0.89);
-      // Actual Productivity panel \u2014 actual unit rate vs the same working hours
-      if (els.actRateBadge) els.actRateBadge.textContent = (Math.round(actRate * 10) / 10).toLocaleString();
-      if (els.actRateSub) els.actRateSub.textContent = actN.toLocaleString() + ' rows \u00B7 ' + actPcs.toLocaleString() + ' pcs';
-      if (els.actWorkBadge) els.actWorkBadge.textContent = (Math.round(wh * 100) / 100).toLocaleString();
-      const actProd = actRate > 0 ? wh / actRate : 0;
-      if (els.actProdBadge) {
-        els.actProdBadge.textContent = (Math.round(actProd * 100) / 100).toLocaleString();
-        els.actProdBadge.classList.toggle('danger', actProd > 0.89);
-      }
     }
     function render() {
       activeCols = visibleColumns();
@@ -3296,6 +3338,7 @@
       winStart = winEnd = -1;
       renderWindow(true);
       updateSimReadout();
+      updateActualReadout();
     }
     function renderColgroup(cols) {
       const frag = document.createDocumentFragment();
