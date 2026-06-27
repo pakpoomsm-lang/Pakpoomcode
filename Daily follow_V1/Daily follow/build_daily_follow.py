@@ -387,7 +387,6 @@ def resolve_columns(header_row):
 
 
 def build_rows():
-    master_ts = load_master_ts()
     routing = load_routing()
     prog_mat, prog_lot = load_progress()
     wb = openpyxl.load_workbook(EXPORT_FILE, read_only=True, data_only=True)
@@ -466,7 +465,7 @@ def build_rows():
                 "lead": lead,
                 "leadRemark": text(row[col["dirRemark"]]) or text(row[col["invRmk"]]),
                 "ts": route.get("ts") or "",
-                "actualTs": master_ts.get(item, ""),
+                "actualTs": route.get("ts") or "",
                 "operation": route.get("operation") or "",
                 "sourceReady": {
                     "metal": norm(row[col["metal"]]),

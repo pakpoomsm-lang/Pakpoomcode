@@ -2599,7 +2599,7 @@
         lead,
         leadRemark: cleanText(at('dirRemark')) || cleanText(at('invRmk')),
         ts: route.ts || '',
-        actualTs: '',
+        actualTs: route.ts || '',
         operation: route.operation || ''
       };
     }
@@ -2816,6 +2816,7 @@
         row.attribute1 = route.attribute1 || '';
         row.unit = route.unit || '';
         row.ts = route.ts || '';
+        row.actualTs = route.ts || '';
         row.operation = route.operation || '';
         const head = `${row.line}|${row.month}|${seqKey(row.seq)}`;
         const matp = (DATA.progressMat && DATA.progressMat[`${head}|${row.item}`]) || {};
