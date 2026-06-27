@@ -1786,12 +1786,13 @@
       return Math.round(v * 10) / 10;
     }
     function computeActualTs(row) {
-      // Only show Actual TS when FG has a value.
+      // Actual TS mirrors the standard TS (MasterTS-first), but only shows once
+      // real production has been posted — i.e. the FG column has a quantity.
       const fg = valueOf(row, 'fg');
       if (fg === '' || fg === null || fg === undefined || !num(fg)) return '';
-      const ats = valueOf(row, 'actualTs');
-      if (ats === '' || ats === null || ats === undefined) return '';
-      return ats;
+      const ts = valueOf(row, 'ts');
+      if (ts === '' || ts === null || ts === undefined) return '';
+      return ts;
     }
     function computeActualUnitRate(row) {
       if (isHairPin(row) || assyOk(row)) return '';
@@ -2599,7 +2600,6 @@
         lead,
         leadRemark: cleanText(at('dirRemark')) || cleanText(at('invRmk')),
         ts: route.ts || '',
-        actualTs: route.ts || '',
         operation: route.operation || ''
       };
     }
@@ -2816,7 +2816,6 @@
         row.attribute1 = route.attribute1 || '';
         row.unit = route.unit || '';
         row.ts = route.ts || '';
-        row.actualTs = route.ts || '';
         row.operation = route.operation || '';
         const head = `${row.line}|${row.month}|${seqKey(row.seq)}`;
         const matp = (DATA.progressMat && DATA.progressMat[`${head}|${row.item}`]) || {};

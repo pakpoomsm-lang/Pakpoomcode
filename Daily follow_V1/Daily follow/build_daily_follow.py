@@ -465,7 +465,6 @@ def build_rows():
                 "lead": lead,
                 "leadRemark": text(row[col["dirRemark"]]) or text(row[col["invRmk"]]),
                 "ts": route.get("ts") or "",
-                "actualTs": route.get("ts") or "",
                 "operation": route.get("operation") or "",
                 "sourceReady": {
                     "metal": norm(row[col["metal"]]),
