@@ -1289,7 +1289,7 @@
             </div>
           </div>
         </div>
-        <div class="sim-panel actual-prod-panel" id="actualProdPanel" title="คลิกเพื่อดู Lead Time Summary · Actual Productivity = ผลรวม Actual Unit Rate (TS x จำนวน FG ที่ผลิตจริง) ของแถวที่ติ๊ก หารด้วยชั่วโมงทำงานเดียวกับ Simulator">
+        <div class="sim-panel actual-prod-panel" id="actualProdPanel" title="คลิกเพื่อดู Lead Time Summary · Actual Productivity = ผลรวม Actual Unit Rate (TS x จำนวน FG ที่ผลิตจริง) ของงานที่ผลิตจริงในมุมมองปัจจุบัน (ตาม filter) หารด้วยชั่วโมงทำงาน (OT) — ไม่เกี่ยวกับการติ๊กใน Simulator">
           <div class="sim-panel-head">
             <span class="sim-panel-title">Actual Productivity</span>
           </div>
@@ -3252,16 +3252,25 @@
     }
     function startSimPoll() { simPollDelay = SIM_POLL_BASE; scheduleSimPoll(SIM_POLL_BASE); }
     function updateSimReadout() {
+      // Simulator: planned unit rate from the rows the user ticked.
       let rate = 0, qty = 0, n = 0;
-      let actRate = 0, actN = 0, actPcs = 0;
       for (const id of selected) {
         const row = byId.get(id);
         if (!row || isHairPin(row)) continue;
         rate += (num(row.ts) / 0.5916) * num(row.assyOrder);
         qty += num(row.assyOrder);
         n += 1;
+      }
+      // Actual Productivity: real production only \u2014 sums the actual unit rate of
+      // every row currently shown (respects the Line/Month/Status/Search filter),
+      // independent of the simulator ticks.
+      let actRate = 0, actN = 0, actPcs = 0;
+      for (const row of filtered) {
         const ur = computeActualUnitRate(row);
-        if (ur !== '' && ur !== 0) { actRate += num(ur); actN += 1; actPcs += num(valueOf(row, 'stockFg')); }
+        if (ur === '' || ur === 0) continue;
+        actRate += num(ur);
+        actN += 1;
+        actPcs += num(valueOf(row, 'stockFg'));
       }
       els.simBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       els.simSub.textContent = n.toLocaleString() + ' rows \u00B7 ' + qty.toLocaleString() + ' pcs';
@@ -3269,7 +3278,7 @@
       const prod = rate > 0 ? wh / rate : 0;
       els.prodBadge.textContent = (Math.round(prod * 100) / 100).toLocaleString();
       els.prodBadge.classList.toggle('danger', prod > 0.89);
-      // Actual Productivity panel \u2014 shares the same ticked rows and working hours
+      // Actual Productivity panel \u2014 actual unit rate vs the same working hours
       if (els.actRateBadge) els.actRateBadge.textContent = (Math.round(actRate * 10) / 10).toLocaleString();
       if (els.actRateSub) els.actRateSub.textContent = actN.toLocaleString() + ' rows \u00B7 ' + actPcs.toLocaleString() + ' pcs';
       if (els.actWorkBadge) els.actWorkBadge.textContent = (Math.round(wh * 100) / 100).toLocaleString();
