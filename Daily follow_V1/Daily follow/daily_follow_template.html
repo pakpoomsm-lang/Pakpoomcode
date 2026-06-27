@@ -2649,7 +2649,7 @@
         saveServerState();
         const st = res.stats || {};
         const dbInfo = st.new_rows !== undefined
-          ? ` [DB +${st.new_rows} new / ${st.skipped_rows} dup / ${(st.total_rows||0).toLocaleString()} total]`
+          ? ` [DB +${st.new_rows} new / ${st.updated_rows} upd / ${(st.total_rows||0).toLocaleString()} total]`
           : '';
         els.importStatus.textContent = `ZPP0022 updated (${currentRows.length.toLocaleString()} rows)${dbInfo}`;
       } catch (error) {
@@ -2717,7 +2717,7 @@
         const fname = res.file ? ` from ${res.file}` : '';
         const st = res.stats || {};
         const dbInfo = st.new_rows !== undefined
-          ? ` [DB +${st.new_rows} new / ${st.skipped_rows} dup / ${(st.total_rows||0).toLocaleString()} total]`
+          ? ` [DB +${st.new_rows} new / ${st.updated_rows} upd / ${(st.total_rows||0).toLocaleString()} total]`
           : '';
         els.importStatus.textContent = `ZPP0059 updated${fname}${rangeStr}${dbInfo} (${nMat.toLocaleString()} mat / ${nLot.toLocaleString()} lot)`;
       } catch (error) {
