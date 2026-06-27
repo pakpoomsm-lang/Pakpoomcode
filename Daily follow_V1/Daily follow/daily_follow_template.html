@@ -629,7 +629,13 @@
     .prod-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-left: 8px; }
     .prod-legend .lg-plan { background: #2563eb; }
     .prod-legend .lg-actual { background: #f59e0b; }
-    .prod-chart-svg { width: 100%; height: 96px; display: block; }
+    .prod-donuts { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; padding: 4px 0 2px; }
+    .prod-donut { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .prod-donut svg { width: 96px; height: 96px; display: block; }
+    .prod-donut-name { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--primary-dark); }
+    .prod-donut-vals { display: flex; gap: 12px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .prod-donut-vals .v-plan { color: #2563eb; }
+    .prod-donut-vals .v-actual { color: #d97706; }
     .lead-legend { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
     .lead-leg-title {
       font-size: 9px;
@@ -1389,7 +1395,7 @@
               <span class="prod-chart-title">Plan vs Actual</span>
               <span class="prod-legend"><i class="lg-plan"></i>Plan<i class="lg-actual"></i>Actual</span>
             </div>
-            <svg id="prodChart" class="prod-chart-svg" viewBox="0 0 320 96" preserveAspectRatio="none" role="img" aria-label="Plan vs Actual chart"></svg>
+            <div id="prodDonuts" class="prod-donuts"></div>
           </div>
         </div>
       </div>
@@ -3379,36 +3385,56 @@
       simStats = { rate, result: prod };
       renderProdChart();
     }
-    // Inline SVG comparison chart (no external lib \u2014 factory runs offline).
+    // Plan vs Actual donut charts (inline SVG, no external lib \u2014 factory runs offline).
+    // One donut per metric: blue = Plan, orange = Actual (proportional slices);
+    // the centre shows how much Actual reached vs Plan.
     function renderProdChart() {
-      const svg = document.getElementById('prodChart');
-      if (!svg) return;
+      const wrap = document.getElementById('prodDonuts');
+      if (!wrap) return;
       const NS = 'http://www.w3.org/2000/svg';
-      const W = 320, rowH = 40, barH = 13, gap = 6, labelW = 64, valW = 34;
-      const x0 = labelW, x1 = W - valW;
+      const round = (v, d) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
       const metrics = [
         { name: 'Unit Rate', plan: simStats.rate,   act: actStats.rate,   dec: 1 },
         { name: 'Result',    plan: simStats.result, act: actStats.result, dec: 2 },
       ];
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
       const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-      metrics.forEach((m, i) => {
-        const top = i * (rowH + 8) + 4;
-        const max = Math.max(m.plan, m.act, 0.0001);
-        const label = mk('text', { x: 0, y: top + rowH / 2, 'dominant-baseline': 'middle' });
-        label.textContent = m.name;
-        label.setAttribute('font-size', '11'); label.setAttribute('font-weight', '700'); label.setAttribute('fill', '#475569');
-        svg.appendChild(label);
-        [['plan', '#2563eb', top], ['act', '#f59e0b', top + barH + gap]].forEach(([key, color, y]) => {
-          const v = m[key];
-          const w = Math.max(0, (v / max) * (x1 - x0));
-          svg.appendChild(mk('rect', { x: x0, y, width: (x1 - x0), height: barH, rx: 3, fill: '#e8eef9' }));
-          if (w > 0) svg.appendChild(mk('rect', { x: x0, y, width: w, height: barH, rx: 3, fill: color }));
-          const t = mk('text', { x: x1 + 4, y: y + barH / 2, 'dominant-baseline': 'middle', 'font-size': '10', 'font-weight': '700', fill: '#334155' });
-          t.textContent = (Math.round(v * Math.pow(10, m.dec)) / Math.pow(10, m.dec)).toLocaleString();
-          svg.appendChild(t);
-        });
-      });
+      const R = 38, C = 2 * Math.PI * R, SW = 15;
+      wrap.replaceChildren();
+      for (const m of metrics) {
+        const total = m.plan + m.act;
+        const box = document.createElement('div');
+        box.className = 'prod-donut';
+        const svg = mk('svg', { viewBox: '0 0 100 100', role: 'img', 'aria-label': m.name + ' plan vs actual' });
+        // Track ring
+        svg.appendChild(mk('circle', { cx: 50, cy: 50, r: R, fill: 'none', stroke: '#e8eef9', 'stroke-width': SW }));
+        if (total > 0) {
+          const planLen = (m.plan / total) * C;
+          const planArc = mk('circle', { cx: 50, cy: 50, r: R, fill: 'none', stroke: '#2563eb',
+            'stroke-width': SW, 'stroke-dasharray': `${planLen} ${C - planLen}`, transform: 'rotate(-90 50 50)' });
+          const actArc = mk('circle', { cx: 50, cy: 50, r: R, fill: 'none', stroke: '#f59e0b',
+            'stroke-width': SW, 'stroke-dasharray': `${C - planLen} ${planLen}`, 'stroke-dashoffset': -planLen, transform: 'rotate(-90 50 50)' });
+          svg.appendChild(planArc);
+          svg.appendChild(actArc);
+        }
+        // Centre: Actual as % of Plan (achievement)
+        const pct = m.plan > 0 ? Math.round((m.act / m.plan) * 100) + '%' : (m.act > 0 ? '\u221e' : '\u2013');
+        const ctr = mk('text', { x: 50, y: 50, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+          'font-size': '19', 'font-weight': '800', fill: '#1f2937' });
+        ctr.textContent = pct;
+        svg.appendChild(ctr);
+        box.appendChild(svg);
+        const name = document.createElement('div');
+        name.className = 'prod-donut-name';
+        name.textContent = m.name;
+        box.appendChild(name);
+        const vals = document.createElement('div');
+        vals.className = 'prod-donut-vals';
+        const vp = document.createElement('span'); vp.className = 'v-plan'; vp.textContent = 'P ' + round(m.plan, m.dec).toLocaleString();
+        const va = document.createElement('span'); va.className = 'v-actual'; va.textContent = 'A ' + round(m.act, m.dec).toLocaleString();
+        vals.append(vp, va);
+        box.appendChild(vals);
+        wrap.appendChild(box);
+      }
     }
     function render() {
       activeCols = visibleColumns();
