@@ -301,13 +301,25 @@ def load_incoming():
     """Read incoming.db, group received parts per (line, month, seq).
 
     Returns one map the page joins onto its rows:
-      by_key["LINE|month|seq"] = [{part, qty, last}]   (qty summed per part)
+      by_key["LINE|month|seq"] = [{part, desc, partType, qty, last}]
     """
     by_key = {}
     if not STOCK_DB.is_file() or STOCK_DB.stat().st_size == 0:
         return by_key
     try:
         conn = sqlite3.connect(f"file:{STOCK_DB.as_posix()}?mode=ro", uri=True)
+        # Load description lookup first (small table, fits in memory).
+        desc_map = {}  # part_no -> (description, part_type)
+        try:
+            for item_code, description, part_type in conn.execute(
+                "SELECT item_code, description, part_type FROM item_descriptions"
+            ):
+                desc_map[str(item_code or "").strip()] = (
+                    str(description or "").strip(),
+                    str(part_type or "").strip(),
+                )
+        except sqlite3.Error:
+            pass  # table missing → descriptions stay blank
         cur = conn.execute(
             "SELECT line_num, seq, pro_month, part_no, qty, receive_date "
             "FROM incoming ORDER BY receive_date, receive_time"
@@ -324,14 +336,20 @@ def load_incoming():
             key = f"{line}|{month}|{seq_n}"
             q = qty if isinstance(qty, (int, float)) else 0
             bucket = parts.setdefault(key, {})
-            row = bucket.setdefault(part, {"qty": 0, "last": ""})
-            row["qty"] += q
+            entry = bucket.setdefault(part, {"qty": 0, "last": ""})
+            entry["qty"] += q
             if receive_date:
-                row["last"] = str(receive_date)
+                entry["last"] = str(receive_date)
         conn.close()
         for key, bucket in parts.items():
             by_key[key] = [
-                {"part": p, "qty": bdf.clean_qty(v["qty"]), "last": v["last"]}
+                {
+                    "part": p,
+                    "desc": desc_map.get(p, ("", ""))[0],
+                    "partType": desc_map.get(p, ("", ""))[1],
+                    "qty": bdf.clean_qty(v["qty"]),
+                    "last": v["last"],
+                }
                 for p, v in bucket.items()
             ]
     except sqlite3.Error:

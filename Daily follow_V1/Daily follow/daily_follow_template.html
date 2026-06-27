@@ -1142,6 +1142,14 @@
     .badge.clickable { cursor: pointer; }
     .badge.clickable:hover { filter: brightness(.93); }
     .cs-panel { width: 320px; }
+    .inc-panel { width: 480px; }
+    .inc-row { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid #e8eaf0; }
+    .inc-row:last-child { border-bottom: none; }
+    .inc-row-top { display: flex; align-items: baseline; gap: 8px; }
+    .inc-part { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
+    .inc-qty { font-size: 13px; font-weight: 700; color: #138a55; white-space: nowrap; }
+    .inc-meta { font-size: 11px; color: #8892a4; display: flex; gap: 10px; padding-left: 2px; }
+    .inc-type { font-size: 11px; font-weight: 600; color: #5b6a8a; background: #eef1f8; border-radius: 3px; padding: 1px 5px; }
     .cs-list { padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 10px; }
     .cs-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
     .cs-dot {
@@ -1365,7 +1373,7 @@
     </div>
   </div>
   <div id="incOverlay" class="dash-overlay" hidden>
-    <div class="dash-panel cs-panel">
+    <div class="dash-panel inc-panel">
       <div class="dash-head">
         <div id="incTitle" class="dash-title">Part Incoming</div>
         <button id="incClose" class="dash-close" type="button">&#10005;</button>
@@ -1528,14 +1536,40 @@
       list.replaceChildren();
       for (const it of items) {
         const div = document.createElement('div');
-        div.className = 'cs-row';
-        const lbl = document.createElement('span');
-        const qty = document.createElement('span');
-        lbl.className = 'cs-label';
-        lbl.textContent = it.part + (it.last ? `  (${it.last})` : '');
-        qty.className = 'cs-result ok';
-        qty.textContent = it.qty;
-        div.append(lbl, qty);
+        div.className = 'inc-row';
+
+        // top row: part no + qty
+        const top = document.createElement('div');
+        top.className = 'inc-row-top';
+        const partEl = document.createElement('span');
+        partEl.className = 'inc-part';
+        partEl.textContent = it.part;
+        const qtyEl = document.createElement('span');
+        qtyEl.className = 'inc-qty';
+        qtyEl.textContent = it.qty + ' PC';
+        top.append(partEl, qtyEl);
+
+        // bottom row: description + part_type badge + receive date
+        const meta = document.createElement('div');
+        meta.className = 'inc-meta';
+        if (it.partType) {
+          const typeEl = document.createElement('span');
+          typeEl.className = 'inc-type';
+          typeEl.textContent = it.partType;
+          meta.appendChild(typeEl);
+        }
+        if (it.desc) {
+          const descEl = document.createElement('span');
+          descEl.textContent = it.desc;
+          meta.appendChild(descEl);
+        }
+        if (it.last) {
+          const dateEl = document.createElement('span');
+          dateEl.textContent = it.last;
+          meta.appendChild(dateEl);
+        }
+
+        div.append(top, meta);
         list.appendChild(div);
       }
       ovl.hidden = false;
