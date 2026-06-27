@@ -505,8 +505,8 @@ def db_upsert(conn: sqlite3.Connection, headers: list[str], rows,
     return new, updated
 
 
-def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
-    """Re-aggregate the full DB into (progressMat, progressLot) for the page."""
+def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict, dict]:
+    """Re-aggregate the full DB into (progressMat, progressLot, progressMatCt) for the page."""
     # Map header -> safe col name.
     col_map = {r[1]: r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
 
@@ -517,10 +517,11 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
     needed = [c(x) for x in PROGRESS_COLS]
     missing = [n for n in needed if n not in col_map]
     if missing:
-        return {}, {}
+        return {}, {}, {}
 
     op_field = {"Insert": "fp", "Brazing": "auto", "Cutting": "cutting"}
     hp_op = "H/P bender"
+    has_ct = c("CT Value") in col_map
 
     def clean(v):
         if v is None:
@@ -534,6 +535,7 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
 
     by_mat: dict = defaultdict(lambda: defaultdict(float))
     by_lot: dict = defaultdict(float)
+    by_mat_ct: dict = defaultdict(lambda: defaultdict(lambda: {"ct": 0.0, "qty": 0.0}))
 
     # Exclude cancelled / deleted postings so the aggregate doesn't over-count.
     # These columns may be absent in an older table, so only filter when present.
@@ -542,13 +544,16 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
         cc = c(name)
         if cc in col_map:
             where.append(f'IFNULL("{cc}", "") = ""')
+
+    ct_col = f', "{c("CT Value")}"' if has_ct else ""
     sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", '
            f'"{c("Sequence")}", "{c("Material")}", "{c("Assembly Order")}", '
-           f'"{c("Operation Short Text")}", "{c("Posted Quantity")}" '
+           f'"{c("Operation Short Text")}", "{c("Posted Quantity")}"{ct_col} '
            f'FROM zpp0059_raw WHERE ' + " AND ".join(where))
 
     for row in conn.execute(sql):
-        line, month_raw, seq_raw, mat, ao, op, qty_raw = row
+        line, month_raw, seq_raw, mat, ao, op, qty_raw = row[:7]
+        ct_raw = row[7] if has_ct else None
         if not line:
             continue
         try:
@@ -559,14 +564,27 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
         if op == hp_op:
             by_lot[f"{head}|{ao}"] += qty
         elif op in op_field:
-            by_mat[f"{head}|{mat}"][op_field[op]] += qty
+            field = op_field[op]
+            mat_key = f"{head}|{mat}"
+            by_mat[mat_key][field] += qty
+            if field in ("auto", "cutting") and ct_raw is not None and qty > 0:
+                try:
+                    ct_val = float(ct_raw)
+                except (TypeError, ValueError):
+                    ct_val = 0.0
+                by_mat_ct[mat_key][field]["ct"] += ct_val * qty
+                by_mat_ct[mat_key][field]["qty"] += qty
 
     def rnd(v):
         return int(v) if float(v).is_integer() else round(v, 3)
 
     mat_out = {k: {f: rnd(q) for f, q in fields.items()} for k, fields in by_mat.items()}
     lot_out = {k: rnd(q) for k, q in by_lot.items()}
-    return mat_out, lot_out
+    mat_ct_out = {
+        k: {f: {"ct": round(d["ct"], 2), "qty": rnd(d["qty"])} for f, d in fields.items()}
+        for k, fields in by_mat_ct.items()
+    }
+    return mat_out, lot_out, mat_ct_out
 
 
 def db_stats(conn: sqlite3.Connection, table: str = "zpp0059_raw") -> dict:
@@ -965,7 +983,7 @@ def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
     return export
 
 
-def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, str, dict]:
+def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, dict, str, dict]:
     """Drive SAP → upsert into DB → aggregate. Returns (mat, lot, filename, stats).
     date_from / date_to override the rolling window when supplied (format DD.MM.YYYY).
     """
@@ -1022,13 +1040,13 @@ def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, str
           f"(total export: {len(rows)})")
 
     # Aggregate from the full DB (not just this export).
-    mat, lot = db_aggregate(conn)
+    mat, lot, mat_ct = db_aggregate(conn)
     stats = db_stats(conn)
     stats["last_export"] = export.name
     stats["new_rows"] = new
     stats["updated_rows"] = updated
     conn.close()
-    return mat, lot, export.name, stats
+    return mat, lot, mat_ct, export.name, stats
 
 
 def run_zpp0022() -> tuple[str, dict]:
@@ -1105,12 +1123,12 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 body = json.loads(self.rfile.read(length)) if length else {}
-                mat, lot, fname, stats = run_zpp0059(
+                mat, lot, mat_ct, fname, stats = run_zpp0059(
                     date_from=body.get("date_from", ""),
                     date_to=body.get("date_to", ""),
                 )
                 self._send(200, json.dumps(
-                    {"ok": True, "mat": mat, "lot": lot, "file": fname, "stats": stats}
+                    {"ok": True, "mat": mat, "lot": lot, "matCt": mat_ct, "file": fname, "stats": stats}
                 ))
             except SapNotReady as exc:
                 self._send(409, json.dumps(

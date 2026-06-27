@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent
 EXPORT_FILE = ROOT / "EXPORT_20260601070215.xlsx"
 SAMPLE_FILE = ROOT / "HEI-18-05-PP-Original-SAP-1 (1).xlsm"
 ROUTING_FILE = ROOT / "Routing.xlsx"
+MASTER_TS_FILE = ROOT / "MasterTS.xlsx"
 PROGRESS_FILE = ROOT / "ZPP0059.xlsx"
 OUTPUT_FILE = ROOT / "daily_follow.html"
 TEMPLATE_FILE = ROOT / "daily_follow_template.html"
@@ -102,7 +103,26 @@ def month_display(value):
     return raw
 
 
+def load_master_ts():
+    """Return {ITEM: TS_VALUE} from MasterTS.xlsx."""
+    if not MASTER_TS_FILE.exists():
+        return {}
+    wb = openpyxl.load_workbook(MASTER_TS_FILE, read_only=True, data_only=True)
+    ws = wb.active
+    rows = ws.iter_rows(values_only=True)
+    headers = [text(v) for v in next(rows)]
+    idx = {h: i for i, h in enumerate(headers)}
+    result = {}
+    for row in rows:
+        item = text(row[idx["ITEM"]])
+        if item:
+            result[item] = number(row[idx["TS_VALUE"]])
+    wb.close()
+    return result
+
+
 def load_routing():
+    master_ts = load_master_ts()
     wb = openpyxl.load_workbook(ROUTING_FILE, read_only=True, data_only=True)
     ws = wb.active
     rows = ws.iter_rows(values_only=True)
@@ -113,13 +133,14 @@ def load_routing():
         material = text(row[idx["Material"]])
         if not material or material in routing:
             continue
+        ts = master_ts.get(material, number(row[idx["OPR Time Standard"]]))
         routing[material] = {
             "description": text(row[idx["Description"]]),
             "operation": text(row[idx["Operation Text"]]),
             "attribute1": text(row[idx["Attribute1"]]),
             "attribute2": text(row[idx["Attribute2"]]),
             "unit": number(row[idx["Standard lot"]]),
-            "ts": number(row[idx["OPR Time Standard"]]),
+            "ts": ts,
         }
     wb.close()
     return routing
@@ -153,14 +174,18 @@ def clean_qty(value):
 def load_progress():
     """Aggregate real per-process progress from ZPP0059.
 
-    Returns (by_mat, by_lot):
+    Returns (by_mat, by_lot, by_mat_ct):
       by_mat["line|month|seq|material"] = {"fp": q, "auto": q, "cutting": q}
       by_lot["line|month|seq|assyOrder"] = q   (H/P bender, summed per lot)
+      by_mat_ct["line|month|seq|material"] = {"auto": {"ct": total_ct_sec, "qty": total_posted},
+                                               "cutting": {...}}
     """
     by_mat = defaultdict(lambda: defaultdict(float))
     by_lot = defaultdict(float)
+    # ct_qty = sum of (CT Value × Posted Quantity); qty = sum of Posted Quantity
+    by_mat_ct = defaultdict(lambda: defaultdict(lambda: {"ct": 0.0, "qty": 0.0}))
     if not PROGRESS_FILE.exists():
-        return {}, {}
+        return {}, {}, {}
     wb = openpyxl.load_workbook(PROGRESS_FILE, read_only=True, data_only=True)
     ws = wb.active
     rows = ws.iter_rows(values_only=True)
@@ -173,6 +198,7 @@ def load_progress():
     c_ao = idx["Assembly Order"]
     c_op = idx["Operation Short Text"]
     c_qty = idx["Posted Quantity"]
+    c_ct = idx.get("CT Value")
     # Optional in older exports — used to skip cancelled / deleted postings.
     c_del = idx.get("Deletion Flag")
     c_cancel = idx.get("Cancel Date")
@@ -190,14 +216,44 @@ def load_progress():
         if op == HP_OP:
             by_lot[f"{key_head}|{text(row[c_ao])}"] += qty
         elif op in OP_TO_FIELD:
-            by_mat[f"{key_head}|{text(row[c_mat])}"][OP_TO_FIELD[op]] += qty
+            field = OP_TO_FIELD[op]
+            mat_key = f"{key_head}|{text(row[c_mat])}"
+            by_mat[mat_key][field] += qty
+            # Accumulate CT seconds for FG operations (Brazing and Cutting only).
+            if field in ("auto", "cutting") and c_ct is not None and qty > 0:
+                ct_val = row[c_ct] if isinstance(row[c_ct], (int, float)) else 0
+                by_mat_ct[mat_key][field]["ct"] += ct_val * qty
+                by_mat_ct[mat_key][field]["qty"] += qty
     wb.close()
     mat_out = {
         k: {f: clean_qty(q) for f, q in fields.items()}
         for k, fields in by_mat.items()
     }
     lot_out = {k: clean_qty(q) for k, q in by_lot.items()}
-    return mat_out, lot_out
+    mat_ct_out = {
+        k: {
+            f: {"ct": round(d["ct"], 2), "qty": clean_qty(d["qty"])}
+            for f, d in fields.items()
+        }
+        for k, fields in by_mat_ct.items()
+    }
+    return mat_out, lot_out, mat_ct_out
+
+
+def actual_ts_from_ct(attribute2, ct_data):
+    """Compute actual TS (hours/unit) from ZPP0059 CT data for the FG operation."""
+    a = (attribute2 or "").strip().upper()
+    if a.endswith("-BZ"):
+        field = "auto"
+    elif a.endswith("-CT"):
+        field = "cutting"
+    else:
+        return ""
+    d = ct_data.get(field, {})
+    qty = d.get("qty", 0)
+    if not qty:
+        return ""
+    return round(d["ct"] / qty / 3600, 4)
 
 
 def most_common(counter, default=""):
@@ -367,7 +423,7 @@ def resolve_columns(header_row):
 
 def build_rows():
     routing = load_routing()
-    prog_mat, prog_lot = load_progress()
+    prog_mat, prog_lot, prog_mat_ct = load_progress()
     wb = openpyxl.load_workbook(EXPORT_FILE, read_only=True, data_only=True)
     ws = wb.active
     rows = ws.iter_rows(values_only=True)
@@ -399,6 +455,7 @@ def build_rows():
         matp = prog_mat.get(f"{head}|{item}", {})
         hp_val = prog_lot.get(f"{head}|{assy_order_no}", "")
         fin = final_qty(route.get("attribute2"), matp)
+        actual_ts = actual_ts_from_ct(route.get("attribute2"), prog_mat_ct.get(f"{head}|{item}", {}))
         remark = " ".join(
             part
             for part in [
@@ -444,6 +501,7 @@ def build_rows():
                 "lead": lead,
                 "leadRemark": text(row[col["dirRemark"]]) or text(row[col["invRmk"]]),
                 "ts": route.get("ts") or "",
+                "actualTs": actual_ts,
                 "operation": route.get("operation") or "",
                 "sourceReady": {
                     "metal": norm(row[col["metal"]]),
@@ -478,7 +536,7 @@ def render_html(rows):
     default_date = ""
     routing = load_routing()
     speed_by_line, speed_by_model = load_speed_maps()
-    prog_mat, prog_lot = load_progress()
+    prog_mat, prog_lot, prog_mat_ct = load_progress()
     payload = json.dumps(
         {
             "generatedAt": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -495,6 +553,7 @@ def render_html(rows):
             },
             "progressMat": prog_mat,
             "progressLot": prog_lot,
+            "progressMatCt": prog_mat_ct,
             "rows": rows,
         },
         ensure_ascii=False,
