@@ -600,6 +600,25 @@
       gap: 16px;
       flex-wrap: wrap;
     }
+    .actual-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      align-self: stretch;
+      flex: 1 1 240px;
+      min-width: 0;
+      padding: 9px 14px 11px;
+      border: 1px solid #d7e0ee;
+      border-radius: 14px;
+      background: var(--surface-2);
+      box-shadow: var(--shadow-sm);
+    }
+    .actual-head {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
     .lead-legend { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
     .lead-leg-title {
       font-size: 9px;
@@ -1288,20 +1307,11 @@
             </div>
           </div>
         </div>
-        <div class="lead-panel">
-          <div class="lead-head">
-            <span class="lead-panel-title">Target Assy Leadtime (Hrs.)</span>
-            <div class="lead-legend">
-              <span class="lead-leg-title">Target</span>
-              <span class="ll-item"><span class="ll-sw" style="background:#e23b3b"></span>&lt; 4 hr</span>
-              <span class="ll-item"><span class="ll-sw" style="background:#e0a200"></span>4-10 hr</span>
-              <span class="ll-item"><span class="ll-sw" style="background:#1f9254"></span>&gt;10-20 hr</span>
-              <span class="ll-item"><span class="ll-sw" style="background:#2f56c4"></span>&gt;20-40 hr</span>
-              <span class="ll-item"><span class="ll-sw" style="background:#7c3aed"></span>&gt;40 hr</span>
-            </div>
-            <button id="editTargetBtn" class="lead-edit-btn" type="button" title="Edit Assy / SC leadtime targets per line">&#9881; Edit Target</button>
+        <div class="actual-panel">
+          <div class="actual-head">
+            <span class="lead-panel-title">Actual Unit Rate</span>
           </div>
-          <div class="lead-strip empty" id="leadStrip"></div>
+          <div class="lead-strip empty" id="actualStrip"></div>
         </div>
         <div class="sim-panel">
           <div class="sim-panel-head">
@@ -1618,7 +1628,7 @@
       simTabs: document.getElementById('simTabs'), simPlanDate: document.getElementById('simPlanDate'),
       simPullOt: document.getElementById('simPullOt'), simOtInfo: document.getElementById('simOtInfo'),
       simWorkTitle: document.getElementById('simWorkTitle'),
-      leadStrip: document.getElementById('leadStrip'),
+      actualStrip: document.getElementById('actualStrip'),
       editTargetBtn: document.getElementById('editTargetBtn'),
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
@@ -2290,7 +2300,7 @@
       });
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
-      if (els.leadStrip) els.leadStrip.addEventListener('click', openDashboard);
+      if (els.actualStrip) els.actualStrip.addEventListener('click', openDashboard);
       if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
       if (els.dbClose) els.dbClose.addEventListener('click', () => { els.dbOverlay.hidden = true; });
       if (els.dbOverlay) els.dbOverlay.addEventListener('click', (e) => { if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; });
@@ -2298,7 +2308,7 @@
       if (els.dbSearch) els.dbSearch.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadDatabase(); });
       els.dashClose.addEventListener('click', closeDashboard);
       els.dashOverlay.addEventListener('click', (e) => { if (e.target === els.dashOverlay) closeDashboard(); });
-      els.editTargetBtn.addEventListener('click', openTargetEditor);
+      if (els.editTargetBtn) els.editTargetBtn.addEventListener('click', openTargetEditor);
       els.targetClose.addEventListener('click', closeTargetEditor);
       els.targetSave.addEventListener('click', saveTargetEditor);
       els.targetReset.addEventListener('click', resetTargetEditor);
@@ -3685,42 +3695,59 @@
       return { lines, gLead, gScLead, gPcs, gOrders, maxLead };
     }
     function renderLeadStrip() {
-      if (!els.leadStrip) return;
-      const { lines } = computeLineSummary();
-      els.leadStrip.replaceChildren();
-      if (!lines.length) {
-        els.leadStrip.classList.add('empty');
+      if (!els.actualStrip) return;
+      if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
+      ensureLeadGroups();
+
+      // Aggregate actual unit rate per production line (same row filters as computeLineSummary)
+      const byLine = new Map();
+      for (const row of sortedAll) {
+        const line = row.line || '-';
+        if (/^SRV/i.test(line)) continue;
+        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isHiddenByAssyStatus(row)) continue;
+        if (isHairPin(row)) continue;
+        const ur = computeActualUnitRate(row);
+        if (ur === '' || ur === 0) continue;
+        let a = byLine.get(line);
+        if (!a) { a = { line, ur: 0, pcs: 0 }; byLine.set(line, a); }
+        a.ur += ur;
+        a.pcs += num(valueOf(row, 'stockFg'));
+      }
+
+      els.actualStrip.replaceChildren();
+      if (!byLine.size) {
+        els.actualStrip.classList.add('empty');
         return;
       }
-      els.leadStrip.classList.remove('empty');
+      els.actualStrip.classList.remove('empty');
+
+      const lines = [...byLine.values()].sort((x, y) => String(x.line).localeCompare(String(y.line), 'en', { numeric: true }));
+
       const buildChip = (l) => {
         const chip = document.createElement('div');
         chip.className = 'lchip';
-        chip.title = 'Line ' + l.line + ' \u00B7 ' + l.orders + ' ord \u00B7 ' + l.pcs.toLocaleString() + ' pcs (open Dashboard for details)';
+        chip.title = 'Line ' + l.line + ' \u00B7 ' + l.pcs.toLocaleString() + ' pcs produced';
         const name = document.createElement('span');
         name.className = 'lchip-name';
         name.textContent = l.line;
         chip.appendChild(name);
-        [
-          { lab: 'ASSY \u2265' + assyTarget(l.line), val: l.lead, bg: assyBg(l.lead, l.line), col: assyColor(l.lead, l.line) },
-          { lab: 'SC \u2265' + scTarget(l.line), val: l.scLead, bg: scBg(l.scLead, l.line), col: scColor(l.scLead, l.line) }
-        ].forEach((mm) => {
-          const m = document.createElement('span');
-          m.className = 'lmetric';
-          m.style.background = mm.bg;
-          m.style.borderColor = mm.col;
-          const ml = document.createElement('span'); ml.className = 'lmetric-l'; ml.textContent = mm.lab;
-          ml.style.color = mm.col;
-          const mv = document.createElement('span'); mv.className = 'lmetric-v'; mv.textContent = round1(mm.val).toLocaleString();
-          m.append(ml, mv);
-          chip.appendChild(m);
-        });
+        const m = document.createElement('span');
+        m.className = 'lmetric';
+        m.style.background = '#fff7ed';
+        m.style.borderColor = '#d97706';
+        const ml = document.createElement('span'); ml.className = 'lmetric-l'; ml.textContent = 'UR';
+        ml.style.color = '#d97706';
+        const mv = document.createElement('span'); mv.className = 'lmetric-v'; mv.textContent = round1(l.ur).toLocaleString();
+        m.append(ml, mv);
+        chip.appendChild(m);
         return chip;
       };
+
       const track = document.createElement('div');
       track.className = 'lead-track';
       for (const l of lines) track.appendChild(buildChip(l));
-      els.leadStrip.appendChild(track);
+      els.actualStrip.appendChild(track);
     }
     function renderDashboardBody() {
       const { lines, gLead, gScLead, gPcs, gOrders, maxLead } = computeLineSummary();
