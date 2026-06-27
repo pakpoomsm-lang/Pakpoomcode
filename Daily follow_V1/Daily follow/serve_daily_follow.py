@@ -264,20 +264,30 @@ def db_init(conn: sqlite3.Connection, headers: list[str],
 
 def db_upsert(conn: sqlite3.Connection, headers: list[str], rows,
               table: str = "zpp0059_raw") -> tuple[int, int]:
-    """Insert rows that don't already exist. Returns (inserted, skipped)."""
+    """Upsert rows keyed by the business key (latest export wins). Returns (new, updated).
+
+    A row with the same business key (Order+Activity+Short Time Stamp+Tag ID)
+    overwrites the stored copy, so a later edit or cancellation in SAP replaces
+    the earlier values instead of being ignored. _inserted_at is left untouched
+    on update, so it still marks when the row was first seen.
+    """
     safe_headers = db_init(conn, headers, table)
-    h_to_safe = {h: s for h, s in zip(headers, safe_headers)}
 
     # Determine which columns to use for the business key.
     key_cols = [c for c in UNIQUE_KEY_COLS if c in headers]
     use_hash = len(key_cols) < 2  # fallback: SHA-256 of entire row
 
-    inserted = skipped = 0
     placeholders = ", ".join("?" for _ in safe_headers)
     col_list = ", ".join(f'"{c}"' for c in safe_headers)
-    sql = (f'INSERT OR IGNORE INTO {table} (_row_hash, {col_list}) '
-           f'VALUES (?, {placeholders})')
+    set_clause = ", ".join(f'"{c}" = excluded."{c}"' for c in safe_headers)
+    sql = (f'INSERT INTO {table} (_row_hash, {col_list}) VALUES (?, {placeholders}) '
+           f'ON CONFLICT(_row_hash) DO UPDATE SET {set_clause}')
 
+    # Pre-load existing keys so we can report new vs updated honestly: the upsert
+    # itself counts both as a change, so rowcount alone can't tell them apart.
+    seen = {r[0] for r in conn.execute(f"SELECT _row_hash FROM {table}")}
+
+    new = updated = 0
     batch = []
     for row in rows:
         values = [str(v).strip() if v is not None else "" for v in row]
@@ -286,19 +296,20 @@ def db_upsert(conn: sqlite3.Connection, headers: list[str], rows,
         else:
             key_vals = [values[headers.index(c)] for c in key_cols]
             key = hashlib.sha256("|".join(key_vals).encode()).hexdigest()
+        if key in seen:
+            updated += 1
+        else:
+            new += 1
+            seen.add(key)
         batch.append((key, *values))
         if len(batch) >= 500:
-            cur = conn.executemany(sql, batch)
-            inserted += cur.rowcount
-            skipped += len(batch) - cur.rowcount
+            conn.executemany(sql, batch)
             batch.clear()
 
     if batch:
-        cur = conn.executemany(sql, batch)
-        inserted += cur.rowcount
-        skipped += len(batch) - cur.rowcount
+        conn.executemany(sql, batch)
     conn.commit()
-    return inserted, skipped
+    return new, updated
 
 
 def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
@@ -331,10 +342,17 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
     by_mat: dict = defaultdict(lambda: defaultdict(float))
     by_lot: dict = defaultdict(float)
 
+    # Exclude cancelled / deleted postings so the aggregate doesn't over-count.
+    # These columns may be absent in an older table, so only filter when present.
+    where = [f'"{c("Production Line")}" != ""']
+    for name in ("Deletion Flag", "Cancel Date"):
+        cc = c(name)
+        if cc in col_map:
+            where.append(f'IFNULL("{cc}", "") = ""')
     sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", '
            f'"{c("Sequence")}", "{c("Material")}", "{c("Assembly Order")}", '
            f'"{c("Operation Short Text")}", "{c("Posted Quantity")}" '
-           f'FROM zpp0059_raw WHERE "{c("Production Line")}" != ""')
+           f'FROM zpp0059_raw WHERE ' + " AND ".join(where))
 
     for row in conn.execute(sql):
         line, month_raw, seq_raw, mat, ao, op, qty_raw = row
@@ -806,16 +824,16 @@ def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, str
     # Read the export and upsert into SQLite.
     headers, rows = _read_xlsx(export)
     conn = _get_db()
-    inserted, skipped = db_upsert(conn, headers, rows)
-    print(f"[DB] {inserted} new rows inserted, {skipped} duplicates skipped "
+    new, updated = db_upsert(conn, headers, rows)
+    print(f"[DB] {new} new rows, {updated} updated "
           f"(total export: {len(rows)})")
 
     # Aggregate from the full DB (not just this export).
     mat, lot = db_aggregate(conn)
     stats = db_stats(conn)
     stats["last_export"] = export.name
-    stats["new_rows"] = inserted
-    stats["skipped_rows"] = skipped
+    stats["new_rows"] = new
+    stats["updated_rows"] = updated
     conn.close()
     return mat, lot, export.name, stats
 
@@ -864,13 +882,13 @@ def run_zpp0022() -> tuple[str, dict]:
     # Accumulate the raw rows in their own SQLite table (dedup, never wipe).
     headers, rows = _read_xlsx(export)
     conn = _get_db()
-    inserted, skipped = db_upsert(conn, headers, rows, table=ZPP0022_TABLE)
-    print(f"[DB:0022] {inserted} new rows inserted, {skipped} duplicates skipped "
+    new, updated = db_upsert(conn, headers, rows, table=ZPP0022_TABLE)
+    print(f"[DB:0022] {new} new rows, {updated} updated "
           f"(total export: {len(rows)})")
     stats = db_stats(conn, table=ZPP0022_TABLE)
     stats["last_export"] = export.name
-    stats["new_rows"] = inserted
-    stats["skipped_rows"] = skipped
+    stats["new_rows"] = new
+    stats["updated_rows"] = updated
     conn.close()
     return export.name, stats
 

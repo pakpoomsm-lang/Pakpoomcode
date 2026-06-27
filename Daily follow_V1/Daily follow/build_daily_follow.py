@@ -173,9 +173,16 @@ def load_progress():
     c_ao = idx["Assembly Order"]
     c_op = idx["Operation Short Text"]
     c_qty = idx["Posted Quantity"]
+    # Optional in older exports — used to skip cancelled / deleted postings.
+    c_del = idx.get("Deletion Flag")
+    c_cancel = idx.get("Cancel Date")
     for row in rows:
         line = text(row[c_line])
         if not line:
+            continue
+        if c_del is not None and text(row[c_del]):
+            continue
+        if c_cancel is not None and text(row[c_cancel]):
             continue
         key_head = f"{line}|{month_display(row[c_month])}|{seq_key(row[c_seq])}"
         op = text(row[c_op])
