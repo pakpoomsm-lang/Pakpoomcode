@@ -600,7 +600,36 @@
       gap: 16px;
       flex-wrap: wrap;
     }
-    .actual-prod-panel { margin-left: 0; cursor: pointer; }
+    /* .actual-prod-panel removed — merged into .prod-panel */
+    .prod-panel {
+      display: flex; flex-direction: column; gap: 10px;
+      align-self: stretch; margin-left: auto; flex: 1 1 560px; min-width: 0;
+      padding: 11px 16px 13px; border: 1px solid #c2d4f4; border-radius: 14px;
+      background: linear-gradient(180deg, #eaf1ff 0%, #f4f7fe 100%); box-shadow: var(--shadow-sm);
+    }
+    .prod-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .prod-title { font-size: 12px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase; color: var(--primary-dark); }
+    .prod-head-right { display: flex; align-items: center; gap: 10px; }
+    .prod-link {
+      height: 26px; padding: 0 10px; border: 1px solid #b9cdf2; border-radius: 8px;
+      background: #fff; color: var(--primary); font: 700 10px/1 inherit;
+      text-transform: uppercase; letter-spacing: .3px; cursor: pointer;
+    }
+    .prod-link:hover { background: #eef4ff; }
+    .prod-body { display: flex; gap: 14px; flex-wrap: wrap; }
+    .prod-col { display: flex; flex-direction: column; gap: 7px; flex: 1 1 240px; min-width: 0; }
+    .prod-col-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .prod-tag { font-size: 10px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
+    .tag-plan { color: #1d4ed8; background: #dbe6fb; }
+    .tag-actual { color: #b45309; background: #fde9cf; }
+    .prod-chart { border-top: 1px solid #d4e1f6; padding-top: 9px; }
+    .prod-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .prod-chart-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--primary-dark); }
+    .prod-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; color: var(--muted); }
+    .prod-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-left: 8px; }
+    .prod-legend .lg-plan { background: #2563eb; }
+    .prod-legend .lg-actual { background: #f59e0b; }
+    .prod-chart-svg { width: 100%; height: 96px; display: block; }
     .lead-legend { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
     .lead-leg-title {
       font-size: 9px;
@@ -1289,59 +1318,78 @@
             </div>
           </div>
         </div>
-        <div class="sim-panel actual-prod-panel" id="actualProdPanel" title="Actual Productivity = ผลผลิตจริง ณ วันที่เลือก (แยกกะตาม Shift A/B ของ Simulator) หารด้วยชั่วโมงทำงาน OT ของวันนั้น">
-          <div class="sim-panel-head">
-            <span class="sim-panel-title">Actual Productivity</span>
-            <input id="actProdDate" class="sim-date" type="date" title="เลือกวันที่ดูผลผลิตจริง ณ วันนั้น">
-          </div>
-          <div class="sim">
-            <div class="sim-cell">
-              <span class="sim-title">Unit Rate</span>
-              <span class="sim-badge" id="actRateBadge">0</span>
-              <span class="sim-sub" id="actRateSub">0 rows</span>
-            </div>
-            <div class="sim-cell">
-              <span class="sim-title">Working</span>
-              <span class="sim-badge" id="actWorkBadge">0</span>
-              <span class="sim-sub">Hrs</span>
-            </div>
-            <div class="sim-cell">
-              <span class="sim-title">Result</span>
-              <span class="sim-badge" id="actProdBadge" title="Working hour / Actual unit rate">0</span>
-              <span class="sim-sub">Hrs./Unit rate</span>
+        <!-- Merged Productivity card: Plan (simulator) + Actual side by side -->
+        <div class="prod-panel" id="prodPanel">
+          <div class="prod-head">
+            <span class="prod-title">Productivity</span>
+            <div class="prod-head-right">
+              <button id="leadDashBtn" class="prod-link" type="button" title="ดู Lead Time Summary by Line">Lead Time</button>
+              <div class="sim-tabs" id="simTabs">
+                <button class="sim-tab active" type="button" data-shift="A">Shift A</button>
+                <button class="sim-tab" type="button" data-shift="B">Shift B</button>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="sim-panel">
-          <div class="sim-panel-head">
-            <span class="sim-panel-title">Productivity Simulator</span>
-            <div class="sim-tabs" id="simTabs">
-              <button class="sim-tab active" type="button" data-shift="A">Shift A</button>
-              <button class="sim-tab" type="button" data-shift="B">Shift B</button>
+          <div class="prod-body">
+            <!-- PLAN (simulator) -->
+            <div class="prod-col">
+              <div class="prod-col-head">
+                <span class="prod-tag tag-plan">Plan</span>
+                <input id="simPlanDate" class="sim-date" type="date" title="วันที่วางแผน (ดึงชั่วโมงจาก OT และจดจำแผนรายวัน)">
+                <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT">&#8635; OT</button>
+              </div>
+              <div class="sim" id="simBox" title="ติ๊กแถวด้านซ้ายเพื่อวางแผน · Unit Rate = ผลรวม (TS x Assy Order) ของแถวที่ติ๊ก">
+                <div class="sim-cell">
+                  <span class="sim-title">Unit Rate</span>
+                  <span class="sim-badge" id="simBadge">0</span>
+                  <span class="sim-sub" id="simSub">0 rows</span>
+                </div>
+                <div class="sim-cell">
+                  <span class="sim-title" id="simWorkTitle">Working A</span>
+                  <input id="workHour" class="sim-input" type="number" min="0" step="0.5" placeholder="0" title="ชั่วโมงการทำงานของ Shift นี้">
+                  <span class="sim-sub">Hrs</span>
+                </div>
+                <div class="sim-cell">
+                  <span class="sim-title">Result</span>
+                  <span class="sim-badge" id="prodBadge" title="Working hour / Unit rate">0</span>
+                  <span class="sim-sub">Hrs./Unit rate</span>
+                </div>
+                <button id="simClear" class="sim-clear" type="button">Clear</button>
+              </div>
+              <span id="simOtInfo" class="sim-ot-info"></span>
+            </div>
+            <!-- ACTUAL -->
+            <div class="prod-col">
+              <div class="prod-col-head">
+                <span class="prod-tag tag-actual">Actual</span>
+                <input id="actProdDate" class="sim-date" type="date" title="เลือกวันที่ดูผลผลิตจริง ณ วันนั้น">
+              </div>
+              <div class="sim" title="Actual = ผลผลิตจริง ณ วันที่เลือก (แยกกะตาม Shift A/B) หารด้วยชั่วโมง OT ของวันนั้น">
+                <div class="sim-cell">
+                  <span class="sim-title">Unit Rate</span>
+                  <span class="sim-badge" id="actRateBadge">0</span>
+                  <span class="sim-sub" id="actRateSub">0 rows</span>
+                </div>
+                <div class="sim-cell">
+                  <span class="sim-title">Working</span>
+                  <span class="sim-badge" id="actWorkBadge">0</span>
+                  <span class="sim-sub">Hrs</span>
+                </div>
+                <div class="sim-cell">
+                  <span class="sim-title">Result</span>
+                  <span class="sim-badge" id="actProdBadge" title="Working hour / Actual unit rate">0</span>
+                  <span class="sim-sub">Hrs./Unit rate</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="sim-plan-row">
-            <input id="simPlanDate" class="sim-date" type="date" title="วันที่วางแผน (ใช้ดึงชั่วโมงจาก OT และจดจำแผนรายวัน)">
-            <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT สำหรับวันที่นี้">&#8635; OT Hours</button>
-            <span id="simOtInfo" class="sim-ot-info"></span>
-          </div>
-          <div class="sim" id="simBox" title="ติ๊กแถวด้านซ้ายเพื่อวางแผนของแต่ละ Shift · Unit Rate = ผลรวม (TS x Assy Order) ของแถวที่ติ๊ก · Working ดึงจากโปรแกรม OT">
-            <div class="sim-cell">
-              <span class="sim-title">Unit Rate</span>
-              <span class="sim-badge" id="simBadge">0</span>
-              <span class="sim-sub" id="simSub">0 rows</span>
+          <!-- COMPARISON CHART -->
+          <div class="prod-chart">
+            <div class="prod-chart-head">
+              <span class="prod-chart-title">Plan vs Actual</span>
+              <span class="prod-legend"><i class="lg-plan"></i>Plan<i class="lg-actual"></i>Actual</span>
             </div>
-            <div class="sim-cell">
-              <span class="sim-title" id="simWorkTitle">Working A</span>
-              <input id="workHour" class="sim-input" type="number" min="0" step="0.5" placeholder="0" title="ชั่วโมงการทำงานของ Shift นี้ (ดึงจาก OT หรือกรอกเอง)">
-              <span class="sim-sub">Hrs</span>
-            </div>
-            <div class="sim-cell">
-              <span class="sim-title">Result</span>
-              <span class="sim-badge" id="prodBadge" title="Working hour / Unit rate">0</span>
-              <span class="sim-sub">Hrs./Unit rate</span>
-            </div>
-            <button id="simClear" class="sim-clear" type="button">Clear</button>
+            <svg id="prodChart" class="prod-chart-svg" viewBox="0 0 320 96" preserveAspectRatio="none" role="img" aria-label="Plan vs Actual chart"></svg>
           </div>
         </div>
       </div>
@@ -1632,7 +1680,7 @@
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
       actProdBadge: document.getElementById('actProdBadge'),
-      actualProdPanel: document.getElementById('actualProdPanel'),
+      leadDashBtn: document.getElementById('leadDashBtn'),
       editTargetBtn: document.getElementById('editTargetBtn'),
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
@@ -1700,6 +1748,8 @@
     let actProdDate = todayISO();
     let actProd = { D: {}, N: {} };   // production by shift for actProdDate (from server)
     let actOt = null;                 // { shifts:{A,B}, morning_shift } for actProdDate
+    let simStats = { rate: 0, result: 0 };  // latest plan readout (for chart)
+    let actStats = { rate: 0, result: 0 };  // latest actual readout (for chart)
     let byId = new Map();
     let fillSource = null;
     let fillDragging = false;
@@ -2314,7 +2364,7 @@
       });
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
-      if (els.actualProdPanel) els.actualProdPanel.addEventListener('click', (e) => { if (e.target !== els.actProdDate) openDashboard(); });
+      if (els.leadDashBtn) els.leadDashBtn.addEventListener('click', openDashboard);
       if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
       if (els.dbClose) els.dbClose.addEventListener('click', () => { els.dbOverlay.hidden = true; });
       if (els.dbOverlay) els.dbOverlay.addEventListener('click', (e) => { if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; });
@@ -3282,14 +3332,9 @@
     // Actual Productivity readout: production on actProdDate for the active shift.
     function updateActualReadout() {
       const shift = activeSimShift;                       // A / B (shared with simulator)
-      const morning = actOt && actOt.morning_shift;       // which label is the day shift
-      // Map active A/B shift to the ZPP0059 D/N bucket. If morning unknown, merge both.
-      let byKey;
-      if (morning) {
-        byKey = actProd[(shift === morning) ? 'D' : 'N'] || {};
-      } else {
-        byKey = Object.assign({}, actProd.N || {}, actProd.D || {});
-      }
+      // Default morning_shift to 'A' so switching A/B always toggles D/N even when OT is unreachable.
+      const morning = (actOt && actOt.morning_shift) || 'A';
+      const byKey = actProd[(shift === morning) ? 'D' : 'N'] || {};
       let rate = 0, n = 0, pcs = 0;
       for (const row of filtered) {
         if (isHairPin(row)) continue;
@@ -3312,6 +3357,8 @@
         els.actProdBadge.textContent = (Math.round(prodVal * 100) / 100).toLocaleString();
         els.actProdBadge.classList.toggle('danger', prodVal > 0.89);
       }
+      actStats = { rate, result: prodVal };
+      renderProdChart();
     }
     function updateSimReadout() {
       // Simulator: planned unit rate from the rows the user ticked.
@@ -3329,6 +3376,39 @@
       const prod = rate > 0 ? wh / rate : 0;
       els.prodBadge.textContent = (Math.round(prod * 100) / 100).toLocaleString();
       els.prodBadge.classList.toggle('danger', prod > 0.89);
+      simStats = { rate, result: prod };
+      renderProdChart();
+    }
+    // Inline SVG comparison chart (no external lib \u2014 factory runs offline).
+    function renderProdChart() {
+      const svg = document.getElementById('prodChart');
+      if (!svg) return;
+      const NS = 'http://www.w3.org/2000/svg';
+      const W = 320, rowH = 40, barH = 13, gap = 6, labelW = 64, valW = 34;
+      const x0 = labelW, x1 = W - valW;
+      const metrics = [
+        { name: 'Unit Rate', plan: simStats.rate,   act: actStats.rate,   dec: 1 },
+        { name: 'Result',    plan: simStats.result, act: actStats.result, dec: 2 },
+      ];
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+      metrics.forEach((m, i) => {
+        const top = i * (rowH + 8) + 4;
+        const max = Math.max(m.plan, m.act, 0.0001);
+        const label = mk('text', { x: 0, y: top + rowH / 2, 'dominant-baseline': 'middle' });
+        label.textContent = m.name;
+        label.setAttribute('font-size', '11'); label.setAttribute('font-weight', '700'); label.setAttribute('fill', '#475569');
+        svg.appendChild(label);
+        [['plan', '#2563eb', top], ['act', '#f59e0b', top + barH + gap]].forEach(([key, color, y]) => {
+          const v = m[key];
+          const w = Math.max(0, (v / max) * (x1 - x0));
+          svg.appendChild(mk('rect', { x: x0, y, width: (x1 - x0), height: barH, rx: 3, fill: '#e8eef9' }));
+          if (w > 0) svg.appendChild(mk('rect', { x: x0, y, width: w, height: barH, rx: 3, fill: color }));
+          const t = mk('text', { x: x1 + 4, y: y + barH / 2, 'dominant-baseline': 'middle', 'font-size': '10', 'font-weight': '700', fill: '#334155' });
+          t.textContent = (Math.round(v * Math.pow(10, m.dec)) / Math.pow(10, m.dec)).toLocaleString();
+          svg.appendChild(t);
+        });
+      });
     }
     function render() {
       activeCols = visibleColumns();
@@ -3339,6 +3419,7 @@
       renderWindow(true);
       updateSimReadout();
       updateActualReadout();
+      renderProdChart();
     }
     function renderColgroup(cols) {
       const frag = document.createDocumentFragment();
