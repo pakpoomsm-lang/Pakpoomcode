@@ -1139,6 +1139,22 @@
     .badge.warn { background: #fdf4dc; color: #a9790a; border-color: #f0deb0; }
     .badge.info { background: #e8effc; color: #2f56c4; border-color: #cdddf8; }
     .badge.ng { background: #fdecec; color: #c0392b; border-color: #f3c2bd; }
+    .badge.clickable { cursor: pointer; }
+    .badge.clickable:hover { filter: brightness(.93); }
+    .cs-panel { width: 320px; }
+    .cs-list { padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 10px; }
+    .cs-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+    .cs-dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .cs-dot.ok { background: #138a55; }
+    .cs-dot.ng { background: #c0392b; }
+    .cs-dot.miss { background: #c8cdd8; border: 1px solid #adb3bf; }
+    .cs-label { flex: 1; color: var(--ink); }
+    .cs-result { font-size: 12px; font-weight: 700; }
+    .cs-result.ok { color: #138a55; }
+    .cs-result.ng { color: #c0392b; }
+    .cs-result.miss { color: #8892a4; }
     .blank { color: transparent; }
     .muted { color: var(--muted); }
     .red { color: var(--late); font-weight: 700; }
@@ -1339,6 +1355,15 @@
       <div id="dashBody" class="dash-body"></div>
     </div>
   </div>
+  <div id="csOverlay" class="dash-overlay" hidden>
+    <div class="dash-panel cs-panel">
+      <div class="dash-head">
+        <div id="csTitle" class="dash-title">Check Sheet</div>
+        <button id="csClose" class="dash-close" type="button">&#10005;</button>
+      </div>
+      <div id="csList" class="cs-list"></div>
+    </div>
+  </div>
   <div id="dbOverlay" class="dash-overlay" hidden>
     <div class="dash-panel db-panel">
       <div class="dash-head">
@@ -1402,18 +1427,44 @@
       );
       let have = 0, ng = false;
       const missing = [];
+      const detail = [];
       for (const [key, label] of CHECK_PROCS) {
         const v = procs[key];
-        if (v === 'OK') have++;
-        else if (v === 'NG') ng = true;
-        else missing.push(label);
+        if (v === 'OK') { have++; detail.push({ label, result: 'OK' }); }
+        else if (v === 'NG') { ng = true; detail.push({ label, result: 'NG' }); }
+        else { missing.push(label); detail.push({ label, result: null }); }
       }
       const need = CHECK_PROCS.length;
-      if (have === 0 && !ng) return { state: 'none' };
-      if (ng) return { state: 'ng', cls: 'ng', label: 'NG', title: 'มี process ผล NG' };
-      if (have === need) return { state: 'full', cls: 'ok', label: 'ครบ', title: 'ครบทุก process' };
-      return { state: 'partial', cls: 'warn', label: `${have}/${need}`, title: 'ยังขาด: ' + missing.join(', ') };
+      if (have === 0 && !ng) return { state: 'none', detail };
+      if (ng) return { state: 'ng', cls: 'ng', label: 'NG', title: 'มี process ผล NG', detail };
+      if (have === need) return { state: 'full', cls: 'ok', label: 'ครบ', title: 'ครบทุก process', detail };
+      return { state: 'partial', cls: 'warn', label: `${have}/${need}`, title: 'ยังขาด: ' + missing.join(', '), detail };
     }
+    function openCsDetail(cs, row) {
+      const ovl = document.getElementById('csOverlay');
+      const title = document.getElementById('csTitle');
+      const list = document.getElementById('csList');
+      if (!ovl) return;
+      title.textContent = `Check Sheet — Line ${row.line}  Seq ${row.seq}  (${row.month})`;
+      list.replaceChildren();
+      for (const { label, result } of (cs.detail || [])) {
+        const div = document.createElement('div');
+        div.className = 'cs-row';
+        const dot = document.createElement('span');
+        const lbl = document.createElement('span');
+        const res = document.createElement('span');
+        const cls = result === 'OK' ? 'ok' : result === 'NG' ? 'ng' : 'miss';
+        dot.className = 'cs-dot ' + cls;
+        lbl.className = 'cs-label';
+        lbl.textContent = label;
+        res.className = 'cs-result ' + cls;
+        res.textContent = result === 'OK' ? '✓ OK' : result === 'NG' ? '✗ NG' : 'ยังไม่มี';
+        div.append(dot, lbl, res);
+        list.appendChild(div);
+      }
+      ovl.hidden = false;
+    }
+
     const columns = [
       ['_sel','','selcol',36],
       ['line','Line','center',46], ['seq','Seq.','num',54], ['month','Month','num',62], ['code','Code','',88],
@@ -2125,6 +2176,10 @@
       els.targetSave.addEventListener('click', saveTargetEditor);
       els.targetReset.addEventListener('click', resetTargetEditor);
       els.targetOverlay.addEventListener('click', (e) => { if (e.target === els.targetOverlay) closeTargetEditor(); });
+      const csOverlay = document.getElementById('csOverlay');
+      const csClose = document.getElementById('csClose');
+      if (csClose) csClose.addEventListener('click', () => { csOverlay.hidden = true; });
+      if (csOverlay) csOverlay.addEventListener('click', (e) => { if (e.target === csOverlay) csOverlay.hidden = true; });
       recompute(true);
       loadChecksheets();   // fills the Check Sheet column once the server responds
     }
@@ -3145,9 +3200,10 @@
           const cs = csStatus(row);
           if (cs && cs.state !== 'none') {
             const b = document.createElement('span');
-            b.className = 'badge ' + cs.cls;
+            b.className = 'badge clickable ' + cs.cls;
             b.textContent = cs.label;
-            b.title = cs.title;
+            b.title = cs.title + ' — คลิกดูรายละเอียด';
+            b.addEventListener('click', (e) => { e.stopPropagation(); openCsDetail(cs, row); });
             td.appendChild(b);
           } else {
             td.classList.add('blank');
