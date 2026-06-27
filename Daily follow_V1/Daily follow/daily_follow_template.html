@@ -1138,6 +1138,7 @@
     .badge.ok { background: #e6f6ee; color: #138a55; border-color: #b7ecd0; }
     .badge.warn { background: #fdf4dc; color: #a9790a; border-color: #f0deb0; }
     .badge.info { background: #e8effc; color: #2f56c4; border-color: #cdddf8; }
+    .badge.ng { background: #fdecec; color: #c0392b; border-color: #f3c2bd; }
     .blank { color: transparent; }
     .muted { color: var(--muted); }
     .red { color: var(--late); font-weight: 700; }
@@ -1370,6 +1371,49 @@
   <script>
     const DATA = JSON.parse(document.getElementById('daily-data').textContent);
     let currentRows = DATA.rows;
+
+    // --- First-lot check sheets ---------------------------------------------
+    // Processes a lot must have a confirmed (OK) check sheet for. NG counts as
+    // "not done". The maps come from the local server (/api/checksheets), which
+    // reads the Server_firstlot SQLite files.
+    const CHECK_PROCS = [
+      ['cutting', 'Cutting'], ['fp', 'FP'], ['hp', 'H/P'], ['hp_insert', 'HP insert'],
+    ];
+    let checkSheets = null;  // {byKey, byLineSeq} once loaded
+    async function loadChecksheets() {
+      try {
+        const resp = await fetch('/api/checksheets', { cache: 'no-store' });
+        if (!resp.ok) return;
+        checkSheets = await resp.json();
+        if (typeof render === 'function') render();   // show the column once loaded
+      } catch (e) { /* server not running -> column stays blank, page still works */ }
+    }
+    // For one row, roll up its check-sheet state across CHECK_PROCS.
+    function csStatus(row) {
+      if (!checkSheets) return null;
+      const line = String(row.line || '').trim().toUpperCase();
+      const seq = seqKey(row.seq);
+      const month = String(row.month || '').trim();
+      if (!line || !seq) return null;
+      const procs = Object.assign(
+        {},
+        (checkSheets.byKey || {})[`${line}|${month}|${seq}`] || {},
+        (checkSheets.byLineSeq || {})[`${line}|${seq}`] || {},
+      );
+      let have = 0, ng = false;
+      const missing = [];
+      for (const [key, label] of CHECK_PROCS) {
+        const v = procs[key];
+        if (v === 'OK') have++;
+        else if (v === 'NG') ng = true;
+        else missing.push(label);
+      }
+      const need = CHECK_PROCS.length;
+      if (have === 0 && !ng) return { state: 'none' };
+      if (ng) return { state: 'ng', cls: 'ng', label: 'NG', title: 'มี process ผล NG' };
+      if (have === need) return { state: 'full', cls: 'ok', label: 'ครบ', title: 'ครบทุก process' };
+      return { state: 'partial', cls: 'warn', label: `${have}/${need}`, title: 'ยังขาด: ' + missing.join(', ') };
+    }
     const columns = [
       ['_sel','','selcol',36],
       ['line','Line','center',46], ['seq','Seq.','num',54], ['month','Month','num',62], ['code','Code','',88],
@@ -1377,7 +1421,8 @@
       ['item','Item','',112], ['description','Description','',180], ['attribute','Attribute','',112],
       ['productionOrder','Production Order','num',112], ['speed','Speed','num',58], ['prodDate','Prod.Date','date',92],
       ['prodTime','Prod.Time','time',72], ['assyOrder','Assy Order','num',80], ['assyOrderNo','Assy Order No.','num',104],
-      ['status','Status','center',76], ['assyStatus','Assy Status','center',86], ['remark','Remark','',230], ['hp','H/P','num edit',52],
+      ['status','Status','center',76], ['assyStatus','Assy Status','center',86], ['checkSheet','Check Sheet','center',92],
+      ['remark','Remark','',230], ['hp','H/P','num edit',52],
       ['fp','FP','num edit',52], ['exp','EXP','num edit',52], ['auto','Auto','num edit',54],
       ['cutting','Cutting','num edit',64], ['fg','FG.','num edit',52], ['unit','UNIT','num',58],
       ['stockFg','Assy','num edit',74], ['subcooler','Subcooler','num edit',84], ['lead','Assy LT (Hrs.)','num lead',96], ['scLead','SC LT (Hrs.)','num lead',90],
@@ -2081,6 +2126,7 @@
       els.targetReset.addEventListener('click', resetTargetEditor);
       els.targetOverlay.addEventListener('click', (e) => { if (e.target === els.targetOverlay) closeTargetEditor(); });
       recompute(true);
+      loadChecksheets();   // fills the Check Sheet column once the server responds
     }
     function searchText(row) {
       return [row.line,row.seq,row.month,row.code,row.model,row.item,row.description,row.attribute,row.productionOrder,row.assyOrderNo,row.status,row.remark,row.leadRemark].join(' ').toLowerCase();
@@ -3095,6 +3141,20 @@
         // -BZ records end at Brazing, so the Cutting column is blocked (no value, not editable).
         const cutBlocked = field === 'cutting' && attrEndsBz(row);
         if (cutBlocked) { value = ''; td.classList.add('blocked'); }
+        if (field === 'checkSheet') {
+          const cs = csStatus(row);
+          if (cs && cs.state !== 'none') {
+            const b = document.createElement('span');
+            b.className = 'badge ' + cs.cls;
+            b.textContent = cs.label;
+            b.title = cs.title;
+            td.appendChild(b);
+          } else {
+            td.classList.add('blank');
+          }
+          tr.appendChild(td);
+          continue;
+        }
         if (field === 'status' && fmt(value)) {
           const badge = document.createElement('span');
           const s = String(value).trim().toUpperCase();

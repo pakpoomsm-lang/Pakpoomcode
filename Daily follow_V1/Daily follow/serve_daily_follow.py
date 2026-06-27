@@ -176,6 +176,69 @@ ZPP0022_TABLE          = "zpp0022_raw"
 SAP_EXPORT_BASE        = os.environ.get("SAP_EXPORT_BASE", r"Y:\7.541_HEI\Database follow")
 SAP_EXPORT_DIR_0022    = str(Path(SAP_EXPORT_BASE) / "ZPP0022")
 
+# --- First-lot check sheets --------------------------------------------------
+# The first-lot inspection app stores each process in its own SQLite file under
+# Server_firstlot. We read them (read-only) to show, per row, whether every
+# process check sheet has been confirmed OK. Override the folder per machine
+# with the FIRSTLOT_DIR environment variable.
+FIRSTLOT_DIR = Path(os.environ.get("FIRSTLOT_DIR", str(ROOT.parent.parent / "Server_firstlot")))
+
+# (process, db file, table, line col, seq col, month col or None, result col, ts col)
+CHECKSHEET_SOURCES = [
+    ("cutting",   "cutting_records.db",   "cutting_records", "line", "seq", None,         "status",      "saved_at"),
+    ("fp",        "fp_records.db",        "fp_records",      "line", "seq", "prod_month", "final",       "saved_at"),
+    ("hp",        "hp_records.db",        "hp_records",      "line", "seq", "prod_month", "result",      "saved_at"),
+    ("hp_insert", "hp_insert_records.db", "records",         "line", "seq", "prod_month", "final_check", "created_at"),
+]
+
+
+def _cs_month(value):
+    """Check-sheet prod_month 'MM/YYYY' -> 'M.YYYY' to match build's month_display."""
+    raw = str(value or "").strip()
+    if "/" not in raw:
+        return ""
+    mm, _, yy = raw.partition("/")
+    try:
+        return f"{int(mm)}.{yy}"
+    except ValueError:
+        return ""
+
+
+def load_checksheets():
+    """Read first-lot check sheets, keep the latest OK/NG per (key, process).
+
+    Returns two maps the page joins onto its rows:
+      by_key["LINE|month|seq"] = {process: "OK"/"NG"}   (month-aware sheets)
+      by_ls["LINE|seq"]        = {"cutting": "OK"/"NG"}  (cutting has no month)
+    """
+    by_key, by_ls = {}, {}
+    for proc, fname, table, lcol, scol, mcol, rcol, tcol in CHECKSHEET_SOURCES:
+        db = FIRSTLOT_DIR / fname
+        if not db.is_file() or db.stat().st_size == 0:
+            continue
+        cols = f"{lcol}, {scol}, {rcol}, {tcol}" + (f", {mcol}" if mcol else "")
+        try:
+            conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+            # Oldest first so a later record overwrites (latest result wins).
+            cur = conn.execute(f"SELECT {cols} FROM {table} ORDER BY {tcol}")
+            for r in cur:
+                line = str(r[0] or "").strip().upper()
+                seq = bdf.seq_key(r[1])
+                res = str(r[2] or "").strip().upper()
+                if not line or not seq or res not in ("OK", "NG"):
+                    continue
+                if mcol:
+                    month = _cs_month(r[4])
+                    if month:
+                        by_key.setdefault(f"{line}|{month}|{seq}", {})[proc] = res
+                else:
+                    by_ls.setdefault(f"{line}|{seq}", {})[proc] = res
+            conn.close()
+        except sqlite3.Error:
+            continue  # skip a missing/locked/corrupt DB rather than break the page
+    return by_key, by_ls
+
+
 # --- OT program bridge -------------------------------------------------------
 # The OT recording app (Flask) runs on the same PC. We proxy its working-hours
 # API server-side so the Daily Follow page can read per-shift hours without
@@ -967,6 +1030,13 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(200, STATE_FILE.read_bytes())
                 else:
                     self._send(200, json.dumps({}))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/checksheets":
+            try:
+                by_key, by_ls = load_checksheets()
+                self._send(200, json.dumps({"byKey": by_key, "byLineSeq": by_ls}))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return
