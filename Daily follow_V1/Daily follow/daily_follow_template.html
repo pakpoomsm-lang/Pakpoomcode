@@ -1364,6 +1364,15 @@
       <div id="csList" class="cs-list"></div>
     </div>
   </div>
+  <div id="incOverlay" class="dash-overlay" hidden>
+    <div class="dash-panel cs-panel">
+      <div class="dash-head">
+        <div id="incTitle" class="dash-title">Part Incoming</div>
+        <button id="incClose" class="dash-close" type="button">&#10005;</button>
+      </div>
+      <div id="incList" class="cs-list"></div>
+    </div>
+  </div>
   <div id="dbOverlay" class="dash-overlay" hidden>
     <div class="dash-panel db-panel">
       <div class="dash-head">
@@ -1428,7 +1437,7 @@
     async function csPollTick() {
       // Pause while tab is hidden or user is editing a cell.
       const editing = document.activeElement && document.activeElement.isContentEditable;
-      if (!document.hidden && !editing) await loadChecksheets();
+      if (!document.hidden && !editing) { await loadChecksheets(); await loadIncoming(); }
       scheduleCsPoll();
     }
     // For one row, roll up its check-sheet state across CHECK_PROCS.
@@ -1483,6 +1492,55 @@
       ovl.hidden = false;
     }
 
+    // --- Part incoming (HEI Smart Stock Management) -------------------------
+    // Which parts have physically arrived for a lot. Map comes from the local
+    // server (/api/incoming), keyed line|month|seq just like the check sheets.
+    let incoming = null;       // {byKey} once loaded
+    let incLastJson = '';      // JSON snapshot for change detection
+    async function loadIncoming() {
+      try {
+        const resp = await fetch('/api/incoming', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const text = await resp.text();
+        if (text === incLastJson) return;   // no change — skip render
+        incLastJson = text;
+        incoming = JSON.parse(text);
+        if (typeof render === 'function') render();
+      } catch (e) { /* server not running -> column stays blank, page still works */ }
+    }
+    // Parts received for one row (line|month|seq), or null if none.
+    function incStatus(row) {
+      if (!incoming) return null;
+      const line = String(row.line || '').trim().toUpperCase();
+      const seq = seqKey(row.seq);
+      const month = String(row.month || '').trim();
+      if (!line || !seq || !month) return null;
+      const items = (incoming.byKey || {})[`${line}|${month}|${seq}`];
+      if (!items || !items.length) return null;
+      return items;
+    }
+    function openIncDetail(items, row) {
+      const ovl = document.getElementById('incOverlay');
+      const title = document.getElementById('incTitle');
+      const list = document.getElementById('incList');
+      if (!ovl) return;
+      title.textContent = `Part Incoming — Line ${row.line}  Seq ${row.seq}  (${row.month})`;
+      list.replaceChildren();
+      for (const it of items) {
+        const div = document.createElement('div');
+        div.className = 'cs-row';
+        const lbl = document.createElement('span');
+        const qty = document.createElement('span');
+        lbl.className = 'cs-label';
+        lbl.textContent = it.part + (it.last ? `  (${it.last})` : '');
+        qty.className = 'cs-result ok';
+        qty.textContent = it.qty;
+        div.append(lbl, qty);
+        list.appendChild(div);
+      }
+      ovl.hidden = false;
+    }
+
     const columns = [
       ['_sel','','selcol',36],
       ['line','Line','center',46], ['seq','Seq.','num',54], ['month','Month','num',62], ['code','Code','',88],
@@ -1490,7 +1548,7 @@
       ['item','Item','',112], ['description','Description','',180], ['attribute','Attribute','',112],
       ['productionOrder','Production Order','num',112], ['speed','Speed','num',58], ['prodDate','Prod.Date','date',92],
       ['prodTime','Prod.Time','time',72], ['assyOrder','Assy Order','num',80], ['assyOrderNo','Assy Order No.','num',104],
-      ['status','Status','center',76], ['assyStatus','Assy Status','center',86], ['checkSheet','Check Sheet','center',92],
+      ['status','Status','center',76], ['assyStatus','Assy Status','center',86], ['checkSheet','Check Sheet','center',92], ['incoming','Part เข้า','center',80],
       ['remark','Remark','',230], ['hp','H/P','num edit',52],
       ['fp','FP','num edit',52], ['exp','EXP','num edit',52], ['auto','Auto','num edit',54],
       ['cutting','Cutting','num edit',64], ['fg','FG.','num edit',52], ['unit','UNIT','num',58],
@@ -2198,7 +2256,12 @@
       const csClose = document.getElementById('csClose');
       if (csClose) csClose.addEventListener('click', () => { csOverlay.hidden = true; });
       if (csOverlay) csOverlay.addEventListener('click', (e) => { if (e.target === csOverlay) csOverlay.hidden = true; });
+      const incOverlay = document.getElementById('incOverlay');
+      const incClose = document.getElementById('incClose');
+      if (incClose) incClose.addEventListener('click', () => { incOverlay.hidden = true; });
+      if (incOverlay) incOverlay.addEventListener('click', (e) => { if (e.target === incOverlay) incOverlay.hidden = true; });
       recompute(true);
+      loadIncoming();
       loadChecksheets().then(() => scheduleCsPoll());  // initial load then poll every 10s
     }
     function searchText(row) {
@@ -3222,6 +3285,21 @@
             b.textContent = cs.label;
             b.title = cs.title + ' — คลิกดูรายละเอียด';
             b.addEventListener('click', (e) => { e.stopPropagation(); openCsDetail(cs, row); });
+            td.appendChild(b);
+          } else {
+            td.classList.add('blank');
+          }
+          tr.appendChild(td);
+          continue;
+        }
+        if (field === 'incoming') {
+          const items = incStatus(row);
+          if (items) {
+            const b = document.createElement('span');
+            b.className = 'badge clickable ok';
+            b.textContent = 'Stock';
+            b.title = `${items.length} part เข้าแล้ว — คลิกดูรายละเอียด`;
+            b.addEventListener('click', (e) => { e.stopPropagation(); openIncDetail(items, row); });
             td.appendChild(b);
           } else {
             td.classList.add('blank');

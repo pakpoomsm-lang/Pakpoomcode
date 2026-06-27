@@ -261,6 +261,84 @@ def load_checksheets():
     return by_key, by_ls
 
 
+# --- Part incoming (HEI Smart Stock Management) ------------------------------
+# The warehouse receiving app stores every scanned-in part in incoming.db. We
+# read it (read-only) to show, per row, which parts have physically arrived for
+# that lot. Same idea/keying as the check sheets above.
+#
+# Resolution: STOCK_DB env first, then candidate paths (first existing wins).
+_STOCK_DB_CANDIDATES = [
+    Path(os.environ.get("STOCK_DB", "")),                    # env override (blank → skip)
+    Path(r"W:\PD\2.HEAT INDOOR\13.Suphamat P\HEI Smart Stock Management\incoming.db"),
+    Path(r"Y:\PD\2.HEAT INDOOR\13.Suphamat P\HEI Smart Stock Management\incoming.db"),
+    Path(r"J:\PD\2.HEAT INDOOR\13.Suphamat P\HEI Smart Stock Management\incoming.db"),
+    ROOT.parent.parent / "HEI Smart Stock Management" / "incoming.db",  # dev: repo sibling
+]
+
+
+def _resolve_stock_db():
+    for p in _STOCK_DB_CANDIDATES:
+        if p and p.is_file():
+            return p
+    return _STOCK_DB_CANDIDATES[0] if os.environ.get("STOCK_DB") else _STOCK_DB_CANDIDATES[-1]
+
+
+STOCK_DB = _resolve_stock_db()
+
+
+def _stock_month(value):
+    """incoming pro_month 'MMYYYY' (e.g. '062026') -> 'M.YYYY' to match build."""
+    raw = str(value or "").strip()
+    if len(raw) != 6 or not raw.isdigit():
+        return ""
+    try:
+        return f"{int(raw[:2])}.{raw[2:]}"
+    except ValueError:
+        return ""
+
+
+def load_incoming():
+    """Read incoming.db, group received parts per (line, month, seq).
+
+    Returns one map the page joins onto its rows:
+      by_key["LINE|month|seq"] = [{part, qty, last}]   (qty summed per part)
+    """
+    by_key = {}
+    if not STOCK_DB.is_file() or STOCK_DB.stat().st_size == 0:
+        return by_key
+    try:
+        conn = sqlite3.connect(f"file:{STOCK_DB.as_posix()}?mode=ro", uri=True)
+        cur = conn.execute(
+            "SELECT line_num, seq, pro_month, part_no, qty, receive_date "
+            "FROM incoming ORDER BY receive_date, receive_time"
+        )
+        # Sum qty per (key, part); keep the newest receive_date seen.
+        parts = {}  # key -> {part: {"qty": n, "last": date}}
+        for line_num, seq, pro_month, part_no, qty, receive_date in cur:
+            line = str(line_num or "").strip().upper()
+            seq_n = bdf.seq_key(seq)
+            month = _stock_month(pro_month)
+            part = str(part_no or "").strip()
+            if not line or not seq_n or not month or not part:
+                continue
+            key = f"{line}|{month}|{seq_n}"
+            q = qty if isinstance(qty, (int, float)) else 0
+            bucket = parts.setdefault(key, {})
+            row = bucket.setdefault(part, {"qty": 0, "last": ""})
+            row["qty"] += q
+            if receive_date:
+                row["last"] = str(receive_date)
+        conn.close()
+        for key, bucket in parts.items():
+            by_key[key] = [
+                {"part": p, "qty": bdf.clean_qty(v["qty"]), "last": v["last"]}
+                for p, v in bucket.items()
+            ]
+    except sqlite3.Error:
+        return {}  # missing/locked/corrupt DB -> blank column, page still works
+    return by_key
+
+
 # --- OT program bridge -------------------------------------------------------
 # The OT recording app (Flask) runs on the same PC. We proxy its working-hours
 # API server-side so the Daily Follow page can read per-shift hours without
@@ -1059,6 +1137,12 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 by_key, by_ls = load_checksheets()
                 self._send(200, json.dumps({"byKey": by_key, "byLineSeq": by_ls}))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/incoming":
+            try:
+                self._send(200, json.dumps({"byKey": load_incoming()}, ensure_ascii=False))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return
