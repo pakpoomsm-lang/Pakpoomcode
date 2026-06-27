@@ -1756,6 +1756,9 @@
     let actOt = null;                 // { shifts:{A,B}, morning_shift } for actProdDate
     let simStats = { rate: 0, result: 0 };  // latest plan readout (for chart)
     let actStats = { rate: 0, result: 0 };  // latest actual readout (for chart)
+    let lastActualDate = '';   // date of the last actual-production fetch (D: skip if unchanged)
+    let lastActualLoad = 0;    // timestamp of the last actual fetch (B: throttle the today-poll)
+    let otCache = null;        // { date, shifts, morning_shift } from the last OT pull (C: dedup)
     let byId = new Map();
     let fillSource = null;
     let fillDragging = false;
@@ -3020,7 +3023,7 @@
         }
         DATA.progressMat = res.mat || {};
         DATA.progressLot = res.lot || {};
-        loadActualProduction();
+        loadActualProduction(true);
         applyProgressToRows();
         progressCleared = false;
         localStorage.removeItem('dailyFollowProgCleared');
@@ -3274,6 +3277,7 @@
           return false;
         }
         const sh = res.shifts || {};
+        otCache = { date, shifts: sh, morning_shift: res.morning_shift };
         const inputFocused = (document.activeElement === els.workHour);
         for (const s of SIM_SHIFTS) {
           if (auto && simShifts[s].manual) continue;     // respect manual override
@@ -3316,22 +3320,31 @@
     async function simPollTick() {
       if (document.hidden) { scheduleSimPoll(SIM_POLL_BASE); return; }   // idle while not viewed
       const ok = await pullOtHours(true, true);
-      loadActualProduction();
+      // Actual production rarely changes — only refresh "today", ~once a minute.
+      if (actProdDate === todayISO() && Date.now() - lastActualLoad >= 60000) loadActualProduction(true);
       simPollDelay = ok ? SIM_POLL_BASE : Math.min(simPollDelay * 2, SIM_POLL_MAX);
       scheduleSimPoll(simPollDelay);
     }
     function startSimPoll() { simPollDelay = SIM_POLL_BASE; scheduleSimPoll(SIM_POLL_BASE); }
-    // Fetch real production + OT working hours for the Actual Productivity date.
-    async function loadActualProduction() {
+    // Fetch real production (+ OT working hours) for the Actual Productivity date.
+    // D: skips the network when the date is unchanged (pass force=true to override).
+    // C: reuses the simulator's OT pull when it is for the same date.
+    async function loadActualProduction(force) {
       if (location.protocol === 'file:') return;   // needs the server DB / OT proxy
       const date = actProdDate || todayISO();
+      if (!force && date === lastActualDate) { updateActualReadout(); return; }
       try {
+        const cachedOt = (otCache && otCache.date === date) ? otCache : null;
         const [prodRes, otRes] = await Promise.all([
           fetch('api/actual-production?date=' + encodeURIComponent(date)).then(r => r.json()).catch(() => null),
-          fetch('api/ot-working-hours?date=' + encodeURIComponent(date)).then(r => r.json()).catch(() => null),
+          cachedOt ? Promise.resolve(null)
+                   : fetch('api/ot-working-hours?date=' + encodeURIComponent(date)).then(r => r.json()).catch(() => null),
         ]);
         actProd = (prodRes && prodRes.success && prodRes.byShift) ? prodRes.byShift : { D: {}, N: {} };
-        actOt = (otRes && otRes.success) ? { shifts: otRes.shifts || {}, morning_shift: otRes.morning_shift } : null;
+        if (cachedOt) actOt = { shifts: cachedOt.shifts, morning_shift: cachedOt.morning_shift };
+        else actOt = (otRes && otRes.success) ? { shifts: otRes.shifts || {}, morning_shift: otRes.morning_shift } : null;
+        lastActualDate = date;
+        lastActualLoad = Date.now();
       } catch (e) { actProd = { D: {}, N: {} }; actOt = null; }
       updateActualReadout();
     }

@@ -451,6 +451,12 @@ def db_init(conn: sqlite3.Connection, headers: list[str],
     for c in safe:
         if c not in existing:
             conn.execute(f'ALTER TABLE {table} ADD COLUMN "{c}" TEXT')
+    # Index the production-date columns so api/actual-production does an index
+    # range scan instead of a full-table scan (the table grows unbounded).
+    for date_header in ("Working day", "Posting Date"):
+        dc = _col_name(date_header)
+        if dc in existing or dc in safe:
+            conn.execute(f'CREATE INDEX IF NOT EXISTS "idx_{dc}" ON {table}("{dc}")')
     conn.commit()
     return safe
 
@@ -583,8 +589,15 @@ def actual_production_by_date(date_iso):
         c("Posting Date") if c("Posting Date") in col_map else None)
     if not date_col:
         conn.close(); return {"D": {}, "N": {}}
-    where = [f'"{date_col}" LIKE ?']
-    params = [date_iso + "%"]
+    # Range scan (index-friendly) instead of LIKE: stored timestamps sort
+    # lexicographically like their ISO date prefix.
+    try:
+        next_day = (date.fromisoformat(date_iso) + timedelta(days=1)).isoformat()
+        where = [f'"{date_col}" >= ? AND "{date_col}" < ?']
+        params = [date_iso, next_day]
+    except ValueError:
+        where = [f'"{date_col}" LIKE ?']
+        params = [date_iso + "%"]
     for name in ("Deletion Flag", "Cancel Date"):
         cc = c(name)
         if cc in col_map:
