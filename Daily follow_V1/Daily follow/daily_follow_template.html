@@ -829,6 +829,39 @@
     }
     .sim-badge.danger { color: var(--late); }
     .sim-sub { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+    .ct-breakdown {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      margin-top: 8px;
+      padding: 8px 12px;
+      border: 1px solid #cdddf8;
+      border-radius: 10px;
+      background: #f8fbff;
+    }
+    .ct-head {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-right: 4px;
+    }
+    .ct-proc {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 7px;
+      background: #fff;
+      border: 1px solid #e1e9f6;
+    }
+    .ct-proc-name { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .3px; }
+    .ct-proc-val { font-size: 15px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ct-total { background: #eef3ff; border-color: #cdddf8; }
+    .ct-total .ct-proc-val { color: var(--primary-dark); }
+    .ct-miss { font-size: 11px; font-weight: 700; color: var(--missing); }
     .sim-clear {
       height: 32px;
       padding: 0 14px;
@@ -1311,6 +1344,16 @@
                 </div>
                 <button id="simClear" class="sim-clear" type="button">Clear</button>
               </div>
+              <div class="ct-breakdown" id="ctBreakdown" title="ผลรวม Assy Order × CT ของแถวที่ติ๊ก แยกตาม process (หน่วย: ชั่วโมง) · ใช้ CT ตัวมากสุดต่อ material">
+                <span class="ct-head">Cycle Time (hr)</span>
+                <span class="ct-proc"><span class="ct-proc-name">Finpress</span><span class="ct-proc-val" id="ctFinpress">0</span></span>
+                <span class="ct-proc"><span class="ct-proc-name">HP Bender</span><span class="ct-proc-val" id="ctHpbender">0</span></span>
+                <span class="ct-proc"><span class="ct-proc-name">Expander</span><span class="ct-proc-val" id="ctExpander">0</span></span>
+                <span class="ct-proc"><span class="ct-proc-name">Auto-Brazing</span><span class="ct-proc-val" id="ctAutoBrazing">0</span></span>
+                <span class="ct-proc"><span class="ct-proc-name">Cutting</span><span class="ct-proc-val" id="ctCutting">0</span></span>
+                <span class="ct-proc ct-total"><span class="ct-proc-name">Total</span><span class="ct-proc-val" id="ctTotal">0</span></span>
+                <span class="ct-miss" id="ctMiss"></span>
+              </div>
               <span id="simOtInfo" class="sim-ot-info"></span>
             </div>
             <!-- ACTUAL -->
@@ -1657,6 +1700,10 @@
       targetSave: document.getElementById('targetSave'),
       workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
+      ctFinpress: document.getElementById('ctFinpress'), ctHpbender: document.getElementById('ctHpbender'),
+      ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
+      ctCutting: document.getElementById('ctCutting'), ctTotal: document.getElementById('ctTotal'),
+      ctMiss: document.getElementById('ctMiss'),
       hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
       hideOldDlvBtn: document.getElementById('hideOldDlvBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
@@ -3479,16 +3526,44 @@
       actStats = { rate, result: prodVal };
       renderProdChart();
     }
+    // Process cycle time per unit (seconds) for a row, from the baked CT data.
+    // Finpress -> Auto-Brazing come from the *-CT columns, Cutting from Cutting-Sec.
+    const CT_PROCS = ['finpress', 'hpbender', 'expander', 'autoBrazing', 'cutting'];
+    function ctOf(row) { return (DATA.ct && DATA.ct[row.item]) || null; }
+
+    function ctHr(sec) { return (Math.round((sec / 3600) * 100) / 100).toLocaleString(); }
+    function renderCtBreakdown(ctSec, missing) {
+      els.ctFinpress.textContent = ctHr(ctSec.finpress);
+      els.ctHpbender.textContent = ctHr(ctSec.hpbender);
+      els.ctExpander.textContent = ctHr(ctSec.expander);
+      els.ctAutoBrazing.textContent = ctHr(ctSec.autoBrazing);
+      els.ctCutting.textContent = ctHr(ctSec.cutting);
+      const total = ctSec.finpress + ctSec.hpbender + ctSec.expander + ctSec.autoBrazing + ctSec.cutting;
+      els.ctTotal.textContent = ctHr(total);
+      els.ctMiss.textContent = missing ? `· ${missing} row${missing === 1 ? '' : 's'} ไม่มี CT` : '';
+    }
+
     function updateSimReadout() {
       // Simulator: planned unit rate from the rows the user ticked.
       let rate = 0, qty = 0, n = 0;
+      // Planned cycle time per process = sum(Assy Order x CT) over ticked rows.
+      const ctSec = { finpress: 0, hpbender: 0, expander: 0, autoBrazing: 0, cutting: 0 };
+      let ctMissing = 0;
       for (const id of selected) {
         const row = byId.get(id);
         if (!row || isHairPin(row)) continue;
         rate += (num(row.ts) / TS_HOURS_PER_UNIT) * num(row.assyOrder);
         qty += num(row.assyOrder);
         n += 1;
+        const ct = ctOf(row);
+        if (ct) {
+          const q = num(row.assyOrder);
+          for (const p of CT_PROCS) ctSec[p] += q * num(ct[p]);
+        } else {
+          ctMissing += 1;
+        }
       }
+      renderCtBreakdown(ctSec, ctMissing);
       els.simBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       els.simSub.textContent = n.toLocaleString() + ' rows \u00B7 ' + qty.toLocaleString() + ' pcs';
       const wh = num(els.workHour.value);

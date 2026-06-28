@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime, time
@@ -14,6 +15,8 @@ SAMPLE_FILE = ROOT / "HEI-18-05-PP-Original-SAP-1 (1).xlsm"
 ROUTING_FILE = ROOT / "Routing.xlsx"
 MASTER_TS_FILE = ROOT / "MasterTS.xlsx"
 PROGRESS_FILE = ROOT / "ZPP0059.xlsx"
+CT_DB_FILE = ROOT / "CT.db"
+CT_XLSX_FILE = ROOT / "CT.xlsx"
 OUTPUT_FILE = ROOT / "daily_follow.html"
 TEMPLATE_FILE = ROOT / "daily_follow_template.html"
 
@@ -144,6 +147,43 @@ def load_routing():
         }
     wb.close()
     return routing
+
+
+def load_ct():
+    """Return {material: {finpress, hpbender, expander, autoBrazing, cutting}}.
+
+    Per-process cycle time in seconds, from CT.db (built by build_ct_db.py).
+    A material can appear under several sub-types with different CTs, so we take
+    the MAX of each process across them (worst-case capacity planning). Finpress
+    -> Auto-Brazing use the *-CT columns; Cutting uses Cutting-Sec.
+    """
+    if not CT_DB_FILE.exists():
+        if not CT_XLSX_FILE.exists():
+            return {}
+        import build_ct_db  # build CT.db on the fly from CT.xlsx
+        build_ct_db.main()
+    con = sqlite3.connect(CT_DB_FILE)
+    rows = con.execute(
+        """
+        SELECT material,
+               MAX(finpress_ct), MAX(hpbender_ct), MAX(expander_ct),
+               MAX(auto_brazing_ct), MAX(cutting_sec)
+        FROM cycle_time
+        WHERE material IS NOT NULL AND material <> ''
+        GROUP BY material
+        """
+    ).fetchall()
+    con.close()
+    return {
+        mat: {
+            "finpress": fp or 0,
+            "hpbender": hp or 0,
+            "expander": ex or 0,
+            "autoBrazing": ab or 0,
+            "cutting": cut or 0,
+        }
+        for mat, fp, hp, ex, ab, cut in rows
+    }
 
 
 def seq_key(value):
@@ -516,6 +556,7 @@ def render_html(rows):
             },
             "progressMat": prog_mat,
             "progressLot": prog_lot,
+            "ct": load_ct(),
             "rows": rows,
         },
         ensure_ascii=False,
