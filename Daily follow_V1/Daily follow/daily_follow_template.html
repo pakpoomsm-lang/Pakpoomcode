@@ -308,9 +308,11 @@
     .dmetric-num span { font-size: 12px; font-weight: 750; color: var(--muted); }
     .dmetric-bar {
       grid-column: 1;
-      position: relative; height: 14px; min-width: 70px;
-      margin-bottom: 12px; border-radius: 3px; overflow: visible;
-      background: #edf1f6; box-shadow: inset 0 0 0 1px rgba(15,23,42,.05);
+      position: relative; display: flex; gap: 3px;
+      height: 17px; min-width: 70px; box-sizing: border-box;
+      margin-bottom: 12px; padding: 2px;
+      border: 2px solid #64748b; border-radius: 6px; overflow: visible;
+      background: #fff;
     }
     .dmetric-bar::before, .dmetric-bar::after {
       position: absolute; top: 17px; color: #64748b;
@@ -318,18 +320,23 @@
     }
     .dmetric-bar::before { content: "0"; left: 0; }
     .dmetric-bar::after { content: "40 hr"; right: 0; }
-    .dmetric-bar i {
-      display: block; height: 100%; min-width: 0; border-radius: inherit;
-      background-color: var(--metric-color, #64748b);
-      background-image: repeating-linear-gradient(
-        135deg, rgba(255,255,255,.24) 0 8px, transparent 8px 16px
+    .dmetric-segment {
+      flex: 1 1 0; height: 100%; min-width: 0;
+      border-radius: 2px; background: #e8edf3;
+      box-shadow: inset 0 0 0 1px rgba(15,23,42,.025);
+    }
+    .dmetric-segment.active {
+      background: linear-gradient(
+        90deg,
+        var(--metric-color, #64748b) 0 var(--segment-fill, 100%),
+        #e8edf3 var(--segment-fill, 100%) 100%
       );
-      transition: width .3s ease;
     }
     .dmetric-bar b {
-      position: absolute; top: -4px; bottom: -4px; width: 2px;
+      position: absolute; top: -5px; bottom: -5px; width: 2px;
       border-radius: 2px; background: #0f172a; opacity: .48;
       transform: translateX(-1px);
+      z-index: 2;
     }
     .dmetric-bar b::after {
       content: attr(data-label); position: absolute; left: 50%; top: -14px;
@@ -4069,12 +4076,21 @@
         const bar = document.createElement('div');
         bar.className = 'dmetric-bar';
         bar.title = `${value.toLocaleString()} hr / target ${targetValue} hr`;
-        const fill = document.createElement('i');
-        fill.style.width = Math.min(100, Math.max(0, value / scaleMax * 100)) + '%';
+        const segmentValue = scaleMax / 10;
+        for (let i = 0; i < 10; i++) {
+          const segment = document.createElement('i');
+          segment.className = 'dmetric-segment';
+          const segmentFill = Math.min(100, Math.max(0, (value - i * segmentValue) / segmentValue * 100));
+          if (segmentFill > 0) {
+            segment.classList.add('active');
+            segment.style.setProperty('--segment-fill', segmentFill + '%');
+          }
+          bar.appendChild(segment);
+        }
         const marker = document.createElement('b');
         marker.style.left = Math.min(100, Math.max(0, targetValue / scaleMax * 100)) + '%';
         marker.dataset.label = targetValue + ' hr';
-        bar.append(fill, marker);
+        bar.appendChild(marker);
         lab.style.color = col;
         num.style.color = '#0f172a';
         box.style.setProperty('--metric-color', col);
