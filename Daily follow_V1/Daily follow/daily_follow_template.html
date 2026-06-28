@@ -602,13 +602,15 @@
     }
     /* .actual-prod-panel removed — merged into .prod-panel */
     .prod-panel {
-      display: flex; flex-direction: column; gap: 10px;
+      display: flex; flex-direction: column; gap: 12px;
       align-self: stretch; margin-left: auto; flex: 1 1 560px; min-width: 0;
-      padding: 11px 16px 13px; border: 1px solid #c2d4f4; border-radius: 14px;
-      background: linear-gradient(180deg, #eaf1ff 0%, #f4f7fe 100%); box-shadow: var(--shadow-sm);
+      padding: 14px 16px 15px; border: 1px solid #d9e2f0; border-radius: 16px;
+      background: #f8fafc; box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
     }
     .prod-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .prod-title { font-size: 12px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase; color: var(--primary-dark); }
+    .prod-heading { display: flex; flex-direction: column; gap: 2px; }
+    .prod-title { font-size: 13px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase; color: #172554; }
+    .prod-kicker { font-size: 10px; font-weight: 600; color: #7c8aa0; }
     .prod-head-right { display: flex; align-items: center; gap: 10px; }
     .prod-link {
       height: 26px; padding: 0 10px; border: 1px solid #b9cdf2; border-radius: 8px;
@@ -616,26 +618,44 @@
       text-transform: uppercase; letter-spacing: .3px; cursor: pointer;
     }
     .prod-link:hover { background: #eef4ff; }
-    .prod-body { display: flex; gap: 14px; flex-wrap: wrap; }
-    .prod-col { display: flex; flex-direction: column; gap: 7px; flex: 1 1 240px; min-width: 0; }
+    .prod-body { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px; }
+    .prod-col {
+      display: flex; flex-direction: column; gap: 9px; min-width: 0;
+      padding: 11px 12px 10px; border: 1px solid #e2e8f0; border-radius: 12px;
+      background: #fff; box-shadow: 0 2px 8px rgba(15, 23, 42, .035);
+    }
     .prod-col-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .prod-tag { font-size: 10px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
-    .tag-plan { color: #1d4ed8; background: #dbe6fb; }
-    .tag-actual { color: #b45309; background: #fde9cf; }
-    .prod-chart { border-top: 1px solid #d4e1f6; padding-top: 9px; }
-    .prod-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .prod-chart-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--primary-dark); }
+    .tag-plan { color: #1d4ed8; background: #e7efff; }
+    .tag-actual { color: #b45309; background: #fff0d8; }
+    .prod-chart {
+      padding: 11px 13px 12px; border: 1px solid #e2e8f0; border-radius: 12px;
+      background: #fff;
+    }
+    .prod-chart-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .prod-chart-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: #172554; }
     .prod-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; color: var(--muted); }
     .prod-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-left: 8px; }
     .prod-legend .lg-plan { background: #2563eb; }
     .prod-legend .lg-actual { background: #f59e0b; }
-    .prod-donuts { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; padding: 4px 0 2px; }
-    .prod-donut { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-    .prod-donut svg { width: 96px; height: 96px; display: block; }
-    .prod-donut-name { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px; color: var(--primary-dark); }
-    .prod-donut-vals { display: flex; gap: 12px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .prod-donut-vals .v-plan { color: #2563eb; }
-    .prod-donut-vals .v-actual { color: #d97706; }
+    .prod-bars { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px 22px; }
+    .prod-metric { min-width: 0; }
+    .prod-metric-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+    .prod-metric-name { font-size: 10.5px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; color: #334155; }
+    .prod-achievement { font-size: 13px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
+    .prod-achievement.good { color: #059669; }
+    .prod-achievement.low { color: #dc2626; }
+    .prod-bar-row { display: grid; grid-template-columns: 42px minmax(80px, 1fr) 70px; align-items: center; gap: 7px; margin-top: 5px; }
+    .prod-bar-label { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #94a3b8; }
+    .prod-bar-track { height: 7px; overflow: hidden; border-radius: 999px; background: #edf2f7; }
+    .prod-bar-fill { display: block; height: 100%; min-width: 0; border-radius: inherit; transition: width .25s ease; }
+    .prod-bar-fill.plan { background: #2563eb; }
+    .prod-bar-fill.actual { background: #f59e0b; }
+    .prod-bar-value { text-align: right; font-size: 10.5px; font-weight: 750; color: #334155; font-variant-numeric: tabular-nums; }
+    .prod-gap { margin-top: 7px; font-size: 9.5px; font-weight: 700; color: #64748b; }
+    @media (max-width: 1000px) {
+      .prod-body, .prod-bars { grid-template-columns: 1fr; }
+    }
     .lead-legend { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
     .lead-leg-title {
       font-size: 9px;
@@ -1327,7 +1347,10 @@
         <!-- Merged Productivity card: Plan (simulator) + Actual side by side -->
         <div class="prod-panel" id="prodPanel">
           <div class="prod-head">
-            <span class="prod-title">Productivity</span>
+            <div class="prod-heading">
+              <span class="prod-title">Productivity</span>
+              <span class="prod-kicker">Production performance overview</span>
+            </div>
             <div class="prod-head-right">
               <button id="leadDashBtn" class="prod-link" type="button" title="ดู Lead Time Summary by Line">Lead Time</button>
               <div class="sim-tabs" id="simTabs">
@@ -1395,7 +1418,7 @@
               <span class="prod-chart-title">Plan vs Actual</span>
               <span class="prod-legend"><i class="lg-plan"></i>Plan<i class="lg-actual"></i>Actual</span>
             </div>
-            <div id="prodDonuts" class="prod-donuts"></div>
+            <div id="prodDonuts" class="prod-bars"></div>
           </div>
         </div>
       </div>
@@ -3414,54 +3437,64 @@
       simStats = { rate, result: prod };
       renderProdChart();
     }
-    // Plan vs Actual donut charts (inline SVG, no external lib \u2014 factory runs offline).
-    // One donut per metric: blue = Plan, orange = Actual (proportional slices);
-    // the centre shows how much Actual reached vs Plan.
+    // Compact comparison bars. Keeping this dependency-free lets the dashboard
+    // continue to work on factory PCs without internet access.
     function renderProdChart() {
       const wrap = document.getElementById('prodDonuts');
       if (!wrap) return;
-      const NS = 'http://www.w3.org/2000/svg';
       const round = (v, d) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
       const metrics = [
         { name: 'Unit Rate', plan: simStats.rate,   act: actStats.rate,   dec: 1 },
         { name: 'Result',    plan: simStats.result, act: actStats.result, dec: 2 },
       ];
-      const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
-      const R = 38, C = 2 * Math.PI * R, SW = 15;
       wrap.replaceChildren();
       for (const m of metrics) {
-        const total = m.plan + m.act;
+        const max = Math.max(m.plan, m.act, 1);
+        const pct = m.plan > 0 ? Math.round((m.act / m.plan) * 100) : null;
+        const gap = m.act - m.plan;
         const box = document.createElement('div');
-        box.className = 'prod-donut';
-        const svg = mk('svg', { viewBox: '0 0 100 100', role: 'img', 'aria-label': m.name + ' plan vs actual' });
-        // Track ring
-        svg.appendChild(mk('circle', { cx: 50, cy: 50, r: R, fill: 'none', stroke: '#e8eef9', 'stroke-width': SW }));
-        if (total > 0) {
-          const planLen = (m.plan / total) * C;
-          const planArc = mk('circle', { cx: 50, cy: 50, r: R, fill: 'none', stroke: '#2563eb',
-            'stroke-width': SW, 'stroke-dasharray': `${planLen} ${C - planLen}`, transform: 'rotate(-90 50 50)' });
-          const actArc = mk('circle', { cx: 50, cy: 50, r: R, fill: 'none', stroke: '#f59e0b',
-            'stroke-width': SW, 'stroke-dasharray': `${C - planLen} ${planLen}`, 'stroke-dashoffset': -planLen, transform: 'rotate(-90 50 50)' });
-          svg.appendChild(planArc);
-          svg.appendChild(actArc);
-        }
-        // Centre: Actual as % of Plan (achievement)
-        const pct = m.plan > 0 ? Math.round((m.act / m.plan) * 100) + '%' : (m.act > 0 ? '\u221e' : '\u2013');
-        const ctr = mk('text', { x: 50, y: 50, 'text-anchor': 'middle', 'dominant-baseline': 'central',
-          'font-size': '19', 'font-weight': '800', fill: '#1f2937' });
-        ctr.textContent = pct;
-        svg.appendChild(ctr);
-        box.appendChild(svg);
+        box.className = 'prod-metric';
+        box.setAttribute('aria-label', m.name + ' plan versus actual');
+
+        const top = document.createElement('div');
+        top.className = 'prod-metric-top';
         const name = document.createElement('div');
-        name.className = 'prod-donut-name';
+        name.className = 'prod-metric-name';
         name.textContent = m.name;
-        box.appendChild(name);
-        const vals = document.createElement('div');
-        vals.className = 'prod-donut-vals';
-        const vp = document.createElement('span'); vp.className = 'v-plan'; vp.textContent = 'P ' + round(m.plan, m.dec).toLocaleString();
-        const va = document.createElement('span'); va.className = 'v-actual'; va.textContent = 'A ' + round(m.act, m.dec).toLocaleString();
-        vals.append(vp, va);
-        box.appendChild(vals);
+        const achievement = document.createElement('span');
+        achievement.className = 'prod-achievement';
+        achievement.textContent = pct === null ? '\u2013' : pct + '%';
+        if (pct !== null) achievement.classList.add(pct >= 100 ? 'good' : 'low');
+        top.append(name, achievement);
+        box.appendChild(top);
+
+        for (const item of [
+          { label: 'Plan', value: m.plan, type: 'plan' },
+          { label: 'Actual', value: m.act, type: 'actual' },
+        ]) {
+          const row = document.createElement('div');
+          row.className = 'prod-bar-row';
+          const label = document.createElement('span');
+          label.className = 'prod-bar-label';
+          label.textContent = item.label;
+          const track = document.createElement('span');
+          track.className = 'prod-bar-track';
+          const fill = document.createElement('span');
+          fill.className = 'prod-bar-fill ' + item.type;
+          fill.style.width = (item.value > 0 ? Math.max(2, item.value / max * 100) : 0) + '%';
+          track.appendChild(fill);
+          const value = document.createElement('span');
+          value.className = 'prod-bar-value';
+          value.textContent = round(item.value, m.dec).toLocaleString();
+          row.append(label, track, value);
+          box.appendChild(row);
+        }
+
+        const gapText = document.createElement('div');
+        gapText.className = 'prod-gap';
+        const gapValue = round(gap, m.dec);
+        gapText.textContent = 'Gap  ' + (gapValue > 0 ? '+' : '') + gapValue.toLocaleString();
+        box.appendChild(gapText);
         wrap.appendChild(box);
       }
     }
