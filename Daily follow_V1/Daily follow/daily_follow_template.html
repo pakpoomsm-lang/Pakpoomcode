@@ -302,10 +302,10 @@
     .dmetric-label { font-size: 11px; font-weight: 850; letter-spacing: .45px; text-transform: uppercase; }
     .dmetric.assy .dmetric-label { color: var(--primary); }
     .dmetric.sc .dmetric-label { color: #0e7c8b; }
-    .dmetric-num { font-size: 22px; font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
+    .dmetric-num { font-size: 26px; font-weight: 850; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
     .dmetric.assy .dmetric-num { color: var(--primary-dark); }
     .dmetric.sc .dmetric-num { color: #0c6b78; }
-    .dmetric-num span { font-size: 12px; font-weight: 750; color: var(--muted); }
+    .dmetric-num span { font-size: 14px; font-weight: 750; color: var(--muted); }
     .dmetric-bar {
       grid-column: 1;
       position: relative; display: flex; gap: 3px;
@@ -319,7 +319,7 @@
       font-size: 8px; font-weight: 700;
     }
     .dmetric-bar::before { content: "0"; left: 0; }
-    .dmetric-bar::after { content: "40 hr"; right: 0; }
+    .dmetric-bar::after { content: "20 hr"; right: 0; }
     .dmetric-segment {
       flex: 1 1 0; height: 100%; min-width: 0;
       border-radius: 2px; background: #e8edf3;
@@ -4087,7 +4087,7 @@
       const targetKey = document.createElement('span');
       targetKey.className = 'dash-target-key';
       targetKey.textContent = 'Target';
-      scale.append(document.createTextNode('Scale: 0 \u2013 40 hr'), targetKey);
+      scale.append(document.createTextNode('Scale: 0 \u2013 20 hr'), targetKey);
       legend.appendChild(scale);
       target.appendChild(legend);
       if (!lines.length) {
@@ -4106,7 +4106,7 @@
         const unit = document.createElement('span'); unit.textContent = ' hr'; num.appendChild(unit);
         const col = cls === 'sc' ? scColor(value, line) : assyColor(value, line);
         const targetValue = cls === 'sc' ? scTarget(line) : assyTarget(line);
-        const scaleMax = 40;
+        const scaleMax = 20;
         const bar = document.createElement('div');
         bar.className = 'dmetric-bar';
         bar.classList.toggle('below-target', value < targetValue);
