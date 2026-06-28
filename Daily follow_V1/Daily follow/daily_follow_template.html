@@ -679,10 +679,15 @@
     .prod-kicker { font-size: 10px; font-weight: 600; color: #7c8aa0; }
     .prod-head-right { display: flex; align-items: center; gap: 10px; }
     .summary-collapse {
-      height: 27px; padding: 0 11px; border: 1px solid #d8e1ef;
+      display: inline-grid; place-items: center;
+      width: 31px; height: 27px; padding: 0; border: 1px solid #d8e1ef;
       border-radius: 8px; background: #fff; color: #64748b;
-      font: 750 10px/1 inherit; cursor: pointer;
+      cursor: pointer;
     }
+    .summary-collapse svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; }
+    .summary-collapse .eye-off { display: none; }
+    .summary-collapse[aria-expanded="false"] .eye-open { display: none; }
+    .summary-collapse[aria-expanded="false"] .eye-off { display: block; }
     .summary-collapse:hover { border-color: #93a9d4; color: #1d4ed8; }
     .prod-panel.collapsed { gap: 0; padding-top: 10px; padding-bottom: 10px; }
     .prod-panel.collapsed .summary-view,
@@ -1471,7 +1476,16 @@
                 <button class="sim-tab active" type="button" data-shift="A">Shift A</button>
                 <button class="sim-tab" type="button" data-shift="B">Shift B</button>
               </div>
-              <button id="summaryCollapseBtn" class="summary-collapse" type="button" aria-expanded="true">Hide</button>
+              <button id="summaryCollapseBtn" class="summary-collapse" type="button" aria-expanded="true" aria-label="Hide dashboard" title="Hide dashboard">
+                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path>
+                  <circle cx="12" cy="12" r="2.5"></circle>
+                </svg>
+                <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 3l18 18"></path>
+                  <path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a16.9 16.9 0 0 1-3.1 3.8M6.3 6.3C3.5 8.2 2 12 2 12s3.5 6 10 6a10.5 10.5 0 0 0 3.2-.5"></path>
+                </svg>
+              </button>
             </div>
           </div>
           <div id="productivityView" class="summary-view">
@@ -2534,7 +2548,8 @@
         els.summaryCollapseBtn.addEventListener('click', toggleSummaryPanel);
         if (localStorage.getItem('dailySummaryCollapsed') === '1') {
           els.prodPanel.classList.add('collapsed');
-          els.summaryCollapseBtn.textContent = 'Show';
+          els.summaryCollapseBtn.setAttribute('aria-label', 'Show dashboard');
+          els.summaryCollapseBtn.title = 'Show dashboard';
           els.summaryCollapseBtn.setAttribute('aria-expanded', 'false');
         }
       }
@@ -3956,7 +3971,7 @@
     function round1(n) { return Math.round(n * 10) / 10; }
     function ltColor(h) {
       if (h < 4) return '#b91c1c';
-      if (h <= 10) return '#92620a';
+      if (h <= 10) return '#f5b700';
       if (h <= 20) return '#15643a';
       if (h <= 40) return '#1a3a9e';
       return '#4c1d95';
@@ -3987,7 +4002,7 @@
     function assyColor(h, line) {
       const t = assyTarget(line);
       if (h < t) return '#b91c1c';
-      if (h <= 10) return '#92620a';
+      if (h <= 10) return '#f5b700';
       if (h <= 20) return '#15643a';
       if (h <= 40) return '#1a3a9e';
       return '#4c1d95';
@@ -4076,7 +4091,7 @@
       legend.className = 'dash-legend';
       const lgT = document.createElement('span'); lgT.className = 'dash-leg-title'; lgT.textContent = 'Target (Lead Time)';
       legend.appendChild(lgT);
-      [['#e23b3b', '< 4 hr'], ['#e0a200', '4-10 hr'], ['#1f9254', '>10-20 hr'], ['#2f56c4', '>20-40 hr'], ['#7c3aed', '>40 hr']].forEach(b => {
+      [['#e23b3b', '< 4 hr'], ['#f5b700', '4-10 hr'], ['#1f9254', '>10-20 hr'], ['#2f56c4', '>20-40 hr'], ['#7c3aed', '>40 hr']].forEach(b => {
         const it = document.createElement('span'); it.className = 'dash-leg-item';
         const sw = document.createElement('span'); sw.className = 'dash-leg-sw'; sw.style.background = b[0];
         it.append(sw, document.createTextNode(b[1]));
@@ -4156,8 +4171,9 @@
     }
     function toggleSummaryPanel() {
       const collapsed = els.prodPanel.classList.toggle('collapsed');
-      els.summaryCollapseBtn.textContent = collapsed ? 'Show' : 'Hide';
       els.summaryCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      els.summaryCollapseBtn.setAttribute('aria-label', collapsed ? 'Show dashboard' : 'Hide dashboard');
+      els.summaryCollapseBtn.title = collapsed ? 'Show dashboard' : 'Hide dashboard';
       localStorage.setItem('dailySummaryCollapsed', collapsed ? '1' : '0');
     }
     function showSummaryView(view) {
