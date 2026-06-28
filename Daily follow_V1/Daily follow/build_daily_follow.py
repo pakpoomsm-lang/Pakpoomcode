@@ -120,13 +120,24 @@ def month_display(value):
     return raw
 
 
+def _db_needs_build(db_path, xlsx_path):
+    """True if the SQLite db should be (re)built from the xlsx: db missing, or
+    the xlsx has been edited since the db was built. Without this a stale db
+    would silently shadow an updated spreadsheet."""
+    if not xlsx_path.exists():
+        return False  # no source to build from; use the db as-is (or none)
+    if not db_path.exists():
+        return True
+    return xlsx_path.stat().st_mtime > db_path.stat().st_mtime
+
+
 def load_master_ts():
     """Return {ITEM: TS_VALUE} from MasterTS.db (built from MasterTS.xlsx)."""
-    if not MASTER_TS_DB_FILE.exists():
-        if not MASTER_TS_FILE.exists():
-            return {}
-        import build_masterts_db  # build MasterTS.db on the fly from the xlsx
+    if _db_needs_build(MASTER_TS_DB_FILE, MASTER_TS_FILE):
+        import build_masterts_db  # (re)build MasterTS.db from the xlsx
         build_masterts_db.main()
+    if not MASTER_TS_DB_FILE.exists():
+        return {}
     con = sqlite3.connect(MASTER_TS_DB_FILE)
     rows = con.execute(
         "SELECT item, ts_value FROM master_ts WHERE item IS NOT NULL AND item <> ''"
@@ -168,11 +179,11 @@ def load_ct():
     the MAX of each process across them (worst-case capacity planning). Finpress
     -> Auto-Brazing use the *-CT columns; Cutting uses Cutting-Sec.
     """
-    if not CT_DB_FILE.exists():
-        if not CT_XLSX_FILE.exists():
-            return {}
-        import build_ct_db  # build CT.db on the fly from CT.xlsx
+    if _db_needs_build(CT_DB_FILE, CT_XLSX_FILE):
+        import build_ct_db  # (re)build CT.db from CT.xlsx
         build_ct_db.main()
+    if not CT_DB_FILE.exists():
+        return {}
     con = sqlite3.connect(CT_DB_FILE)
     rows = con.execute(
         """
