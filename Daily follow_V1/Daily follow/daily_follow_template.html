@@ -1451,7 +1451,7 @@
             </div>
             <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
               <thead>
-                <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th><th>Total (Hrs.)</th></tr>
+                <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th></tr>
               </thead>
               <tbody id="ctItemBody"></tbody>
             </table>
@@ -3764,10 +3764,8 @@
       for (const r of rows) {
         const tr = document.createElement('tr');
         if (r.cls) tr.className = r.cls;
-        let rowTotal = 0;
         const cells = [r.label];
-        for (const p of CT_PROCS) { const v = r.val(p); rowTotal += v; cells.push(fmt(v)); }
-        cells.push(fmt(rowTotal));
+        for (const p of CT_PROCS) cells.push(fmt(r.val(p)));
         for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
         els.ctItemBody.appendChild(tr);
       }
