@@ -463,6 +463,17 @@
     .dm-sep { height: 1px; background: var(--border); margin: 3px 4px; }
     .dm-toggle.vis-toggle::before { content: "\1F441\FE0E"; }
     .dm-label { font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }
+    .machine-counts { display: grid; gap: 4px; padding: 4px 12px 8px; }
+    .machine-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      color: var(--ink-soft); font-size: 11px; font-weight: 700;
+    }
+    .machine-row input {
+      width: 64px; height: 26px; padding: 0 8px;
+      border: 1px solid var(--border); border-radius: 6px;
+      font: 700 12px/1 inherit; color: var(--ink); text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
     .freeze-control {
       display: grid; gap: 5px; padding: 7px 12px 10px;
       color: var(--ink-soft); font-size: 10px; font-weight: 700;
@@ -1264,6 +1275,15 @@
                   <input id="importRouting" type="file" accept=".xlsx,.xlsm">
                 </label>
                 <div class="dm-sep"></div>
+                <div class="dm-label">จำนวนเครื่องจักร (Machines)</div>
+                <div class="machine-counts" id="machineCounts" title="จำนวนเครื่องที่เดินขนานกันต่อ process · ใช้หาร Cycle Time ในตัววางแผน">
+                  <label class="machine-row">Fin Press<input id="mcFinpress" type="number" min="1" step="1" value="1"></label>
+                  <label class="machine-row">Hair Pin Bender<input id="mcHpbender" type="number" min="1" step="1" value="1"></label>
+                  <label class="machine-row">Expander<input id="mcExpander" type="number" min="1" step="1" value="1"></label>
+                  <label class="machine-row">Brazing<input id="mcBrazing" type="number" min="1" step="1" value="1"></label>
+                  <label class="machine-row">Cutting<input id="mcCutting" type="number" min="1" step="1" value="1"></label>
+                </div>
+                <div class="dm-sep"></div>
                 <button id="defaultDisplayBtn" class="dm-item dm-reset" type="button" title="Reset all column widths back to fit-the-screen">Default display</button>
                 <div class="dm-sep"></div>
                 <button id="dbViewBtn" class="dm-item" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
@@ -1704,6 +1724,9 @@
       ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
       ctCutting: document.getElementById('ctCutting'), ctTotal: document.getElementById('ctTotal'),
       ctMiss: document.getElementById('ctMiss'),
+      mcFinpress: document.getElementById('mcFinpress'), mcHpbender: document.getElementById('mcHpbender'),
+      mcExpander: document.getElementById('mcExpander'), mcBrazing: document.getElementById('mcBrazing'),
+      mcCutting: document.getElementById('mcCutting'),
       hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
       hideOldDlvBtn: document.getElementById('hideOldDlvBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
@@ -2401,6 +2424,18 @@
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
       els.importRouting.addEventListener('change', importRoutingData);
+      syncMachineInputs();
+      for (const [elId, p] of MACHINE_INPUTS) {
+        const inp = els[elId];
+        if (!inp) continue;
+        inp.addEventListener('input', () => {
+          const v = parseInt(inp.value, 10);
+          machineCounts[p] = v >= 1 ? v : 1;
+          saveMachineCounts();
+          updateSimReadout();
+        });
+        inp.addEventListener('change', () => { inp.value = machineCounts[p]; });  // normalise on blur
+      }
       if (els.dataMgmtBtn) els.dataMgmtBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const open = els.dataMgmtMenu.hidden;
@@ -3531,15 +3566,34 @@
     const CT_PROCS = ['finpress', 'hpbender', 'expander', 'autoBrazing', 'cutting'];
     function ctOf(row) { return (DATA.ct && DATA.ct[row.item]) || null; }
 
+    // Machines running in parallel per process (entered in Data Management).
+    // Planned cycle time is divided by this to get wall-clock hours.
+    let machineCounts = { finpress: 1, hpbender: 1, expander: 1, autoBrazing: 1, cutting: 1 };
+    try {
+      const saved = JSON.parse(localStorage.getItem('dailyFollowMachines') || '{}');
+      for (const p of CT_PROCS) if (saved[p] >= 1) machineCounts[p] = saved[p];
+    } catch (e) { /* keep defaults */ }
+    function saveMachineCounts() { localStorage.setItem('dailyFollowMachines', JSON.stringify(machineCounts)); }
+    function machinesOf(proc) { return machineCounts[proc] >= 1 ? machineCounts[proc] : 1; }
+    // Maps each Data Management input to its CT process key (Brazing -> autoBrazing).
+    const MACHINE_INPUTS = [
+      ['mcFinpress', 'finpress'], ['mcHpbender', 'hpbender'], ['mcExpander', 'expander'],
+      ['mcBrazing', 'autoBrazing'], ['mcCutting', 'cutting'],
+    ];
+    function syncMachineInputs() {
+      for (const [elId, p] of MACHINE_INPUTS) if (els[elId]) els[elId].value = machineCounts[p];
+    }
+
     function ctHr(sec) { return (Math.round((sec / 3600) * 100) / 100).toLocaleString(); }
     function renderCtBreakdown(ctSec, missing) {
-      els.ctFinpress.textContent = ctHr(ctSec.finpress);
-      els.ctHpbender.textContent = ctHr(ctSec.hpbender);
-      els.ctExpander.textContent = ctHr(ctSec.expander);
-      els.ctAutoBrazing.textContent = ctHr(ctSec.autoBrazing);
-      els.ctCutting.textContent = ctHr(ctSec.cutting);
-      const total = ctSec.finpress + ctSec.hpbender + ctSec.expander + ctSec.autoBrazing + ctSec.cutting;
-      els.ctTotal.textContent = ctHr(total);
+      // Wall-clock hours = work seconds / machines running in parallel / 3600.
+      els.ctFinpress.textContent = ctHr(ctSec.finpress / machinesOf('finpress'));
+      els.ctHpbender.textContent = ctHr(ctSec.hpbender / machinesOf('hpbender'));
+      els.ctExpander.textContent = ctHr(ctSec.expander / machinesOf('expander'));
+      els.ctAutoBrazing.textContent = ctHr(ctSec.autoBrazing / machinesOf('autoBrazing'));
+      els.ctCutting.textContent = ctHr(ctSec.cutting / machinesOf('cutting'));
+      const totalSec = CT_PROCS.reduce((s, p) => s + ctSec[p] / machinesOf(p), 0);
+      els.ctTotal.textContent = ctHr(totalSec);
       els.ctMiss.textContent = missing ? `· ${missing} row${missing === 1 ? '' : 's'} ไม่มี CT` : '';
     }
 
