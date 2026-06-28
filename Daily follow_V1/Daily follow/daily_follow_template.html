@@ -3360,15 +3360,26 @@
         ? Object.assign({}, actProd.N || {}, actProd.D || {})
         : (actProd[(shift === morning) ? 'D' : 'N'] || {});
       let rate = 0, n = 0, pcs = 0;
+      // Production is aggregated per material/seq, so each key counts once even
+      // though the same material appears in several order rows of the table.
+      const seen = new Set();
       for (const row of filtered) {
+        // Match the production population the rest of the dashboard uses:
+        // skip service (SRV) lines, hair pins, and hidden/cancelled records.
+        if (/^SRV/i.test(row.line || '')) continue;
         if (isHairPin(row)) continue;
+        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isHiddenByAssyStatus(row)) continue;
         const ts = valueOf(row, 'ts');
         if (ts === '' || ts === null || ts === undefined) continue;
-        const prod = byKey[`${row.line}|${row.month}|${seqKey(row.seq)}|${row.item}`];
+        const key = `${row.line}|${row.month}|${seqKey(row.seq)}|${row.item}`;
+        if (seen.has(key)) continue;
+        const prod = byKey[key];
         if (!prod) continue;
         const a = String(row.attribute || '').trim().toUpperCase();
         const fg = a.endsWith('-BZ') ? num(prod.auto) : a.endsWith('-CT') ? num(prod.cutting) : 0;
         if (!fg) continue;
+        seen.add(key);
         rate += (num(ts) / 0.5916) * fg;
         n += 1; pcs += fg;
       }
