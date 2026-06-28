@@ -14,6 +14,7 @@ EXPORT_FILE = ROOT / "EXPORT_20260601070215.xlsx"
 SAMPLE_FILE = ROOT / "HEI-18-05-PP-Original-SAP-1 (1).xlsm"
 ROUTING_FILE = ROOT / "Routing.xlsx"
 MASTER_TS_FILE = ROOT / "MasterTS.xlsx"
+MASTER_TS_DB_FILE = ROOT / "MasterTS.db"
 PROGRESS_FILE = ROOT / "ZPP0059.xlsx"
 CT_DB_FILE = ROOT / "CT.db"
 CT_XLSX_FILE = ROOT / "CT.xlsx"
@@ -50,6 +51,19 @@ def number(value):
     except ValueError:
         return value
     return int(f) if f.is_integer() else round(f, 3)
+
+
+def ts_number(value):
+    """Like number() but keeps 6 decimals. TS values can have 4 decimals
+    (e.g. 0.0485); rounding to 3 like number() would collapse it to 0.049 and
+    skew the unit rate (0.0485 -> 16.4, but 0.049 -> 16.6 for a lot of 200)."""
+    if value in (None, ""):
+        return ""
+    try:
+        f = float(str(value).strip())
+    except ValueError:
+        return value
+    return int(f) if f.is_integer() else round(f, 6)
 
 
 def excel_date(value):
@@ -107,21 +121,18 @@ def month_display(value):
 
 
 def load_master_ts():
-    """Return {ITEM: TS_VALUE} from MasterTS.xlsx."""
-    if not MASTER_TS_FILE.exists():
-        return {}
-    wb = openpyxl.load_workbook(MASTER_TS_FILE, read_only=True, data_only=True)
-    ws = wb.active
-    rows = ws.iter_rows(values_only=True)
-    headers = [text(v) for v in next(rows)]
-    idx = {h: i for i, h in enumerate(headers)}
-    result = {}
-    for row in rows:
-        item = text(row[idx["ITEM"]])
-        if item:
-            result[item] = number(row[idx["TS_VALUE"]])
-    wb.close()
-    return result
+    """Return {ITEM: TS_VALUE} from MasterTS.db (built from MasterTS.xlsx)."""
+    if not MASTER_TS_DB_FILE.exists():
+        if not MASTER_TS_FILE.exists():
+            return {}
+        import build_masterts_db  # build MasterTS.db on the fly from the xlsx
+        build_masterts_db.main()
+    con = sqlite3.connect(MASTER_TS_DB_FILE)
+    rows = con.execute(
+        "SELECT item, ts_value FROM master_ts WHERE item IS NOT NULL AND item <> ''"
+    ).fetchall()
+    con.close()
+    return {item: ts_number(ts) for item, ts in rows}
 
 
 def load_routing():
@@ -136,7 +147,7 @@ def load_routing():
         material = text(row[idx["Material"]])
         if not material or material in routing:
             continue
-        ts = master_ts.get(material, number(row[idx["OPR Time Standard"]]))
+        ts = master_ts.get(material, ts_number(row[idx["OPR Time Standard"]]))
         routing[material] = {
             "description": text(row[idx["Description"]]),
             "operation": text(row[idx["Operation Text"]]),
