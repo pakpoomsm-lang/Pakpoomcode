@@ -346,8 +346,8 @@
       background: var(--surface);
     }
     .left-stack {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: minmax(650px, 1fr) auto;
       align-items: end;
       gap: 12px 18px;
       width: 100%;
@@ -355,7 +355,7 @@
     }
     .filter-row {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 10px 14px;
       align-items: end;
     }
@@ -400,7 +400,7 @@
     }
     select[multiple] option { padding: 2px 6px; border-radius: 4px; }
     input[type="search"] { min-width: 0; width: 100%; }
-    .control-search { flex: 0 1 280px; }
+    .control-search { flex: 1 1 280px; max-width: 360px; }
     .control-actions {
       display: flex;
       gap: 10px;
@@ -636,11 +636,18 @@
     .sim-tabs[hidden] { display: none; }
     .summary-view[hidden] { display: none; }
     .lead-inline-body {
-      max-height: 292px; padding: 2px 4px 2px 0; overflow: auto;
-      scrollbar-width: thin;
+      padding: 2px 0 0; overflow: visible;
     }
     .lead-inline-body .dash-legend { margin-bottom: 8px; }
-    .lead-inline-body .dline { margin-bottom: 6px; }
+    .lead-lines-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 8px;
+    }
+    .lead-lines-grid .dline { margin: 0; }
+    .lead-lines-grid .dash-detail { grid-column: 1 / -1; padding: 6px 0 2px 40px; }
+    @media (max-width: 1100px) {
+      .lead-lines-grid { grid-template-columns: 1fr; }
+    }
     .prod-link {
       height: 26px; padding: 0 10px; border: 1px solid #b9cdf2; border-radius: 8px;
       background: #fff; color: var(--primary); font: 700 10px/1 inherit;
@@ -1291,8 +1298,8 @@
       .brand-subtitle { font-size: 8px; letter-spacing: 1.4px; }
       .connection { padding: 5px 10px; font-size: 9px; }
       .controls { padding: 10px 12px; }
-      .left-stack { align-items: stretch; flex-direction: column; }
-      .filter-row { align-items: end; }
+      .left-stack { display: flex; align-items: stretch; flex-direction: column; }
+      .filter-row { align-items: end; flex-wrap: wrap; }
       .action-bar { margin-left: 0; }
       .control-actions { margin-left: 0; }
       input[type="search"] { min-width: 0; }
@@ -4016,6 +4023,9 @@
         if (sub) { const s = document.createElement('div'); s.className = 'dmetric-sub'; s.textContent = sub; box.appendChild(s); }
         return box;
       }
+      const lineGrid = document.createElement('div');
+      lineGrid.className = 'lead-lines-grid';
+      target.appendChild(lineGrid);
       for (const l of lines) {
         const card = document.createElement('div');
         card.className = 'dline';
@@ -4024,7 +4034,6 @@
         name.textContent = l.line;
         const assy = metricBox('assy', 'Assy LT \u2265' + assyTarget(l.line) + 'hr', round1(l.lead), l.lead / maxLead * 100, l.orders + ' ord \u00B7 ' + l.pcs.toLocaleString() + ' pcs', l.line);
         const sc = metricBox('sc', 'SC LT \u2265' + scTarget(l.line) + 'hr', round1(l.scLead), l.scLead / maxLead * 100, '', l.line);
-        card.append(name, assy, sc);
         const detail = document.createElement('div');
         detail.className = 'dash-detail';
         detail.hidden = true;
@@ -4040,7 +4049,8 @@
           detail.appendChild(dr);
         }
         card.addEventListener('click', () => { detail.hidden = !detail.hidden; });
-        target.append(card, detail);
+        card.append(name, assy, sc, detail);
+        lineGrid.appendChild(card);
       }
     }
     function showSummaryView(view) {
