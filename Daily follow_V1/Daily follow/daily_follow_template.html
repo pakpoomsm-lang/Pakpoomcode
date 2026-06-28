@@ -268,7 +268,7 @@
       border: 1px solid var(--border);
       border-radius: 9px;
       background: #fff;
-      cursor: pointer;
+      cursor: default;
       transition: border-color .15s, box-shadow .15s, background .15s;
     }
     .dline:hover { border-color: #b7c7e5; background: #fbfdff; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
@@ -331,6 +331,19 @@
         var(--metric-color, #64748b) 0 var(--segment-fill, 100%),
         #e8edf3 var(--segment-fill, 100%) 100%
       );
+    }
+    .dmetric-bar.below-target {
+      animation: leadAlert 1.25s ease-in-out infinite;
+    }
+    @keyframes leadAlert {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(226,59,59,.10), 0 0 5px rgba(226,59,59,.18); }
+      50% { box-shadow: 0 0 0 3px rgba(226,59,59,.16), 0 0 13px rgba(226,59,59,.62); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dmetric-bar.below-target {
+        animation: none;
+        box-shadow: 0 0 0 2px rgba(226,59,59,.28);
+      }
     }
     .dmetric-bar b {
       position: absolute; top: -5px; bottom: -5px; width: 2px;
@@ -665,6 +678,16 @@
     .prod-title { font-size: 13px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase; color: #172554; }
     .prod-kicker { font-size: 10px; font-weight: 600; color: #7c8aa0; }
     .prod-head-right { display: flex; align-items: center; gap: 10px; }
+    .summary-collapse {
+      height: 27px; padding: 0 11px; border: 1px solid #d8e1ef;
+      border-radius: 8px; background: #fff; color: #64748b;
+      font: 750 10px/1 inherit; cursor: pointer;
+    }
+    .summary-collapse:hover { border-color: #93a9d4; color: #1d4ed8; }
+    .prod-panel.collapsed { gap: 0; padding-top: 10px; padding-bottom: 10px; }
+    .prod-panel.collapsed .summary-view,
+    .prod-panel.collapsed .prod-kicker,
+    .prod-panel.collapsed .sim-tabs { display: none; }
     .summary-tabs {
       display: inline-flex; align-items: center; gap: 3px; padding: 3px;
       border: 1px solid #d8e1ef; border-radius: 10px; background: #edf2f8;
@@ -1448,6 +1471,7 @@
                 <button class="sim-tab active" type="button" data-shift="A">Shift A</button>
                 <button class="sim-tab" type="button" data-shift="B">Shift B</button>
               </div>
+              <button id="summaryCollapseBtn" class="summary-collapse" type="button" aria-expanded="true">Hide</button>
             </div>
           </div>
           <div id="productivityView" class="summary-view">
@@ -1812,6 +1836,8 @@
       leadInlineBody: document.getElementById('leadInlineBody'),
       summaryTitle: document.getElementById('summaryTitle'),
       summaryKicker: document.getElementById('summaryKicker'),
+      prodPanel: document.getElementById('prodPanel'),
+      summaryCollapseBtn: document.getElementById('summaryCollapseBtn'),
       editTargetBtn: document.getElementById('editTargetBtn'),
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
@@ -2503,6 +2529,14 @@
       }
       if (els.leadDashBtn) {
         els.leadDashBtn.addEventListener('click', () => showSummaryView('leadtime'));
+      }
+      if (els.summaryCollapseBtn) {
+        els.summaryCollapseBtn.addEventListener('click', toggleSummaryPanel);
+        if (localStorage.getItem('dailySummaryCollapsed') === '1') {
+          els.prodPanel.classList.add('collapsed');
+          els.summaryCollapseBtn.textContent = 'Show';
+          els.summaryCollapseBtn.setAttribute('aria-expanded', 'false');
+        }
       }
       if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
       if (els.dbClose) els.dbClose.addEventListener('click', () => { els.dbOverlay.hidden = true; });
@@ -4075,6 +4109,7 @@
         const scaleMax = 40;
         const bar = document.createElement('div');
         bar.className = 'dmetric-bar';
+        bar.classList.toggle('below-target', value < targetValue);
         bar.title = `${value.toLocaleString()} hr / target ${targetValue} hr`;
         const segmentValue = scaleMax / 10;
         for (let i = 0; i < 10; i++) {
@@ -4105,7 +4140,6 @@
         const card = document.createElement('div');
         card.className = 'dline';
         card.style.borderLeft = '3px solid ' + assyColor(round1(l.lead), l.line);
-        card.title = 'Click to show the rows summed for this line';
         const name = document.createElement('div'); name.className = 'dline-name';
         name.textContent = l.line;
         const meta = document.createElement('span');
@@ -4116,24 +4150,15 @@
         name.appendChild(meta);
         const assy = metricBox('assy', 'Assy LT', round1(l.lead), l.lead / maxLead * 100, '', l.line);
         const sc = metricBox('sc', 'SC LT', round1(l.scLead), l.scLead / maxLead * 100, '', l.line);
-        const detail = document.createElement('div');
-        detail.className = 'dash-detail';
-        detail.hidden = true;
-        for (const r of l.rows) {
-          const dr = document.createElement('div');
-          dr.className = 'dash-detail-row';
-          const c1 = document.createElement('span'); c1.textContent = r.d || '-';
-          const c2 = document.createElement('span'); c2.textContent = r.item;
-          const c3 = document.createElement('span'); c3.className = 'r'; c3.textContent = r.stock.toLocaleString() + ' pcs';
-          const c4 = document.createElement('span'); c4.className = 'r'; c4.textContent = r.lead + ' hr';
-          const c5 = document.createElement('span'); c5.className = 'r'; c5.textContent = (r.sc === '' ? '-' : r.sc + ' SC');
-          dr.append(c1, c2, c3, c4, c5);
-          detail.appendChild(dr);
-        }
-        card.addEventListener('click', () => { detail.hidden = !detail.hidden; });
-        card.append(name, assy, sc, detail);
+        card.append(name, assy, sc);
         lineGrid.appendChild(card);
       }
+    }
+    function toggleSummaryPanel() {
+      const collapsed = els.prodPanel.classList.toggle('collapsed');
+      els.summaryCollapseBtn.textContent = collapsed ? 'Show' : 'Hide';
+      els.summaryCollapseBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      localStorage.setItem('dailySummaryCollapsed', collapsed ? '1' : '0');
     }
     function showSummaryView(view) {
       const showLead = view === 'leadtime';
