@@ -3535,6 +3535,7 @@
       updateActualReadout();
       renderProdChart();
       applyFrozenColumns();
+      refreshLeadTimeView();
     }
     function renderColgroup(cols) {
       const frag = document.createDocumentFragment();
@@ -3761,6 +3762,10 @@
     }
     function applyChanges(changes) {
       const undoEntry = [];
+      const affectsLeadTime = changes.some(ch => {
+        const field = ch.key.slice(ch.key.lastIndexOf('|') + 1);
+        return field === 'fg' || field === 'stockFg' || field === 'subcooler';
+      });
       for (const ch of changes) {
         const had = Object.prototype.hasOwnProperty.call(saved, ch.key);
         const prev = saved[ch.key];
@@ -3773,6 +3778,7 @@
         if (undoStack.length > 200) undoStack.shift();
         localStorage.setItem('dailyFollowProgress', JSON.stringify(saved));
         leadDirty = true;
+        if (affectsLeadTime) refreshLeadTimeView();
       }
       return undoEntry.length > 0;
     }
@@ -3787,6 +3793,7 @@
       leadDirty = true;
       renderWindow(true);
       updateSimReadout();
+      refreshLeadTimeView();
     }
     function highlightPending() {
       els.body.querySelectorAll('td.fill-sel').forEach(td => td.classList.remove('fill-sel'));
@@ -4056,6 +4063,11 @@
         ? 'Assembly and subcooler lead time by line'
         : 'Production performance overview';
       if (showLead) renderDashboardBody(els.leadInlineBody);
+    }
+    function refreshLeadTimeView() {
+      if (!els.leadTimeView || els.leadTimeView.hidden) return;
+      if (els.prodPanel && els.prodPanel.classList.contains('collapsed')) return;
+      renderDashboardBody(els.leadInlineBody);
     }
     function openDashboard() { renderDashboardBody(); els.dashOverlay.hidden = false; }
     function closeDashboard() { els.dashOverlay.hidden = true; }
