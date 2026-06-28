@@ -3751,13 +3751,13 @@
       if (itemAgg.size === 0) { els.ctItemTable.hidden = true; return; }
       els.ctItemTable.hidden = false;
       const changes = Math.max(0, itemAgg.size - 1);
-      const lossHr = changes * changeoverMin / 60;            // same loss on every process
+      const lossHr = p => changes * changeoverMin / 60 / machinesOf(p);
       const cycleHr = p => ctSec[p] / machinesOf(p) / 3600;   // wall-clock CT per process
 
       const rows = [
         { label: 'Cycle time', cls: '', val: p => cycleHr(p) },
-        { label: `Model change loss (${changes}×${changeoverMin}m)`, cls: 'ct-change', val: () => lossHr },
-        { label: 'รวม (Total)', cls: 'ct-grand', val: p => cycleHr(p) + lossHr },
+        { label: 'Model change loss', cls: 'ct-change', val: p => lossHr(p) },
+        { label: 'รวม (Total)', cls: 'ct-grand', val: p => cycleHr(p) + lossHr(p) },
       ];
       const fmt = v => (Math.round(v * 100) / 100).toLocaleString();
       els.ctItemBody.innerHTML = '';
