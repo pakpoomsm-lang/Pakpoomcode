@@ -659,7 +659,7 @@
     .prod-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; margin-left: 8px; }
     .prod-legend .lg-plan { background: #2563eb; }
     .prod-legend .lg-actual { background: #f59e0b; }
-    .prod-bars { display: grid; grid-template-columns: repeat(2, minmax(260px, 1fr)); gap: 12px 22px; }
+    .prod-bars { display: grid; grid-template-columns: 1fr; gap: 12px; }
     .prod-metric { min-width: 0; }
     .prod-metric-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
     .prod-metric-name { font-size: 10.5px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase; color: #334155; }
@@ -851,6 +851,12 @@
       border-radius: 10px;
       background: #f8fbff;
     }
+    .cycle-card {
+      padding: 10px 12px; border: 1px solid #dbe4f2; border-radius: 12px;
+      background: #fff; box-shadow: 0 2px 8px rgba(15,23,42,.035);
+    }
+    .cycle-card .ct-breakdown { margin: 0; }
+    .cycle-card .ct-matrix { margin-top: 8px; }
     .ct-head {
       font-size: 11px;
       font-weight: 800;
@@ -877,7 +883,8 @@
       margin-top: 8px;
       border-collapse: collapse;
       width: 100%;
-      max-width: 620px;
+      min-width: 0;
+      max-width: none;
       font-size: 11.5px;
       background: #fff;
       border: 1px solid #cdddf8;
@@ -1381,29 +1388,8 @@
                   <input id="workHour" class="sim-input" type="number" min="0" step="0.5" placeholder="0" title="ชั่วโมงการทำงานของ Shift นี้">
                   <span class="sim-sub">Hrs</span>
                 </div>
-                <div class="sim-cell">
-                  <span class="sim-title">Result</span>
-                  <span class="sim-badge" id="prodBadge" title="Working hour / Unit rate">0</span>
-                  <span class="sim-sub">Hrs./Unit rate</span>
-                </div>
                 <button id="simClear" class="sim-clear" type="button">Clear</button>
               </div>
-              <div class="ct-breakdown" id="ctBreakdown" title="ผลรวม Assy Order × CT ของแถวที่ติ๊ก แยกตาม process (หน่วย: ชั่วโมง) · ใช้ CT ตัวมากสุดต่อ material">
-                <span class="ct-head">Cycle Time (hr)</span>
-                <span class="ct-proc"><span class="ct-proc-name">Finpress</span><span class="ct-proc-val" id="ctFinpress">0</span></span>
-                <span class="ct-proc"><span class="ct-proc-name">HP Bender</span><span class="ct-proc-val" id="ctHpbender">0</span></span>
-                <span class="ct-proc"><span class="ct-proc-name">Expander</span><span class="ct-proc-val" id="ctExpander">0</span></span>
-                <span class="ct-proc"><span class="ct-proc-name">Auto-Brazing</span><span class="ct-proc-val" id="ctAutoBrazing">0</span></span>
-                <span class="ct-proc"><span class="ct-proc-name">Cutting</span><span class="ct-proc-val" id="ctCutting">0</span></span>
-                <span class="ct-proc ct-total"><span class="ct-proc-name">Total</span><span class="ct-proc-val" id="ctTotal">0</span></span>
-                <span class="ct-miss" id="ctMiss"></span>
-              </div>
-              <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
-                <thead>
-                  <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th><th>Total (Hrs.)</th></tr>
-                </thead>
-                <tbody id="ctItemBody"></tbody>
-              </table>
               <span id="simOtInfo" class="sim-ot-info"></span>
             </div>
             <!-- ACTUAL -->
@@ -1422,13 +1408,26 @@
                   <span class="sim-badge" id="actWorkBadge">0</span>
                   <span class="sim-sub">Hrs</span>
                 </div>
-                <div class="sim-cell">
-                  <span class="sim-title">Result</span>
-                  <span class="sim-badge" id="actProdBadge" title="Working hour / Actual unit rate">0</span>
-                  <span class="sim-sub">Hrs./Unit rate</span>
-                </div>
               </div>
             </div>
+          </div>
+          <div class="cycle-card">
+            <div class="ct-breakdown" id="ctBreakdown" title="ผลรวม Assy Order × CT ของแถวที่ติ๊ก แยกตาม process (หน่วย: ชั่วโมง) · ใช้ CT ตัวมากสุดต่อ material">
+              <span class="ct-head">Cycle Time (hr)</span>
+              <span class="ct-proc"><span class="ct-proc-name">Finpress</span><span class="ct-proc-val" id="ctFinpress">0</span></span>
+              <span class="ct-proc"><span class="ct-proc-name">HP Bender</span><span class="ct-proc-val" id="ctHpbender">0</span></span>
+              <span class="ct-proc"><span class="ct-proc-name">Expander</span><span class="ct-proc-val" id="ctExpander">0</span></span>
+              <span class="ct-proc"><span class="ct-proc-name">Auto-Brazing</span><span class="ct-proc-val" id="ctAutoBrazing">0</span></span>
+              <span class="ct-proc"><span class="ct-proc-name">Cutting</span><span class="ct-proc-val" id="ctCutting">0</span></span>
+              <span class="ct-proc ct-total"><span class="ct-proc-name">Total</span><span class="ct-proc-val" id="ctTotal">0</span></span>
+              <span class="ct-miss" id="ctMiss"></span>
+            </div>
+            <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
+              <thead>
+                <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th><th>Total (Hrs.)</th></tr>
+              </thead>
+              <tbody id="ctItemBody"></tbody>
+            </table>
           </div>
           <!-- COMPARISON CHART -->
           <div class="prod-chart">
@@ -1734,7 +1733,6 @@
       actRateBadge: document.getElementById('actRateBadge'),
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
-      actProdBadge: document.getElementById('actProdBadge'),
       productivityViewBtn: document.getElementById('productivityViewBtn'),
       leadDashBtn: document.getElementById('leadDashBtn'),
       productivityView: document.getElementById('productivityView'),
@@ -1748,7 +1746,7 @@
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
       targetSave: document.getElementById('targetSave'),
-      workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
+      workHour: document.getElementById('workHour'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
       ctFinpress: document.getElementById('ctFinpress'), ctHpbender: document.getElementById('ctHpbender'),
       ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
@@ -1842,8 +1840,8 @@
     let actProdDate = todayISO();
     let actProd = { D: {}, N: {} };   // production by shift for actProdDate (from server)
     let actOt = null;                 // { shifts:{A,B}, morning_shift } for actProdDate
-    let simStats = { rate: 0, result: 0 };  // latest plan readout (for chart)
-    let actStats = { rate: 0, result: 0 };  // latest actual readout (for chart)
+    let simStats = { rate: 0 };  // latest plan readout (for chart)
+    let actStats = { rate: 0 };  // latest actual readout (for chart)
     let lastActualDate = '';   // date of the last actual-production fetch (D: skip if unchanged)
     let lastActualLoad = 0;    // timestamp of the last actual fetch (B: throttle the today-poll)
     let otCache = null;        // { date, shifts, morning_shift } from the last OT pull (C: dedup)
@@ -3590,12 +3588,7 @@
       if (els.actRateBadge) els.actRateBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       if (els.actRateSub) els.actRateSub.textContent = n.toLocaleString() + ' rows · ' + pcs.toLocaleString() + ' pcs' + (wholeDay ? ' · ทั้งวัน' : '');
       if (els.actWorkBadge) els.actWorkBadge.textContent = (Math.round(wh * 100) / 100).toLocaleString();
-      const prodVal = rate > 0 ? wh / rate : 0;
-      if (els.actProdBadge) {
-        els.actProdBadge.textContent = (Math.round(prodVal * 100) / 100).toLocaleString();
-        els.actProdBadge.classList.toggle('danger', prodVal > 0.89);
-      }
-      actStats = { rate, result: prodVal };
+      actStats = { rate };
       renderProdChart();
     }
     // Process cycle time per unit (seconds) for a row, from the baked CT data.
@@ -3693,11 +3686,7 @@
       renderCtItemTable(itemAgg, ctSec);
       els.simBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       els.simSub.textContent = n.toLocaleString() + ' rows \u00B7 ' + qty.toLocaleString() + ' pcs';
-      const wh = num(els.workHour.value);
-      const prod = rate > 0 ? wh / rate : 0;
-      els.prodBadge.textContent = (Math.round(prod * 100) / 100).toLocaleString();
-      els.prodBadge.classList.toggle('danger', prod > 0.89);
-      simStats = { rate, result: prod };
+      simStats = { rate };
       renderProdChart();
     }
     // Compact comparison bars. Keeping this dependency-free lets the dashboard
@@ -3708,7 +3697,6 @@
       const round = (v, d) => Math.round(v * Math.pow(10, d)) / Math.pow(10, d);
       const metrics = [
         { name: 'Unit Rate', plan: simStats.rate,   act: actStats.rate,   dec: 1 },
-        { name: 'Result',    plan: simStats.result, act: actStats.result, dec: 2 },
       ];
       wrap.replaceChildren();
       for (const m of metrics) {
