@@ -1448,7 +1448,6 @@
               <span class="ct-proc"><span class="ct-proc-name">Expander</span><span class="ct-proc-val" id="ctExpander">0</span></span>
               <span class="ct-proc"><span class="ct-proc-name">Auto-Brazing</span><span class="ct-proc-val" id="ctAutoBrazing">0</span></span>
               <span class="ct-proc"><span class="ct-proc-name">Cutting</span><span class="ct-proc-val" id="ctCutting">0</span></span>
-              <span class="ct-proc ct-total"><span class="ct-proc-name">Total</span><span class="ct-proc-val" id="ctTotal">0</span></span>
             </div>
             <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
               <thead>
@@ -1791,7 +1790,7 @@
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
       ctFinpress: document.getElementById('ctFinpress'), ctHpbender: document.getElementById('ctHpbender'),
       ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
-      ctCutting: document.getElementById('ctCutting'), ctTotal: document.getElementById('ctTotal'),
+      ctCutting: document.getElementById('ctCutting'),
       missingCtCount: document.getElementById('missingCtCount'),
       editMissingCtBtn: document.getElementById('editMissingCtBtn'),
       changeoverMinInput: document.getElementById('changeoverMinInput'),
@@ -3737,8 +3736,6 @@
       els.ctExpander.textContent = ctHr(ctSec.expander / machinesOf('expander'));
       els.ctAutoBrazing.textContent = ctHr(ctSec.autoBrazing / machinesOf('autoBrazing'));
       els.ctCutting.textContent = ctHr(ctSec.cutting / machinesOf('cutting'));
-      const totalSec = CT_PROCS.reduce((s, p) => s + ctSec[p] / machinesOf(p), 0);
-      els.ctTotal.textContent = ctHr(totalSec);
       if (els.missingCtCount) {
         els.missingCtCount.textContent = missing ? `(${missing} rows)` : '(0)';
         els.missingCtCount.style.color = missing ? '#d97706' : '#16a34a';
