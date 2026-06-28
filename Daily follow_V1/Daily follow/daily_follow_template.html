@@ -908,8 +908,19 @@
     }
     .ct-matrix tbody tr + tr td { border-top: 1px solid var(--grid); }
     .ct-matrix td:last-child { font-weight: 800; }
-    .ct-matrix .ct-change td { color: var(--missing); }
+    .ct-matrix .ct-change td { color: #111827; }
     .ct-matrix .ct-grand td { background: #eef3ff; color: var(--primary-dark); font-weight: 800; }
+    .ct-editor-panel { width: min(1100px, 96vw); }
+    .ct-editor-body { padding: 12px 18px; overflow: auto; }
+    .ct-editor-grid {
+      display: grid; grid-template-columns: 130px minmax(180px, 1fr) repeat(5, 100px);
+      gap: 6px; align-items: center; min-width: 850px;
+    }
+    .ct-editor-grid .head { font-size: 10px; font-weight: 800; color: #64748b; text-transform: uppercase; }
+    .ct-editor-grid .item { font-weight: 800; color: #1e3a8a; }
+    .ct-editor-grid .desc { color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ct-editor-grid input { width: 100%; min-width: 0; height: 30px; }
+    .ct-editor-empty { padding: 28px; text-align: center; color: #64748b; }
     .sim-clear {
       height: 32px;
       padding: 0 14px;
@@ -1319,7 +1330,9 @@
                   <label class="machine-row">Expander<input id="mcExpander" type="number" min="1" step="1" value="1"></label>
                   <label class="machine-row">Brazing<input id="mcBrazing" type="number" min="1" step="1" value="1"></label>
                   <label class="machine-row">Cutting<input id="mcCutting" type="number" min="1" step="1" value="1"></label>
+                  <label class="machine-row">Model change loss (min)<input id="changeoverMinInput" type="number" min="0" step="1" value="15"></label>
                 </div>
+                <button id="editMissingCtBtn" class="dm-item" type="button">&#9998; Edit Missing CT <span id="missingCtCount"></span></button>
                 <div class="dm-sep"></div>
                 <button id="defaultDisplayBtn" class="dm-item dm-reset" type="button" title="Reset all column widths back to fit-the-screen">Default display</button>
                 <div class="dm-sep"></div>
@@ -1436,7 +1449,6 @@
               <span class="ct-proc"><span class="ct-proc-name">Auto-Brazing</span><span class="ct-proc-val" id="ctAutoBrazing">0</span></span>
               <span class="ct-proc"><span class="ct-proc-name">Cutting</span><span class="ct-proc-val" id="ctCutting">0</span></span>
               <span class="ct-proc ct-total"><span class="ct-proc-name">Total</span><span class="ct-proc-val" id="ctTotal">0</span></span>
-              <span class="ct-miss" id="ctMiss"></span>
             </div>
             <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
               <thead>
@@ -1529,6 +1541,18 @@
       <div class="target-actions">
         <button id="targetReset" class="clear-btn" type="button">Reset to default</button>
         <button id="targetSave" class="target-save" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+  <div id="ctEditorOverlay" class="dash-overlay" hidden>
+    <div class="dash-panel ct-editor-panel">
+      <div class="dash-head">
+        <div class="dash-title">Edit Missing Cycle Time (sec/pc)</div>
+        <button id="ctEditorClose" class="dash-close" type="button">&#10005;</button>
+      </div>
+      <div id="ctEditorBody" class="ct-editor-body"></div>
+      <div class="target-actions">
+        <button id="ctEditorSave" class="target-save" type="button">Save CT</button>
       </div>
     </div>
   </div>
@@ -1768,7 +1792,13 @@
       ctFinpress: document.getElementById('ctFinpress'), ctHpbender: document.getElementById('ctHpbender'),
       ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
       ctCutting: document.getElementById('ctCutting'), ctTotal: document.getElementById('ctTotal'),
-      ctMiss: document.getElementById('ctMiss'),
+      missingCtCount: document.getElementById('missingCtCount'),
+      editMissingCtBtn: document.getElementById('editMissingCtBtn'),
+      changeoverMinInput: document.getElementById('changeoverMinInput'),
+      ctEditorOverlay: document.getElementById('ctEditorOverlay'),
+      ctEditorBody: document.getElementById('ctEditorBody'),
+      ctEditorClose: document.getElementById('ctEditorClose'),
+      ctEditorSave: document.getElementById('ctEditorSave'),
       ctItemTable: document.getElementById('ctItemTable'), ctItemBody: document.getElementById('ctItemBody'),
       mcFinpress: document.getElementById('mcFinpress'), mcHpbender: document.getElementById('mcHpbender'),
       mcExpander: document.getElementById('mcExpander'), mcBrazing: document.getElementById('mcBrazing'),
@@ -2471,6 +2501,20 @@
       els.importStock.addEventListener('change', importStockData);
       els.importRouting.addEventListener('change', importRoutingData);
       syncMachineInputs();
+      if (els.changeoverMinInput) {
+        els.changeoverMinInput.value = changeoverMin;
+        els.changeoverMinInput.addEventListener('input', () => {
+          changeoverMin = Math.max(0, Number(els.changeoverMinInput.value) || 0);
+          localStorage.setItem('dailyFollowChangeoverMin', String(changeoverMin));
+          updateSimReadout();
+        });
+      }
+      if (els.editMissingCtBtn) els.editMissingCtBtn.addEventListener('click', openCtEditor);
+      if (els.ctEditorClose) els.ctEditorClose.addEventListener('click', () => { els.ctEditorOverlay.hidden = true; });
+      if (els.ctEditorSave) els.ctEditorSave.addEventListener('click', saveCtEditor);
+      if (els.ctEditorOverlay) els.ctEditorOverlay.addEventListener('click', e => {
+        if (e.target === els.ctEditorOverlay) els.ctEditorOverlay.hidden = true;
+      });
       for (const [elId, p] of MACHINE_INPUTS) {
         const inp = els[elId];
         if (!inp) continue;
@@ -3616,7 +3660,9 @@
     // Process cycle time per unit (seconds) for a row, from the baked CT data.
     // Finpress -> Auto-Brazing come from the *-CT columns, Cutting from Cutting-Sec.
     const CT_PROCS = ['finpress', 'hpbender', 'expander', 'autoBrazing', 'cutting'];
-    function ctOf(row) { return (DATA.ct && DATA.ct[row.item]) || null; }
+    let ctOverrides = {};
+    try { ctOverrides = JSON.parse(localStorage.getItem('dailyFollowCtOverrides') || '{}') || {}; } catch (e) { ctOverrides = {}; }
+    function ctOf(row) { return ctOverrides[row.item] || (DATA.ct && DATA.ct[row.item]) || null; }
 
     // Machines running in parallel per process (entered in Data Management).
     // Planned cycle time is divided by this to get wall-clock hours.
@@ -3635,6 +3681,53 @@
     function syncMachineInputs() {
       for (const [elId, p] of MACHINE_INPUTS) if (els[elId]) els[elId].value = machineCounts[p];
     }
+    function editableCtRows() {
+      const source = selected.size ? [...selected].map(id => byId.get(id)).filter(Boolean) : filtered;
+      const items = new Map();
+      for (const row of source) {
+        if (!row.item || (DATA.ct && DATA.ct[row.item])) continue;
+        if (!items.has(row.item)) items.set(row.item, row);
+      }
+      return [...items.values()];
+    }
+    function openCtEditor() {
+      closeDataMenu();
+      const rows = editableCtRows();
+      if (!rows.length) {
+        els.ctEditorBody.innerHTML = '<div class="ct-editor-empty">No missing CT items in the current selection.</div>';
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'ct-editor-grid';
+        ['Item', 'Description', 'Fin Press', 'HP Bender', 'Expander', 'Auto-Brazing', 'Cutting'].forEach(text => {
+          const head = document.createElement('div'); head.className = 'head'; head.textContent = text; grid.appendChild(head);
+        });
+        for (const row of rows) {
+          const current = ctOverrides[row.item] || {};
+          const item = document.createElement('div'); item.className = 'item'; item.textContent = row.item;
+          const desc = document.createElement('div'); desc.className = 'desc'; desc.textContent = row.description || '';
+          grid.append(item, desc);
+          for (const proc of CT_PROCS) {
+            const input = document.createElement('input');
+            input.type = 'number'; input.min = '0'; input.step = '0.01';
+            input.value = current[proc] ?? '';
+            input.dataset.item = row.item; input.dataset.proc = proc;
+            grid.appendChild(input);
+          }
+        }
+        els.ctEditorBody.replaceChildren(grid);
+      }
+      els.ctEditorOverlay.hidden = false;
+    }
+    function saveCtEditor() {
+      for (const input of els.ctEditorBody.querySelectorAll('input[data-item]')) {
+        const item = input.dataset.item;
+        if (!ctOverrides[item]) ctOverrides[item] = {};
+        ctOverrides[item][input.dataset.proc] = Math.max(0, Number(input.value) || 0);
+      }
+      localStorage.setItem('dailyFollowCtOverrides', JSON.stringify(ctOverrides));
+      els.ctEditorOverlay.hidden = true;
+      updateSimReadout();
+    }
 
     function ctHr(sec) { return (Math.round((sec / 3600) * 100) / 100).toLocaleString(); }
     function renderCtBreakdown(ctSec, missing) {
@@ -3646,23 +3739,27 @@
       els.ctCutting.textContent = ctHr(ctSec.cutting / machinesOf('cutting'));
       const totalSec = CT_PROCS.reduce((s, p) => s + ctSec[p] / machinesOf(p), 0);
       els.ctTotal.textContent = ctHr(totalSec);
-      els.ctMiss.textContent = missing ? `· ${missing} row${missing === 1 ? '' : 's'} ไม่มี CT` : '';
+      if (els.missingCtCount) {
+        els.missingCtCount.textContent = missing ? `(${missing} rows)` : '(0)';
+        els.missingCtCount.style.color = missing ? '#d97706' : '#16a34a';
+      }
     }
 
     // Changing model between different items costs a setup (changeover) on each
     // process. (distinct items - 1) changes x 15 min, charged per process.
-    const CHANGEOVER_MIN = 15;
+    let changeoverMin = Number(localStorage.getItem('dailyFollowChangeoverMin') || 15);
+    if (!Number.isFinite(changeoverMin) || changeoverMin < 0) changeoverMin = 15;
     function renderCtItemTable(itemAgg, ctSec) {
       if (!els.ctItemTable) return;
       if (itemAgg.size === 0) { els.ctItemTable.hidden = true; return; }
       els.ctItemTable.hidden = false;
       const changes = Math.max(0, itemAgg.size - 1);
-      const lossHr = changes * CHANGEOVER_MIN / 60;            // same loss on every process
+      const lossHr = changes * changeoverMin / 60;            // same loss on every process
       const cycleHr = p => ctSec[p] / machinesOf(p) / 3600;   // wall-clock CT per process
 
       const rows = [
         { label: 'Cycle time', cls: '', val: p => cycleHr(p) },
-        { label: `Model change loss (${changes}×${CHANGEOVER_MIN}m)`, cls: 'ct-change', val: () => lossHr },
+        { label: `Model change loss (${changes}×${changeoverMin}m)`, cls: 'ct-change', val: () => lossHr },
         { label: 'รวม (Total)', cls: 'ct-grand', val: p => cycleHr(p) + lossHr },
       ];
       const fmt = v => (Math.round(v * 100) / 100).toLocaleString();
