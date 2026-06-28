@@ -873,29 +873,30 @@
     .ct-total { background: #eef3ff; border-color: #cdddf8; }
     .ct-total .ct-proc-val { color: var(--primary-dark); }
     .ct-miss { font-size: 11px; font-weight: 700; color: var(--missing); }
-    .ct-item-table {
+    .ct-matrix {
       margin-top: 8px;
       border-collapse: collapse;
       width: 100%;
-      max-width: 560px;
+      max-width: 620px;
       font-size: 11.5px;
       background: #fff;
       border: 1px solid #cdddf8;
       border-radius: 10px;
       overflow: hidden;
     }
-    .ct-item-table th, .ct-item-table td { padding: 5px 10px; text-align: right; white-space: nowrap; }
-    .ct-item-table th:first-child, .ct-item-table td:first-child,
-    .ct-item-table th:nth-child(2), .ct-item-table td:nth-child(2) { text-align: left; }
-    .ct-item-table thead th {
+    .ct-matrix th, .ct-matrix td {
+      padding: 5px 10px; text-align: right; white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .ct-matrix th:first-child, .ct-matrix td:first-child { text-align: left; font-weight: 700; }
+    .ct-matrix thead th {
       font-size: 10px; font-weight: 800; letter-spacing: .3px; text-transform: uppercase;
       color: var(--primary); background: #f4f8ff; border-bottom: 1px solid #cdddf8;
     }
-    .ct-item-table td:nth-child(2) { color: var(--ink-soft); max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-    .ct-item-table tbody tr + tr td { border-top: 1px solid var(--grid); }
-    .ct-item-table td:last-child, .ct-item-table th:last-child { font-variant-numeric: tabular-nums; font-weight: 800; }
-    .ct-item-table .ct-change td { border-top: 1px solid #cdddf8; color: var(--missing); font-weight: 700; }
-    .ct-item-table .ct-grand td { background: #eef3ff; color: var(--primary-dark); font-weight: 800; }
+    .ct-matrix tbody tr + tr td { border-top: 1px solid var(--grid); }
+    .ct-matrix td:last-child { font-weight: 800; }
+    .ct-matrix .ct-change td { color: var(--missing); }
+    .ct-matrix .ct-grand td { background: #eef3ff; color: var(--primary-dark); font-weight: 800; }
     .sim-clear {
       height: 32px;
       padding: 0 14px;
@@ -1397,12 +1398,11 @@
                 <span class="ct-proc ct-total"><span class="ct-proc-name">Total</span><span class="ct-proc-val" id="ctTotal">0</span></span>
                 <span class="ct-miss" id="ctMiss"></span>
               </div>
-              <table class="ct-item-table" id="ctItemTable" hidden title="สรุป Cycle Time แยกตาม Item (ไม่รวม Hair Pin) รวมเวลาเปลี่ยนรุ่น 15 นาที/ครั้ง">
+              <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
                 <thead>
-                  <tr><th>Item</th><th>Description</th><th>Qty</th><th>CT (hr)</th></tr>
+                  <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th><th>Total (Hrs.)</th></tr>
                 </thead>
                 <tbody id="ctItemBody"></tbody>
-                <tfoot id="ctItemFoot"></tfoot>
               </table>
               <span id="simOtInfo" class="sim-ot-info"></span>
             </div>
@@ -1755,7 +1755,6 @@
       ctCutting: document.getElementById('ctCutting'), ctTotal: document.getElementById('ctTotal'),
       ctMiss: document.getElementById('ctMiss'),
       ctItemTable: document.getElementById('ctItemTable'), ctItemBody: document.getElementById('ctItemBody'),
-      ctItemFoot: document.getElementById('ctItemFoot'),
       mcFinpress: document.getElementById('mcFinpress'), mcHpbender: document.getElementById('mcHpbender'),
       mcExpander: document.getElementById('mcExpander'), mcBrazing: document.getElementById('mcBrazing'),
       mcCutting: document.getElementById('mcCutting'),
@@ -3635,39 +3634,34 @@
       els.ctMiss.textContent = missing ? `· ${missing} row${missing === 1 ? '' : 's'} ไม่มี CT` : '';
     }
 
-    // Changing model between different items costs setup (changeover) time.
+    // Changing model between different items costs a setup (changeover) on each
+    // process. (distinct items - 1) changes x 15 min, charged per process.
     const CHANGEOVER_MIN = 15;
     function renderCtItemTable(itemAgg, ctSec) {
       if (!els.ctItemTable) return;
       if (itemAgg.size === 0) { els.ctItemTable.hidden = true; return; }
       els.ctItemTable.hidden = false;
-      // Per-item wall-clock hours = sum over processes of (Qty x CT / machines) / 3600.
-      const items = [...itemAgg.entries()].map(([item, a]) => ({
-        item, qty: a.qty, desc: a.desc,
-        hr: CT_PROCS.reduce((s, p) => s + a.sec[p] / machinesOf(p), 0) / 3600,
-      })).sort((x, y) => y.hr - x.hr);
-      let totalQty = 0;
+      const changes = Math.max(0, itemAgg.size - 1);
+      const lossHr = changes * CHANGEOVER_MIN / 60;            // same loss on every process
+      const cycleHr = p => ctSec[p] / machinesOf(p) / 3600;   // wall-clock CT per process
+
+      const rows = [
+        { label: 'Cycle time', cls: '', val: p => cycleHr(p) },
+        { label: `Model change loss (${changes}×${CHANGEOVER_MIN}m)`, cls: 'ct-change', val: () => lossHr },
+        { label: 'รวม (Total)', cls: 'ct-grand', val: p => cycleHr(p) + lossHr },
+      ];
+      const fmt = v => (Math.round(v * 100) / 100).toLocaleString();
       els.ctItemBody.innerHTML = '';
-      for (const it of items) {
-        totalQty += it.qty;
+      for (const r of rows) {
         const tr = document.createElement('tr');
-        const cells = [it.item, it.desc, it.qty.toLocaleString(), (Math.round(it.hr * 100) / 100).toLocaleString()];
-        for (let i = 0; i < cells.length; i++) {
-          const td = document.createElement('td');
-          td.textContent = cells[i];
-          tr.appendChild(td);
-        }
+        if (r.cls) tr.className = r.cls;
+        let rowTotal = 0;
+        const cells = [r.label];
+        for (const p of CT_PROCS) { const v = r.val(p); rowTotal += v; cells.push(fmt(v)); }
+        cells.push(fmt(rowTotal));
+        for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
         els.ctItemBody.appendChild(tr);
       }
-      // Changeover happens between different items: (distinct items - 1) changes.
-      const changes = Math.max(0, items.length - 1);
-      const changeHr = changes * CHANGEOVER_MIN / 60;
-      const procHr = CT_PROCS.reduce((s, p) => s + ctSec[p] / machinesOf(p), 0) / 3600;
-      const grandHr = procHr + changeHr;
-      const round2 = v => (Math.round(v * 100) / 100).toLocaleString();
-      els.ctItemFoot.innerHTML =
-        `<tr class="ct-change"><td colspan="3">เปลี่ยนรุ่น ${changes} ครั้ง × ${CHANGEOVER_MIN} นาที</td><td>${round2(changeHr)}</td></tr>` +
-        `<tr class="ct-grand"><td colspan="2">รวมทั้งหมด (+ เปลี่ยนรุ่น)</td><td>${totalQty.toLocaleString()}</td><td>${round2(grandHr)}</td></tr>`;
     }
 
     function updateSimReadout() {
