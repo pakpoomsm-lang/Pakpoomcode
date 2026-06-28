@@ -551,6 +551,14 @@
     .dm-sep { height: 1px; background: var(--border); margin: 3px 4px; }
     .dm-toggle.vis-toggle::before { content: "\1F441\FE0E"; }
     .dm-label { font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }
+    .freeze-control {
+      display: grid; gap: 5px; padding: 7px 12px 10px;
+      color: var(--ink-soft); font-size: 10px; font-weight: 700;
+    }
+    .freeze-control select {
+      width: 100%; min-width: 190px; height: 30px;
+      font-size: 11px; text-transform: none;
+    }
     .dlv-hidden-info { font: 600 11.5px/1.4 inherit; color: var(--muted); padding: 2px 12px 6px; max-width: 220px; }
     .dlv-hidden-info b { color: var(--primary); }
     .badge.dlv-hideable { padding-right: 4px; }
@@ -1196,6 +1204,10 @@
       box-shadow: inset 0 -2px 0 rgba(0,0,0,.12);
     }
     th:hover { filter: brightness(1.08); }
+    th.freeze-col { z-index: 6; }
+    td.freeze-col { position: sticky; z-index: 2; background: #fff; }
+    td.editable.freeze-col { background: var(--edit-tint); }
+    .freeze-edge { box-shadow: 5px 0 8px -6px rgba(15,23,42,.55); }
     th .th-hide {
       position: absolute;
       top: 50%;
@@ -1430,6 +1442,10 @@
                 <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
                 <button id="hideCnclBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Assy Status is CNCL">Hide CNCL</button>
                 <button id="hideSkipBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Assy Status is SKIP">Hide Skip</button>
+                <div class="dm-sep"></div>
+                <label class="freeze-control">Freeze columns through
+                  <select id="freezeColumnSelect" title="Keep columns fixed through the selected column while scrolling horizontally"></select>
+                </label>
                 <div class="dm-sep"></div>
                 <div class="dm-label">Hidden DLV records</div>
                 <div id="dlvHiddenInfo" class="dlv-hidden-info">None hidden yet. Click the &#10005; on a DLV row to hide it.</div>
@@ -1873,6 +1889,7 @@
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
       hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
+      freezeColumnSelect: document.getElementById('freezeColumnSelect'),
       dlvLineList: document.getElementById('dlvLineList'),
       fillHandle: document.getElementById('fillHandle'),
       dashOverlay: document.getElementById('dashOverlay'),
@@ -1909,6 +1926,7 @@
     let colWidths = {};
     try { colWidths = JSON.parse(localStorage.getItem('dailyFollowColWidths') || '{}') || {}; } catch (e) { colWidths = {}; }
     function saveColWidths() { localStorage.setItem('dailyFollowColWidths', JSON.stringify(colWidths)); }
+    let freezeField = localStorage.getItem('dailyFollowFreezeField') || '';
     const columnTitle = Object.fromEntries(columns.map(([field, title]) => [field, title]));
     let sortKey = 'prodSort';
     let sortDir = 1;
@@ -2246,6 +2264,13 @@
         els.visCtrlBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
       if (els.visCtrlMenu) els.visCtrlMenu.addEventListener('click', (e) => e.stopPropagation());
+      if (els.freezeColumnSelect) {
+        els.freezeColumnSelect.addEventListener('change', () => {
+          freezeField = els.freezeColumnSelect.value;
+          localStorage.setItem('dailyFollowFreezeField', freezeField);
+          applyFrozenColumns();
+        });
+      }
       document.addEventListener('click', () => {
         if (els.visCtrlMenu && !els.visCtrlMenu.hidden) {
           els.visCtrlMenu.hidden = true;
@@ -3276,6 +3301,61 @@
       const visible = columns.filter(([field]) => !hidden.has(field));
       return visible.length ? visible : columns;
     }
+    function renderFreezeOptions() {
+      if (!els.freezeColumnSelect) return;
+      const previous = freezeField;
+      els.freezeColumnSelect.replaceChildren();
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'None';
+      els.freezeColumnSelect.appendChild(none);
+      for (const [field, title] of activeCols) {
+        const option = document.createElement('option');
+        option.value = field;
+        option.textContent = field === '_sel' ? 'Selection' : title;
+        els.freezeColumnSelect.appendChild(option);
+      }
+      if (activeCols.some(([field]) => field === previous)) {
+        els.freezeColumnSelect.value = previous;
+      } else {
+        freezeField = '';
+        els.freezeColumnSelect.value = '';
+        localStorage.setItem('dailyFollowFreezeField', '');
+      }
+    }
+    function applyFrozenColumns() {
+      const table = els.header.closest('table');
+      if (!table) return;
+      table.querySelectorAll('.freeze-col, .freeze-edge').forEach(cell => {
+        cell.classList.remove('freeze-col', 'freeze-edge');
+        cell.style.left = '';
+      });
+      if (!freezeField) return;
+      const freezeIndex = activeCols.findIndex(([field]) => field === freezeField);
+      if (freezeIndex < 0) return;
+      const headers = [...els.header.children];
+      let left = 0;
+      for (let index = 0; index <= freezeIndex; index++) {
+        const header = headers[index];
+        if (!header) break;
+        header.classList.add('freeze-col');
+        header.style.left = left + 'px';
+        for (const row of els.body.querySelectorAll('tr:not(.spacer)')) {
+          const cell = row.children[index];
+          if (!cell) continue;
+          cell.classList.add('freeze-col');
+          cell.style.left = left + 'px';
+        }
+        if (index === freezeIndex) {
+          header.classList.add('freeze-edge');
+          for (const row of els.body.querySelectorAll('tr:not(.spacer)')) {
+            const cell = row.children[index];
+            if (cell) cell.classList.add('freeze-edge');
+          }
+        }
+        left += header.getBoundingClientRect().width;
+      }
+    }
     function renderHeader(activeColumns) {
       els.header.replaceChildren();
       activeColumns.forEach(([field, title]) => {
@@ -3358,9 +3438,10 @@
           grip.classList.remove('active');
           document.body.classList.remove('col-resizing');
           saveColWidths();
+          applyFrozenColumns();
         };
         document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
+      document.addEventListener('mouseup', onUp);
       });
       th.appendChild(grip);
     }
@@ -3671,12 +3752,14 @@
       activeCols = visibleColumns();
       renderColgroup(activeCols);
       renderHeader(activeCols);
+      renderFreezeOptions();
       renderHiddenBar();
       winStart = winEnd = -1;
       renderWindow(true);
       updateSimReadout();
       updateActualReadout();
       renderProdChart();
+      applyFrozenColumns();
     }
     function renderColgroup(cols) {
       const frag = document.createDocumentFragment();
@@ -3835,6 +3918,7 @@
         }
       }
       highlightPending();
+      applyFrozenColumns();
     }
     function onScroll() {
       if (scrollTicking) return;
