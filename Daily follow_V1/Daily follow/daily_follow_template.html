@@ -3970,18 +3970,16 @@
     }
     function round1(n) { return Math.round(n * 10) / 10; }
     function ltColor(h) {
-      if (h < 4) return '#b91c1c';
-      if (h <= 10) return '#f5b700';
-      if (h <= 20) return '#15643a';
-      if (h <= 40) return '#1a3a9e';
-      return '#4c1d95';
+      if (h < 4) return '#ef4444';
+      if (h <= 10) return '#facc15';
+      if (h <= 20) return '#22c55e';
+      return '#2563eb';
     }
     function ltBg(h) {
-      if (h < 4) return '#fca5a5';
-      if (h <= 10) return '#fcd34d';
-      if (h <= 20) return '#6ee7a0';
-      if (h <= 40) return '#93c5fd';
-      return '#d8b4fe';
+      if (h < 4) return '#fee2e2';
+      if (h <= 10) return '#fef9c3';
+      if (h <= 20) return '#dcfce7';
+      return '#dbeafe';
     }
     function defaultAssyTarget(line) { return 4; }
     function defaultScTarget(line) {
@@ -4001,35 +3999,31 @@
     }
     function assyColor(h, line) {
       const t = assyTarget(line);
-      if (h < t) return '#b91c1c';
-      if (h <= 10) return '#f5b700';
-      if (h <= 20) return '#15643a';
-      if (h <= 40) return '#1a3a9e';
-      return '#4c1d95';
+      if (h < t) return '#ef4444';
+      if (h <= 10) return '#facc15';
+      if (h <= 20) return '#22c55e';
+      return '#2563eb';
     }
     function assyBg(h, line) {
       const t = assyTarget(line);
-      if (h < t) return '#fca5a5';
-      if (h <= 10) return '#fcd34d';
-      if (h <= 20) return '#6ee7a0';
-      if (h <= 40) return '#93c5fd';
-      return '#d8b4fe';
+      if (h < t) return '#fee2e2';
+      if (h <= 10) return '#fef9c3';
+      if (h <= 20) return '#dcfce7';
+      return '#dbeafe';
     }
     function scColor(h, line) {
       const t = scTarget(line);
-      if (h <= t) return '#b91c1c';
-      if (h <= 10) return '#92620a';
-      if (h <= 20) return '#15643a';
-      if (h <= 40) return '#1a3a9e';
-      return '#4c1d95';
+      if (h <= t) return '#ef4444';
+      if (h <= 10) return '#facc15';
+      if (h <= 20) return '#22c55e';
+      return '#2563eb';
     }
     function scBg(h, line) {
       const t = scTarget(line);
-      if (h <= t) return '#fca5a5';
-      if (h <= 10) return '#fcd34d';
-      if (h <= 20) return '#6ee7a0';
-      if (h <= 40) return '#93c5fd';
-      return '#d8b4fe';
+      if (h <= t) return '#fee2e2';
+      if (h <= 10) return '#fef9c3';
+      if (h <= 20) return '#dcfce7';
+      return '#dbeafe';
     }
     function dashStat(label, value, cls) {
       const box = document.createElement('div');
@@ -4091,7 +4085,7 @@
       legend.className = 'dash-legend';
       const lgT = document.createElement('span'); lgT.className = 'dash-leg-title'; lgT.textContent = 'Target (Lead Time)';
       legend.appendChild(lgT);
-      [['#e23b3b', '< 4 hr'], ['#f5b700', '4-10 hr'], ['#1f9254', '>10-20 hr'], ['#2f56c4', '>20-40 hr'], ['#7c3aed', '>40 hr']].forEach(b => {
+      [['#ef4444', '< target'], ['#facc15', '4-10 hr'], ['#22c55e', '>10-20 hr'], ['#2563eb', '>20 hr']].forEach(b => {
         const it = document.createElement('span'); it.className = 'dash-leg-item';
         const sw = document.createElement('span'); sw.className = 'dash-leg-sw'; sw.style.background = b[0];
         it.append(sw, document.createTextNode(b[1]));
