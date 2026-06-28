@@ -622,6 +622,12 @@
     }
     .sim-tabs[hidden] { display: none; }
     .summary-view[hidden] { display: none; }
+    .productivity-layout {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .productivity-layout .prod-body { order: 1; }
+    .productivity-layout .prod-chart { order: 2; }
+    .productivity-layout .cycle-card { order: 3; }
     .lead-inline-body {
       padding: 2px 0 0; overflow: visible;
     }
@@ -1369,7 +1375,7 @@
               </button>
             </div>
           </div>
-          <div id="productivityView" class="summary-view">
+          <div id="productivityView" class="summary-view productivity-layout">
           <div class="prod-body">
             <!-- PLAN (simulator) -->
             <div class="prod-col">
@@ -1387,6 +1393,11 @@
                   <span class="sim-title" id="simWorkTitle">Working A</span>
                   <input id="workHour" class="sim-input" type="number" min="0" step="0.5" placeholder="0" title="ชั่วโมงการทำงานของ Shift นี้">
                   <span class="sim-sub">Hrs</span>
+                </div>
+                <div class="sim-cell">
+                  <span class="sim-title">Productivity</span>
+                  <span class="sim-badge" id="prodBadge" title="Working hour / Unit rate">0</span>
+                  <span class="sim-sub">Hrs./Unit rate</span>
                 </div>
                 <button id="simClear" class="sim-clear" type="button">Clear</button>
               </div>
@@ -1407,6 +1418,11 @@
                   <span class="sim-title">Working</span>
                   <span class="sim-badge" id="actWorkBadge">0</span>
                   <span class="sim-sub">Hrs</span>
+                </div>
+                <div class="sim-cell">
+                  <span class="sim-title">Productivity</span>
+                  <span class="sim-badge" id="actProdBadge" title="Working hour / Actual unit rate">0</span>
+                  <span class="sim-sub">Hrs./Unit rate</span>
                 </div>
               </div>
             </div>
@@ -1733,6 +1749,7 @@
       actRateBadge: document.getElementById('actRateBadge'),
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
+      actProdBadge: document.getElementById('actProdBadge'),
       productivityViewBtn: document.getElementById('productivityViewBtn'),
       leadDashBtn: document.getElementById('leadDashBtn'),
       productivityView: document.getElementById('productivityView'),
@@ -1746,7 +1763,7 @@
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
       targetSave: document.getElementById('targetSave'),
-      workHour: document.getElementById('workHour'),
+      workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
       ctFinpress: document.getElementById('ctFinpress'), ctHpbender: document.getElementById('ctHpbender'),
       ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
@@ -1840,8 +1857,8 @@
     let actProdDate = todayISO();
     let actProd = { D: {}, N: {} };   // production by shift for actProdDate (from server)
     let actOt = null;                 // { shifts:{A,B}, morning_shift } for actProdDate
-    let simStats = { rate: 0 };  // latest plan readout (for chart)
-    let actStats = { rate: 0 };  // latest actual readout (for chart)
+    let simStats = { rate: 0, productivity: 0 };
+    let actStats = { rate: 0, productivity: 0 };
     let lastActualDate = '';   // date of the last actual-production fetch (D: skip if unchanged)
     let lastActualLoad = 0;    // timestamp of the last actual fetch (B: throttle the today-poll)
     let otCache = null;        // { date, shifts, morning_shift } from the last OT pull (C: dedup)
@@ -3588,7 +3605,12 @@
       if (els.actRateBadge) els.actRateBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       if (els.actRateSub) els.actRateSub.textContent = n.toLocaleString() + ' rows · ' + pcs.toLocaleString() + ' pcs' + (wholeDay ? ' · ทั้งวัน' : '');
       if (els.actWorkBadge) els.actWorkBadge.textContent = (Math.round(wh * 100) / 100).toLocaleString();
-      actStats = { rate };
+      const productivity = rate > 0 ? wh / rate : 0;
+      if (els.actProdBadge) {
+        els.actProdBadge.textContent = (Math.round(productivity * 100) / 100).toLocaleString();
+        els.actProdBadge.classList.toggle('danger', productivity > 0.89);
+      }
+      actStats = { rate, productivity };
       renderProdChart();
     }
     // Process cycle time per unit (seconds) for a row, from the baked CT data.
@@ -3686,7 +3708,11 @@
       renderCtItemTable(itemAgg, ctSec);
       els.simBadge.textContent = (Math.round(rate * 10) / 10).toLocaleString();
       els.simSub.textContent = n.toLocaleString() + ' rows \u00B7 ' + qty.toLocaleString() + ' pcs';
-      simStats = { rate };
+      const wh = num(els.workHour.value);
+      const productivity = rate > 0 ? wh / rate : 0;
+      els.prodBadge.textContent = (Math.round(productivity * 100) / 100).toLocaleString();
+      els.prodBadge.classList.toggle('danger', productivity > 0.89);
+      simStats = { rate, productivity };
       renderProdChart();
     }
     // Compact comparison bars. Keeping this dependency-free lets the dashboard
