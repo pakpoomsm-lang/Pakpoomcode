@@ -330,19 +330,18 @@
     .dash-detail-row .r { text-align: right; }
     .controls {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px 14px;
-      align-items: stretch;
+      flex-direction: column;
+      gap: 10px;
       padding: 11px 20px;
       border-top: 1px solid #eef2f7;
       background: var(--surface);
     }
     .left-stack {
       display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 14px;
-      flex: 0 1 auto;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 12px 18px;
+      width: 100%;
       min-width: 0;
     }
     .filter-row {
@@ -392,7 +391,7 @@
     }
     select[multiple] option { padding: 2px 6px; border-radius: 4px; }
     input[type="search"] { min-width: 0; width: 100%; }
-    .control-search { flex: 0 1 300px; }
+    .control-search { flex: 0 1 280px; }
     .control-actions {
       display: flex;
       gap: 10px;
@@ -603,7 +602,7 @@
     /* .actual-prod-panel removed — merged into .prod-panel */
     .prod-panel {
       display: flex; flex-direction: column; gap: 12px;
-      align-self: stretch; margin-left: auto; flex: 1 1 560px; min-width: 0;
+      width: 100%; min-width: 0;
       padding: 14px 16px 15px; border: 1px solid #d9e2f0; border-radius: 16px;
       background: #f8fafc; box-shadow: 0 8px 24px rgba(15, 23, 42, .06);
     }
@@ -933,6 +932,7 @@
       flex-wrap: wrap;
       gap: 12px;
       align-items: center;
+      margin-left: auto;
     }
     .action-bar .toggle-btn,
     .action-bar .import-btn,
@@ -1261,6 +1261,9 @@
       .brand-subtitle { font-size: 8px; letter-spacing: 1.4px; }
       .connection { padding: 5px 10px; font-size: 9px; }
       .controls { padding: 10px 12px; }
+      .left-stack { align-items: stretch; flex-direction: column; }
+      .filter-row { align-items: end; }
+      .action-bar { margin-left: 0; }
       .control-actions { margin-left: 0; }
       input[type="search"] { min-width: 0; }
     }
