@@ -2946,6 +2946,12 @@
         restored = true;
       }
       if (restored) {
+        // The saved rows carry a snapshot of master data (ts, description,
+        // attribute, unit) from whenever the state was written, which goes stale
+        // when MasterTS/Routing change. Re-derive those from the freshly built
+        // DATA.routing so master fields always reflect the current build; user
+        // edits are kept separately in the `saved` overlay, so they are safe.
+        applyRoutingToRows();
         needSort = true;
         leadDirty = true;
       }
