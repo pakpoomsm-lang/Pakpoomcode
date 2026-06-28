@@ -53,6 +53,19 @@ def number(value):
     return int(f) if f.is_integer() else round(f, 3)
 
 
+def ts_number(value):
+    """Like number() but keeps 6 decimals. TS values can have 4 decimals
+    (e.g. 0.0485); rounding to 3 like number() would collapse it to 0.049 and
+    skew the unit rate (0.0485 -> 16.4, but 0.049 -> 16.6 for a lot of 200)."""
+    if value in (None, ""):
+        return ""
+    try:
+        f = float(str(value).strip())
+    except ValueError:
+        return value
+    return int(f) if f.is_integer() else round(f, 6)
+
+
 def excel_date(value):
     if value in (None, ""):
         return ""
@@ -119,7 +132,7 @@ def load_master_ts():
         "SELECT item, ts_value FROM master_ts WHERE item IS NOT NULL AND item <> ''"
     ).fetchall()
     con.close()
-    return {item: number(ts) for item, ts in rows}
+    return {item: ts_number(ts) for item, ts in rows}
 
 
 def load_routing():
@@ -134,7 +147,7 @@ def load_routing():
         material = text(row[idx["Material"]])
         if not material or material in routing:
             continue
-        ts = master_ts.get(material, number(row[idx["OPR Time Standard"]]))
+        ts = master_ts.get(material, ts_number(row[idx["OPR Time Standard"]]))
         routing[material] = {
             "description": text(row[idx["Description"]]),
             "operation": text(row[idx["Operation Text"]]),
