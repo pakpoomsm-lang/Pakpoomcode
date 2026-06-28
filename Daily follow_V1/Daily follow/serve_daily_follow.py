@@ -18,6 +18,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from collections import defaultdict
@@ -1218,6 +1219,8 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         if path in ("", "index.html"):
             path = OUTPUT_FILE.name
+        if path == OUTPUT_FILE.name:
+            _rebuild_page_if_stale()
         if path == "api/state":
             try:
                 if STATE_FILE.is_file():
@@ -1330,6 +1333,42 @@ def _detect_lan_ip():
             return None
     finally:
         s.close()
+
+
+# Files whose change should trigger a rebuild of daily_follow.html when the
+# page is requested, so a browser refresh always reflects the latest data/code
+# without restarting the server.
+_BUILD_INPUTS = [
+    bdf.TEMPLATE_FILE, bdf.EXPORT_FILE, bdf.ROUTING_FILE, bdf.PROGRESS_FILE,
+    bdf.SAMPLE_FILE, bdf.MASTER_TS_FILE, bdf.MASTER_TS_DB_FILE,
+    bdf.CT_XLSX_FILE, bdf.CT_DB_FILE,
+    Path(__file__).resolve(), Path(bdf.__file__).resolve(),
+]
+_rebuild_lock = threading.Lock()
+
+
+def _rebuild_page_if_stale():
+    """Rebuild daily_follow.html if any source file or the build code is newer
+    than it. Lets an edited MasterTS/CT/export show up on a plain refresh."""
+    with _rebuild_lock:
+        try:
+            if not OUTPUT_FILE.exists():
+                bdf.main()
+                return
+            out_mtime = OUTPUT_FILE.stat().st_mtime
+            newest = 0.0
+            for p in _BUILD_INPUTS:
+                try:
+                    if p.exists():
+                        newest = max(newest, p.stat().st_mtime)
+                except OSError:
+                    pass
+            if newest > out_mtime:
+                print("Source changed — rebuilding daily_follow.html …")
+                bdf.main()
+        except Exception as exc:
+            # Serve the existing page rather than 500 if a rebuild fails.
+            print(f"[warn] rebuild skipped: {exc}")
 
 
 def main():
