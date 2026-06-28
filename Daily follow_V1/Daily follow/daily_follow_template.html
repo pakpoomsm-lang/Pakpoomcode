@@ -718,10 +718,10 @@
     }
     .lead-lines-grid .dline { margin: 0; }
     .lead-lines-grid .dash-detail { grid-column: 1 / -1; padding: 6px 0 2px 40px; }
-    @media (max-width: 1500px) {
+    @media (max-width: 1180px) {
       .lead-lines-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-    @media (max-width: 900px) {
+    @media (max-width: 760px) {
       .lead-lines-grid { grid-template-columns: 1fr; }
     }
     .prod-link {
@@ -765,7 +765,7 @@
     .prod-bar-fill.actual { background: #f59e0b; }
     .prod-bar-value { text-align: right; font-size: 10.5px; font-weight: 750; color: #334155; font-variant-numeric: tabular-nums; }
     .prod-gap { margin-top: 7px; font-size: 9.5px; font-weight: 700; color: #64748b; }
-    @media (max-width: 1000px) {
+    @media (max-width: 760px) {
       .prod-body, .prod-bars { grid-template-columns: 1fr; }
     }
     .lead-legend { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
@@ -1161,6 +1161,7 @@
       border-spacing: 0;
       table-layout: fixed;
       width: 100%;
+      min-width: 1600px;
     }
     table.sized { width: max-content; min-width: 100%; }
     table.sized th, table.sized td { max-width: none; }
@@ -1367,16 +1368,28 @@
       .sim-tab { padding: 3px 10px; }
       .sim-date, .sim-pull { height: 26px; }
     }
-    @media (max-width: 900px) {
+    @media (max-width: 1400px) {
+      .left-stack { grid-template-columns: minmax(560px, 1fr) auto; gap: 10px; }
+      .filter-row { gap: 8px; }
+      .control-search { max-width: 290px; }
+      .action-bar { gap: 8px; }
+      .dm-toggle { min-width: 138px; height: 34px; padding: 0 11px; }
+      .sap-btn { height: 34px; padding: 0 12px; }
+    }
+    @media (max-width: 1100px) {
+      .left-stack { display: flex; align-items: stretch; flex-direction: column; }
+      .filter-row { align-items: end; flex-wrap: nowrap; }
+      .action-bar { margin-left: 0; justify-content: flex-end; }
+    }
+    @media (max-width: 760px) {
       .banner { height: 54px; padding: 0 12px; }
       .brand { min-width: 0; }
       .brand-title { font-size: 12px; }
       .brand-subtitle { font-size: 8px; letter-spacing: 1.4px; }
       .connection { padding: 5px 10px; font-size: 9px; }
       .controls { padding: 10px 12px; }
-      .left-stack { display: flex; align-items: stretch; flex-direction: column; }
       .filter-row { align-items: end; flex-wrap: wrap; }
-      .action-bar { margin-left: 0; }
+      .action-bar { justify-content: flex-start; }
       .control-actions { margin-left: 0; }
       input[type="search"] { min-width: 0; }
     }
