@@ -1206,6 +1206,7 @@
                 <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
                 <button id="hideCnclBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Assy Status is CNCL">Hide CNCL</button>
                 <button id="hideSkipBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Assy Status is SKIP">Hide Skip</button>
+                <button id="hideOldDlvBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show DLV rows whose Prod.Date is 2 or more days old (e.g. today 28 hides 26 and earlier)">Hide old DLV (&ge;2 days)</button>
                 <div class="dm-sep"></div>
                 <label class="freeze-control">Freeze columns through
                   <select id="freezeColumnSelect" title="Keep columns fixed through the selected column while scrolling horizontally"></select>
@@ -1657,6 +1658,7 @@
       workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
       hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
+      hideOldDlvBtn: document.getElementById('hideOldDlvBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
       freezeColumnSelect: document.getElementById('freezeColumnSelect'),
       dlvLineList: document.getElementById('dlvLineList'),
@@ -1672,6 +1674,7 @@
     let hideHairPin = localStorage.getItem('dailyFollowHideHair') === '1';
     let hideCncl = localStorage.getItem('dailyFollowHideCncl') === '1';
     let hideAssySkip = localStorage.getItem('dailyFollowHideSkip') === '1';
+    let autoHideOldDlv = localStorage.getItem('dailyFollowAutoHideDlv') !== '0';  // on by default
     let hiddenDlvRecords = new Set();
     try { hiddenDlvRecords = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenDlv') || '[]')); } catch (e) { hiddenDlvRecords = new Set(); }
     function saveHiddenDlv() { localStorage.setItem('dailyFollowHiddenDlv', JSON.stringify([...hiddenDlvRecords])); }
@@ -1689,6 +1692,25 @@
     // Stable business key so a hidden record stays hidden across data reloads.
     function recordKey(row) {
       return [row.line, row.month, row.seq, row.productionOrder, row.assyOrderNo, row.item].join('|');
+    }
+    // Auto-hide stale deliveries: a DLV row whose Prod.Date is this many days or
+    // more in the past (e.g. today = 28 -> hide 26 and older).
+    const DLV_AUTO_HIDE_DAYS = 2;
+    function dlvAutoHideCutoff() {
+      const d = new Date();
+      d.setDate(d.getDate() - DLV_AUTO_HIDE_DAYS);
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function isOldDlv(row) {
+      // prodDate is a 'YYYY-MM-DD' string, so a plain string compare is chronological.
+      return isDlv(row) && row.prodDate && row.prodDate <= dlvAutoHideCutoff();
+    }
+    // A DLV row is hidden if the user hid it by hand, or it's an old delivery and
+    // the auto-hide toggle is on.
+    function isDlvHidden(row) {
+      if (!isDlv(row)) return false;
+      if (hiddenDlvRecords.has(recordKey(row))) return true;
+      return autoHideOldDlv && isOldDlv(row);
     }
     let okSet = new Set(JSON.parse(localStorage.getItem('dailyFollowOk') || '[]'));
     let hidden = new Set(JSON.parse(localStorage.getItem('dailyFollowHiddenCols') || '[]'));
@@ -1775,7 +1797,7 @@
       leadGroups = new Map();
       for (const row of currentRows) {
         if (isHairPin(row)) continue;
-        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isDlvHidden(row)) continue;
         if (isHiddenByAssyStatus(row)) continue;
         const k = groupKey(row);
         let g = leadGroups.get(k);
@@ -2020,6 +2042,7 @@
       syncHideBtn(els.hideHairBtn, hideHairPin);
       syncHideBtn(els.hideCnclBtn, hideCncl);
       syncHideBtn(els.hideSkipBtn, hideAssySkip);
+      syncHideBtn(els.hideOldDlvBtn, autoHideOldDlv);
       renderDlvHiddenInfo();
       wireFilters();
       wireVisibilityMenu();
@@ -2081,6 +2104,13 @@
         hideAssySkip = !hideAssySkip;
         localStorage.setItem('dailyFollowHideSkip', hideAssySkip ? '1' : '0');
         syncHideBtn(els.hideSkipBtn, hideAssySkip);
+        leadDirty = true;
+        recompute(true);
+      });
+      if (els.hideOldDlvBtn) els.hideOldDlvBtn.addEventListener('click', () => {
+        autoHideOldDlv = !autoHideOldDlv;
+        localStorage.setItem('dailyFollowAutoHideDlv', autoHideOldDlv ? '1' : '0');
+        syncHideBtn(els.hideOldDlvBtn, autoHideOldDlv);
         leadDirty = true;
         recompute(true);
       });
@@ -2416,7 +2446,7 @@
       if (hideHairPin && isHairPin(row)) return false;
       if (hideCncl && /^CNCL$/i.test(row.assyStatus || '')) return false;
       if (hideAssySkip && /^SKIP$/i.test(row.assyStatus || '')) return false;
-      if (hiddenDlvRecords.size && isDlv(row) && hiddenDlvRecords.has(recordKey(row))) return false;
+      if (isDlvHidden(row)) return false;
       if (q && !(row._hay || '').includes(q)) return false;
       return true;
     }
@@ -3230,7 +3260,7 @@
       if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
       const q = els.search.value.trim().toLowerCase();
       const filtering = q || els.line.value !== 'ALL' || els.month.value !== 'ALL'
-        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideCncl || hideAssySkip || hiddenDlvRecords.size > 0;
+        || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideCncl || hideAssySkip || autoHideOldDlv || hiddenDlvRecords.size > 0;
       filtered = filtering ? sortedAll.filter(r => passes(r, q)) : sortedAll;
       if (resetScroll && els.wrap) els.wrap.scrollTop = 0;
       render();
@@ -3422,7 +3452,7 @@
         // skip service (SRV) lines, hair pins, and hidden/cancelled records.
         if (/^SRV/i.test(row.line || '')) continue;
         if (isHairPin(row)) continue;
-        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isDlvHidden(row)) continue;
         if (isHiddenByAssyStatus(row)) continue;
         const ts = valueOf(row, 'ts');
         if (ts === '' || ts === null || ts === undefined) continue;
@@ -3929,7 +3959,7 @@
       for (const row of sortedAll) {
         const line = row.line || '-';
         if (/^SRV/i.test(line)) continue;
-        if (isDlv(row) && hiddenDlvRecords.has(recordKey(row))) continue;
+        if (isDlvHidden(row)) continue;
         if (isHiddenByAssyStatus(row)) continue;
         let a = byLine.get(line);
         if (!a) { a = { line: line, lead: 0, scLead: 0, pcs: 0, orders: 0, from: '', to: '', rows: [] }; byLine.set(line, a); }
