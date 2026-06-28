@@ -572,7 +572,14 @@
     .prod-heading { display: flex; flex-direction: column; gap: 2px; }
     .prod-title { font-size: 13px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase; color: #172554; }
     .prod-kicker { font-size: 10px; font-weight: 600; color: #7c8aa0; }
-    .prod-head-right { display: flex; align-items: center; gap: 10px; }
+    .prod-head-right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+    .productivity-date {
+      display: inline-flex; align-items: center; gap: 7px;
+      color: #64748b; font-size: 9px; font-weight: 800;
+      letter-spacing: .35px; text-transform: uppercase;
+    }
+    .productivity-date .sim-date { min-width: 128px; }
+    .productivity-date[hidden] { display: none; }
     .summary-collapse {
       display: inline-grid; place-items: center;
       width: 31px; height: 27px; padding: 0; border: 1px solid #d8e1ef;
@@ -587,7 +594,8 @@
     .prod-panel.collapsed { gap: 0; padding-top: 10px; padding-bottom: 10px; }
     .prod-panel.collapsed .summary-view,
     .prod-panel.collapsed .prod-kicker,
-    .prod-panel.collapsed .sim-tabs { display: none; }
+    .prod-panel.collapsed .sim-tabs,
+    .prod-panel.collapsed .productivity-date { display: none; }
     .summary-tabs {
       display: inline-flex; align-items: center; gap: 3px; padding: 3px;
       border: 1px solid #d8e1ef; border-radius: 10px; background: #edf2f8;
@@ -1253,6 +1261,9 @@
               <span id="summaryKicker" class="prod-kicker">Production performance overview</span>
             </div>
             <div class="prod-head-right">
+              <label id="productivityDateWrap" class="productivity-date">Working Date
+                <input id="simPlanDate" class="sim-date" type="date" title="Select one date for both Plan and Actual productivity">
+              </label>
               <div class="summary-tabs" role="tablist" aria-label="Dashboard view">
                 <button id="productivityViewBtn" class="summary-tab active" type="button" role="tab" aria-selected="true">Productivity</button>
                 <button id="leadDashBtn" class="summary-tab" type="button" role="tab" aria-selected="false">Lead Time</button>
@@ -1279,7 +1290,6 @@
             <div class="prod-col">
               <div class="prod-col-head">
                 <span class="prod-tag tag-plan">Plan</span>
-                <input id="simPlanDate" class="sim-date" type="date" title="วันที่วางแผน (ดึงชั่วโมงจาก OT และจดจำแผนรายวัน)">
                 <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT">&#8635; OT</button>
               </div>
               <div class="sim" id="simBox" title="ติ๊กแถวด้านซ้ายเพื่อวางแผน · Unit Rate = ผลรวม (TS x Assy Order) ของแถวที่ติ๊ก">
@@ -1306,7 +1316,6 @@
             <div class="prod-col">
               <div class="prod-col-head">
                 <span class="prod-tag tag-actual">Actual</span>
-                <input id="actProdDate" class="sim-date" type="date" title="เลือกวันที่ดูผลผลิตจริง ณ วันนั้น">
               </div>
               <div class="sim" title="Actual = ผลผลิตจริง ณ วันที่เลือก (แยกกะตาม Shift A/B) หารด้วยชั่วโมง OT ของวันนั้น">
                 <div class="sim-cell">
@@ -1625,9 +1634,9 @@
       clearProgress: document.getElementById('clearProgressBtn'),
       simBadge: document.getElementById('simBadge'), simSub: document.getElementById('simSub'),
       simTabs: document.getElementById('simTabs'), simPlanDate: document.getElementById('simPlanDate'),
+      productivityDateWrap: document.getElementById('productivityDateWrap'),
       simPullOt: document.getElementById('simPullOt'), simOtInfo: document.getElementById('simOtInfo'),
       simWorkTitle: document.getElementById('simWorkTitle'),
-      actProdDate: document.getElementById('actProdDate'),
       actRateBadge: document.getElementById('actRateBadge'),
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
@@ -1990,7 +1999,6 @@
       simPlanDate = todayISO();
       if (els.simPlanDate) els.simPlanDate.value = simPlanDate;
       actProdDate = todayISO();
-      if (els.actProdDate) els.actProdDate.value = actProdDate;
       restoreSelected();
       refreshFilters();
       // Reflect the saved active shift on the tabs + Working label.
@@ -2095,17 +2103,15 @@
         const btn = e.target.closest('.sim-tab');
         if (btn && btn.dataset.shift) setActiveSimShift(btn.dataset.shift);
       });
-      if (els.actProdDate) els.actProdDate.addEventListener('change', () => {
-        actProdDate = els.actProdDate.value || todayISO();
-        loadActualProduction();
-      });
       if (els.simPlanDate) els.simPlanDate.addEventListener('change', () => {
         const date = els.simPlanDate.value || todayISO();
+        actProdDate = date;
         loadSimPlanForDate(date);
         // tabs/label unchanged; refresh table + readout for the new day's plan
         render();
         // Always refresh from OT for the chosen day; the poll keeps it live after.
         pullOtHours(true, false);
+        loadActualProduction(true);
       });
       if (els.simPullOt) els.simPullOt.addEventListener('click', () => pullOtHours(false, false));
     }
@@ -4058,6 +4064,7 @@
       els.productivityViewBtn.setAttribute('aria-selected', showLead ? 'false' : 'true');
       els.leadDashBtn.setAttribute('aria-selected', showLead ? 'true' : 'false');
       els.simTabs.hidden = showLead;
+      if (els.productivityDateWrap) els.productivityDateWrap.hidden = showLead;
       els.summaryTitle.textContent = showLead ? 'Lead Time' : 'Productivity';
       els.summaryKicker.textContent = showLead
         ? 'Assembly and subcooler lead time by line'
