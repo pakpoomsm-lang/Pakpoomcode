@@ -332,17 +332,17 @@
         #e8edf3 var(--segment-fill, 100%) 100%
       );
     }
-    .dmetric-bar.below-target {
-      animation: leadAlert 1.25s ease-in-out infinite;
+    .dmetric-bar.below-target .dmetric-segment.active {
+      animation: leadSegmentAlert 1.05s ease-in-out infinite;
     }
-    @keyframes leadAlert {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(226,59,59,.10), 0 0 5px rgba(226,59,59,.18); }
-      50% { box-shadow: 0 0 0 3px rgba(226,59,59,.16), 0 0 13px rgba(226,59,59,.62); }
+    @keyframes leadSegmentAlert {
+      0%, 100% { filter: brightness(.78); opacity: .72; }
+      50% { filter: brightness(1.35); opacity: 1; box-shadow: 0 0 8px rgba(226,59,59,.75); }
     }
     @media (prefers-reduced-motion: reduce) {
-      .dmetric-bar.below-target {
+      .dmetric-bar.below-target .dmetric-segment.active {
         animation: none;
-        box-shadow: 0 0 0 2px rgba(226,59,59,.28);
+        filter: brightness(1.12);
       }
     }
     .dmetric-bar b {
