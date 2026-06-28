@@ -253,43 +253,52 @@
     .dash-leg-sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
     .dline {
       display: grid;
-      grid-template-columns: 60px 1fr 1fr;
-      gap: 12px;
-      align-items: stretch;
-      padding: 10px;
-      margin-bottom: 8px;
+      grid-template-columns: 52px 1fr 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      margin-bottom: 6px;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 9px;
       background: #fff;
       cursor: pointer;
+      transition: border-color .15s, box-shadow .15s, background .15s;
     }
-    .dline:hover { border-color: var(--primary); box-shadow: var(--shadow-sm); }
+    .dline:hover { border-color: #b7c7e5; background: #fbfdff; box-shadow: 0 2px 8px rgba(15,23,42,.06); }
     .dline-name {
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      font-size: 24px;
+      font-size: 18px;
       font-weight: 800;
-      color: var(--primary);
+      color: #1e3a8a;
       line-height: 1.1;
     }
     .dline-name small { font-size: 8.5px; font-weight: 700; color: var(--muted); margin-top: 4px; text-align: center; }
-    .dmetric { padding: 10px 13px; border-radius: 10px; }
-    .dmetric.assy { background: #eef2fc; border: 1px solid #cdddf8; }
-    .dmetric.sc { background: #e7f5f5; border: 1px solid #b8e6e6; }
-    .dmetric-label { font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; }
+    .dmetric {
+      display: grid; grid-template-columns: minmax(105px, 1fr) auto;
+      align-items: center; gap: 2px 10px; min-width: 0;
+      padding: 7px 10px; border: 1px solid #e2e8f0;
+      border-left: 3px solid var(--metric-color, #94a3b8);
+      border-radius: 7px; background: #fff;
+    }
+    .dmetric.assy, .dmetric.sc {
+      background: #fff; border-color: #e2e8f0;
+      border-left-color: var(--metric-color, #94a3b8);
+    }
+    .dmetric-label { font-size: 9px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; }
     .dmetric.assy .dmetric-label { color: var(--primary); }
     .dmetric.sc .dmetric-label { color: #0e7c8b; }
-    .dmetric-num { font-size: 27px; font-weight: 800; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .dmetric-num { font-size: 18px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
     .dmetric.assy .dmetric-num { color: var(--primary-dark); }
     .dmetric.sc .dmetric-num { color: #0c6b78; }
-    .dmetric-num span { font-size: 12px; font-weight: 700; color: var(--muted); }
+    .dmetric-num span { font-size: 10px; font-weight: 700; color: var(--muted); }
     .dmetric-bar { margin-top: 7px; height: 8px; background: #fff; border: 1px solid rgba(0,0,0,.07); border-radius: 5px; overflow: hidden; }
     .dmetric-bar i { display: block; height: 100%; border-radius: 5px; }
     .dmetric.assy .dmetric-bar i { background: linear-gradient(90deg, #3a548f, #2f56c4); }
     .dmetric.sc .dmetric-bar i { background: linear-gradient(90deg, #0e7c8b, #14b8a6); }
-    .dmetric-sub { margin-top: 6px; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .dmetric-sub { grid-column: 1 / -1; font-size: 9px; color: #94a3b8; font-variant-numeric: tabular-nums; }
     .dash-rowhead, .dash-row {
       display: grid;
       grid-template-columns: 64px 1fr 130px;
@@ -624,14 +633,14 @@
     .summary-tab.active {
       color: #1d4ed8; background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.12);
     }
+    .sim-tabs[hidden] { display: none; }
     .summary-view[hidden] { display: none; }
     .lead-inline-body {
       max-height: 292px; padding: 2px 4px 2px 0; overflow: auto;
       scrollbar-width: thin;
     }
-    .lead-inline-body .dash-stats { margin-bottom: 10px; }
-    .lead-inline-body .dash-legend { margin-bottom: 10px; }
-    .lead-inline-body .dline { margin-bottom: 7px; }
+    .lead-inline-body .dash-legend { margin-bottom: 8px; }
+    .lead-inline-body .dline { margin-bottom: 6px; }
     .prod-link {
       height: 26px; padding: 0 10px; border: 1px solid #b9cdf2; border-radius: 8px;
       background: #fff; color: var(--primary); font: 700 10px/1 inherit;
@@ -3974,15 +3983,6 @@
     function renderDashboardBody(target = els.dashBody) {
       const { lines, gLead, gScLead, gPcs, gOrders, maxLead } = computeLineSummary();
       target.replaceChildren();
-      const stats = document.createElement('div');
-      stats.className = 'dash-stats';
-      stats.append(
-        dashStat('Total Assy LT (hr)', round1(gLead).toLocaleString(), 'assy'),
-        dashStat('Total SC LT (hr)', round1(gScLead).toLocaleString(), 'sc'),
-        dashStat('Lines', lines.length.toLocaleString()),
-        dashStat('Orders', gOrders.toLocaleString())
-      );
-      target.appendChild(stats);
       const legend = document.createElement('div');
       legend.className = 'dash-legend';
       const lgT = document.createElement('span'); lgT.className = 'dash-leg-title'; lgT.textContent = 'Target (Lead Time)';
@@ -4010,9 +4010,8 @@
         const unit = document.createElement('span'); unit.textContent = ' hr'; num.appendChild(unit);
         const col = cls === 'sc' ? scColor(value, line) : assyColor(value, line);
         lab.style.color = col;
-        num.style.color = '#111111';
-        box.style.background = cls === 'sc' ? scBg(value, line) : assyBg(value, line);
-        box.style.borderColor = col;
+        num.style.color = '#0f172a';
+        box.style.setProperty('--metric-color', col);
         box.append(lab, num);
         if (sub) { const s = document.createElement('div'); s.className = 'dmetric-sub'; s.textContent = sub; box.appendChild(s); }
         return box;
