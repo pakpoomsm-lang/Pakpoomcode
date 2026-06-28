@@ -611,6 +611,27 @@
     .prod-title { font-size: 13px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase; color: #172554; }
     .prod-kicker { font-size: 10px; font-weight: 600; color: #7c8aa0; }
     .prod-head-right { display: flex; align-items: center; gap: 10px; }
+    .summary-tabs {
+      display: inline-flex; align-items: center; gap: 3px; padding: 3px;
+      border: 1px solid #d8e1ef; border-radius: 10px; background: #edf2f8;
+    }
+    .summary-tab {
+      height: 27px; padding: 0 13px; border: 0; border-radius: 7px;
+      background: transparent; color: #64748b; font: 750 10px/1 inherit;
+      text-transform: uppercase; letter-spacing: .3px; cursor: pointer;
+    }
+    .summary-tab:hover { color: #1d4ed8; background: rgba(255,255,255,.55); }
+    .summary-tab.active {
+      color: #1d4ed8; background: #fff; box-shadow: 0 1px 4px rgba(15,23,42,.12);
+    }
+    .summary-view[hidden] { display: none; }
+    .lead-inline-body {
+      max-height: 292px; padding: 2px 4px 2px 0; overflow: auto;
+      scrollbar-width: thin;
+    }
+    .lead-inline-body .dash-stats { margin-bottom: 10px; }
+    .lead-inline-body .dash-legend { margin-bottom: 10px; }
+    .lead-inline-body .dline { margin-bottom: 7px; }
     .prod-link {
       height: 26px; padding: 0 10px; border: 1px solid #b9cdf2; border-radius: 8px;
       background: #fff; color: var(--primary); font: 700 10px/1 inherit;
@@ -1351,17 +1372,21 @@
         <div class="prod-panel" id="prodPanel">
           <div class="prod-head">
             <div class="prod-heading">
-              <span class="prod-title">Productivity</span>
-              <span class="prod-kicker">Production performance overview</span>
+              <span id="summaryTitle" class="prod-title">Productivity</span>
+              <span id="summaryKicker" class="prod-kicker">Production performance overview</span>
             </div>
             <div class="prod-head-right">
-              <button id="leadDashBtn" class="prod-link" type="button" title="ดู Lead Time Summary by Line">Lead Time</button>
+              <div class="summary-tabs" role="tablist" aria-label="Dashboard view">
+                <button id="productivityViewBtn" class="summary-tab active" type="button" role="tab" aria-selected="true">Productivity</button>
+                <button id="leadDashBtn" class="summary-tab" type="button" role="tab" aria-selected="false">Lead Time</button>
+              </div>
               <div class="sim-tabs" id="simTabs">
                 <button class="sim-tab active" type="button" data-shift="A">Shift A</button>
                 <button class="sim-tab" type="button" data-shift="B">Shift B</button>
               </div>
             </div>
           </div>
+          <div id="productivityView" class="summary-view">
           <div class="prod-body">
             <!-- PLAN (simulator) -->
             <div class="prod-col">
@@ -1422,6 +1447,10 @@
               <span class="prod-legend"><i class="lg-plan"></i>Plan<i class="lg-actual"></i>Actual</span>
             </div>
             <div id="prodDonuts" class="prod-bars"></div>
+          </div>
+          </div>
+          <div id="leadTimeView" class="summary-view" hidden>
+            <div id="leadInlineBody" class="dash-body lead-inline-body"></div>
           </div>
         </div>
       </div>
@@ -1712,7 +1741,13 @@
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
       actProdBadge: document.getElementById('actProdBadge'),
+      productivityViewBtn: document.getElementById('productivityViewBtn'),
       leadDashBtn: document.getElementById('leadDashBtn'),
+      productivityView: document.getElementById('productivityView'),
+      leadTimeView: document.getElementById('leadTimeView'),
+      leadInlineBody: document.getElementById('leadInlineBody'),
+      summaryTitle: document.getElementById('summaryTitle'),
+      summaryKicker: document.getElementById('summaryKicker'),
       editTargetBtn: document.getElementById('editTargetBtn'),
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
@@ -2399,7 +2434,12 @@
       });
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
-      if (els.leadDashBtn) els.leadDashBtn.addEventListener('click', openDashboard);
+      if (els.productivityViewBtn) {
+        els.productivityViewBtn.addEventListener('click', () => showSummaryView('productivity'));
+      }
+      if (els.leadDashBtn) {
+        els.leadDashBtn.addEventListener('click', () => showSummaryView('leadtime'));
+      }
       if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
       if (els.dbClose) els.dbClose.addEventListener('click', () => { els.dbOverlay.hidden = true; });
       if (els.dbOverlay) els.dbOverlay.addEventListener('click', (e) => { if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; });
@@ -3931,9 +3971,9 @@
       const maxLead = Math.max(1, ...lines.map(l => Math.max(l.lead, l.scLead)));
       return { lines, gLead, gScLead, gPcs, gOrders, maxLead };
     }
-    function renderDashboardBody() {
+    function renderDashboardBody(target = els.dashBody) {
       const { lines, gLead, gScLead, gPcs, gOrders, maxLead } = computeLineSummary();
-      els.dashBody.replaceChildren();
+      target.replaceChildren();
       const stats = document.createElement('div');
       stats.className = 'dash-stats';
       stats.append(
@@ -3942,7 +3982,7 @@
         dashStat('Lines', lines.length.toLocaleString()),
         dashStat('Orders', gOrders.toLocaleString())
       );
-      els.dashBody.appendChild(stats);
+      target.appendChild(stats);
       const legend = document.createElement('div');
       legend.className = 'dash-legend';
       const lgT = document.createElement('span'); lgT.className = 'dash-leg-title'; lgT.textContent = 'Target (Lead Time)';
@@ -3953,13 +3993,13 @@
         it.append(sw, document.createTextNode(b[1]));
         legend.appendChild(it);
       });
-      els.dashBody.appendChild(legend);
+      target.appendChild(legend);
       if (!lines.length) {
         const empty = document.createElement('div');
         empty.style.padding = '14px 2px';
         empty.style.color = 'var(--muted)';
         empty.textContent = 'No data loaded.';
-        els.dashBody.appendChild(empty);
+        target.appendChild(empty);
         return;
       }
       function metricBox(cls, label, value, widthPct, sub, line) {
@@ -4001,8 +4041,23 @@
           detail.appendChild(dr);
         }
         card.addEventListener('click', () => { detail.hidden = !detail.hidden; });
-        els.dashBody.append(card, detail);
+        target.append(card, detail);
       }
+    }
+    function showSummaryView(view) {
+      const showLead = view === 'leadtime';
+      els.productivityView.hidden = showLead;
+      els.leadTimeView.hidden = !showLead;
+      els.productivityViewBtn.classList.toggle('active', !showLead);
+      els.leadDashBtn.classList.toggle('active', showLead);
+      els.productivityViewBtn.setAttribute('aria-selected', showLead ? 'false' : 'true');
+      els.leadDashBtn.setAttribute('aria-selected', showLead ? 'true' : 'false');
+      els.simTabs.hidden = showLead;
+      els.summaryTitle.textContent = showLead ? 'Lead Time' : 'Productivity';
+      els.summaryKicker.textContent = showLead
+        ? 'Assembly and subcooler lead time by line'
+        : 'Production performance overview';
+      if (showLead) renderDashboardBody(els.leadInlineBody);
     }
     function openDashboard() { renderDashboardBody(); els.dashOverlay.hidden = false; }
     function closeDashboard() { els.dashOverlay.hidden = true; }
