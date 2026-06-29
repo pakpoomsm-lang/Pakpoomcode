@@ -474,6 +474,11 @@
     .dm-toggle.plan-toggle::before { content: "\2714"; }
     .dm-toggle.plan-toggle::after { content: none; }
     .dm-toggle.plan-toggle:hover { background: #0b6e3a; box-shadow: 0 4px 10px rgba(10, 128, 67, .3); }
+    /* Fill-to-capacity button (SRV / Boot) */
+    .dm-toggle.fill-toggle { background: #b45309; box-shadow: 0 2px 6px rgba(180, 83, 9, .25); min-width: 150px; }
+    .dm-toggle.fill-toggle::before { content: "\26A1"; }
+    .dm-toggle.fill-toggle:hover { background: #92400e; box-shadow: 0 4px 10px rgba(180, 83, 9, .3); }
+    .dm-toggle.fill-toggle[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; }
     .dm-label { font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }
     .machine-counts { display: grid; gap: 4px; padding: 4px 12px 8px; }
     .machine-row {
@@ -1329,6 +1334,13 @@
           <div class="action-bar">
             <button id="autoPlanBtn" class="dm-toggle plan-toggle" type="button" title="แนะนำการวางแผน: ติ๊กงานที่ยังไม่ DLV ทุกไลน์ ไล่ตามลำดับ จนแต่ละไลน์ได้ leadtime จำลอง (Assy Order × Speed) ครบ 10 ชม.ล่วงหน้า · ไม่เกินงานของวันถัดไป (ล่วงหน้า 1 วันจาก Working date)">แนะนำการวางแผน</button>
             <div class="dm-wrap">
+              <button id="fillCapBtn" class="dm-toggle fill-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="เติมงานจนเต็ม capacity (เปิดใช้เมื่อยังมี capacity เหลือ)">เติม Capacity</button>
+              <div id="fillCapMenu" class="dm-menu" hidden>
+                <button id="fillSrvBtn" class="dm-item" type="button" title="เดินงาน SRV เพิ่มจนเต็ม capacity (ไม่จำกัดวัน) · เลือก item ที่วางแผนแล้วก่อน">เดินงาน SRV เพิ่ม</button>
+                <button id="fillBootBtn" class="dm-item" type="button" title="Boot productivity: เดินงานผลิตเพิ่มเกิน 10 ชม. (ไม่เกิน 3 วัน) จนเต็ม capacity · เลือก item ที่วางแผนแล้วก่อน">Boot productivity (≤3 วัน)</button>
+              </div>
+            </div>
+            <div class="dm-wrap">
               <button id="visCtrlBtn" class="dm-toggle vis-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Show / hide rows">Visible control</button>
               <div id="visCtrlMenu" class="dm-menu" hidden>
                 <button id="hideHairBtn" class="dm-item dm-check" type="button" aria-pressed="false" title="Hide / show rows whose Description is HAIR PIN, HAIR TUBE, or HPIN">Hide Hair Pin</button>
@@ -1825,6 +1837,8 @@
       hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
       hideOldDlvBtn: document.getElementById('hideOldDlvBtn'),
       autoPlanBtn: document.getElementById('autoPlanBtn'),
+      fillCapBtn: document.getElementById('fillCapBtn'), fillCapMenu: document.getElementById('fillCapMenu'),
+      fillSrvBtn: document.getElementById('fillSrvBtn'), fillBootBtn: document.getElementById('fillBootBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
       freezeColumnSelect: document.getElementById('freezeColumnSelect'),
       dlvLineList: document.getElementById('dlvLineList'),
@@ -2234,6 +2248,17 @@
       const showDlvBtn = document.getElementById('showDlvBtn');
       if (showDlvBtn) showDlvBtn.addEventListener('click', showAllHiddenDlv);
       if (els.autoPlanBtn) els.autoPlanBtn.addEventListener('click', autoPlanByLead);
+      if (els.fillCapBtn) els.fillCapBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const open = els.fillCapMenu.hidden;
+        els.fillCapMenu.hidden = !open;
+        els.fillCapBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      if (els.fillSrvBtn) els.fillSrvBtn.addEventListener('click', () => { fillToCapacity('srv'); closeFillMenu(); });
+      if (els.fillBootBtn) els.fillBootBtn.addEventListener('click', () => { fillToCapacity('boot'); closeFillMenu(); });
+      document.addEventListener('click', (e) => {
+        if (els.fillCapMenu && !els.fillCapMenu.hidden && !e.target.closest('.dm-wrap')) closeFillMenu();
+      });
       if (els.visCtrlBtn) els.visCtrlBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const open = els.visCtrlMenu.hidden;
@@ -3528,6 +3553,71 @@
       renderWindow(true);
       updateSimReadout();
     }
+    function closeFillMenu() {
+      if (!els.fillCapMenu) return;
+      els.fillCapMenu.hidden = true;
+      if (els.fillCapBtn) els.fillCapBtn.setAttribute('aria-expanded', 'false');
+    }
+    // Wall-clock hours per process (cycle time + model change loss) for a set of
+    // ticked row ids — the same numbers the Cycle Time table shows, used to
+    // check capacity when filling.
+    function processTotals(ids) {
+      const ctSec = { finpress: 0, hpbender: 0, expander: 0, autoBrazing: 0, cutting: 0 };
+      const items = new Set();
+      for (const id of ids) {
+        const row = byId.get(id);
+        if (!row || isHairPin(row)) continue;
+        const ct = ctOf(row);
+        if (!ct) continue;
+        const q = num(row.assyOrder);
+        for (const p of CT_PROCS) ctSec[p] += q * num(ct[p]);
+        items.add(row.item);
+      }
+      const changes = Math.max(0, items.size - 1);
+      const tot = {};
+      for (const p of CT_PROCS) {
+        tot[p] = ctSec[p] / machinesOf(p) / 3600 + changes * changeoverMin / 60 / machinesOf(p);
+      }
+      return tot;
+    }
+    // มี process ไหนยังเหลือ capacity ไหม (ใช้เปิด/ปิดปุ่มเติม)
+    function hasRemainingCapacity() {
+      const cap = CAPACITY_HOURS[capacityMode];
+      const tot = processTotals(selected);
+      return CT_PROCS.some(p => tot[p] < cap);
+    }
+    // เติมงานจนเต็ม capacity (kind = 'srv' | 'boot'). หยุดเมื่อ process ใด
+    // process หนึ่งถึงเพดาน (NT/OT ที่เลือก). เลือก item ที่วางแผนแล้วก่อนเพื่อ
+    // ลด loss การเปลี่ยนรุ่น. boot = งานผลิตไม่เกิน 3 วัน, SRV = ไม่จำกัดวัน.
+    function fillToCapacity(kind) {
+      if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
+      const cap = CAPACITY_HOURS[capacityMode];
+      const plannedItems = new Set();
+      for (const id of selected) { const r = byId.get(id); if (r) plannedItems.add(r.item); }
+      const bootCutoff = addDaysISO(simPlanDate || todayISO(), 3);
+      const cand = [];
+      for (const r of sortedAll) {
+        if (selected.has(r._id) || isHairPin(r)) continue;
+        const isSrv = /^SRV/i.test(r.line || '');
+        if (kind === 'srv') {
+          if (!isSrv) continue;                                  // SRV ไม่จำกัดวัน
+        } else {
+          if (isSrv || isDlv(r)) continue;                       // boot = งานผลิตที่ยังไม่ DLV
+          if (r.prodDate && r.prodDate > bootCutoff) continue;   // ไม่เกิน 3 วัน
+        }
+        cand.push(r);
+      }
+      // item ที่อยู่ในแผนแล้วมาก่อน (sort เสถียร → คงลำดับการผลิตในแต่ละกลุ่ม)
+      cand.sort((a, b) => (plannedItems.has(b.item) ? 1 : 0) - (plannedItems.has(a.item) ? 1 : 0));
+      for (const r of cand) {
+        selected.add(r._id);
+        const tot = processTotals(selected);
+        if (CT_PROCS.some(p => tot[p] > cap)) selected.delete(r._id);  // ไม่ฟิต → ลองตัวถัดไป
+      }
+      saveSelected();
+      renderWindow(true);
+      updateSimReadout();
+    }
     function todayISO() {
       const d = new Date();
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -3913,6 +4003,12 @@
       els.prodBadge.textContent = (Math.round(productivity * 100) / 100).toLocaleString();
       els.prodBadge.classList.toggle('danger', productivity > 0.89);
       simStats = { rate, productivity };
+      // ปุ่มเติม capacity เปิดใช้เมื่อยังมี process ที่เหลือกำลัง
+      if (els.fillCapBtn) {
+        const remains = hasRemainingCapacity();
+        els.fillCapBtn.disabled = !remains;
+        if (!remains) closeFillMenu();
+      }
     }
     function render() {
       activeCols = visibleColumns();
