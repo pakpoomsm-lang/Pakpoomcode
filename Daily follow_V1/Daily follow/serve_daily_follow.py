@@ -299,6 +299,22 @@ def _resolve_stock_db():
 STOCK_DB = _resolve_stock_db()
 
 
+def _print_stock_db_status():
+    """One startup line so the operator can see why 'Part เข้า' is/ isn't filled.
+
+    The column fails silently (blank) when incoming.db can't be found or read,
+    which on the shop floor looks like a bug. Make the cause visible instead.
+    """
+    if not STOCK_DB.is_file() or STOCK_DB.stat().st_size == 0:
+        print(f"Part incoming DB:    NOT FOUND → {STOCK_DB}")
+        print("  → คอลัมน์ 'Part เข้า' จะว่าง. ตั้ง env STOCK_DB ชี้ไปที่ไฟล์ incoming.db")
+        return
+    lots = len(load_incoming())
+    print(f"Part incoming DB:    {STOCK_DB}  ({lots} lots)")
+    if lots == 0:
+        print("  → เปิดไฟล์ได้แต่ join ไม่ติด lot ใดเลย (เช็ค line/seq/pro_month ใน incoming)")
+
+
 def _stock_month(value):
     """incoming pro_month 'MMYYYY' (e.g. '062026') -> 'M.YYYY' to match build."""
     raw = str(value or "").strip()
@@ -1400,6 +1416,7 @@ def main():
         print("(เครื่องอื่นเข้าผ่าน IP ของเครื่องนี้ได้ — เปิด Firewall ขาเข้า"
               f" TCP {PORT} ด้วย)")
     print(f"SQLite database:     {DB_FILE}")
+    _print_stock_db_status()
     print("Press Ctrl+C to stop.")
     try:
         webbrowser.open(url)
