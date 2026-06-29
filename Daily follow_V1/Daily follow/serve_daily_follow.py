@@ -484,7 +484,9 @@ def db_init(conn: sqlite3.Connection, headers: list[str],
             conn.execute(f'ALTER TABLE {table} ADD COLUMN "{c}" TEXT')
     # Index the production-date columns so api/actual-production does an index
     # range scan instead of a full-table scan (the table grows unbounded).
-    for date_header in ("Working day", "Posting Date"):
+    # Short Time Stamp is indexed too: actual-production now range-scans the
+    # shift window on it (07:40 today → 07:40 tomorrow).
+    for date_header in ("Working day", "Posting Date", "Short Time Stamp"):
         dc = _col_name(date_header)
         if dc in existing or dc in safe:
             conn.execute(f'CREATE INDEX IF NOT EXISTS "idx_{dc}" ON {table}("{dc}")')
@@ -606,45 +608,62 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
     return mat_out, lot_out
 
 
+# Shift split by time-of-day on the Short Time Stamp. The day shift runs
+# 07:40–19:40 (incl. OT to 19:40); the night shift 19:40–07:40 next day (incl.
+# OT to 07:40). We trust the posting timestamp over SAP's "Shift D/N" column so
+# a posting always lands in the shift that actually produced it.
+SHIFT_DAY_START   = "07:40"   # day shift begins (= night shift ends)
+SHIFT_NIGHT_START = "19:40"   # night shift begins (= day shift ends)
+
+
+def _shift_by_time(ts_str):
+    """'D' or 'N' from a 'YYYY-MM-DD HH:MM:SS' string, by its HH:MM.
+    Returns '' when the string has no usable time part."""
+    hm = ts_str[11:16]
+    if len(hm) < 5 or hm[2] != ":":
+        return ""
+    return "D" if SHIFT_DAY_START <= hm < SHIFT_NIGHT_START else "N"
+
+
 def actual_production_by_date(date_iso):
-    """Final-op qty (Brazing->auto, Cutting->cutting) produced on one working day,
-    grouped by shift D/N and by line|month|seq|material key."""
+    """Final-op qty (Brazing->auto, Cutting->cutting) produced during one
+    working day, split into day/night shift by the Short Time Stamp time.
+
+    A working day runs 07:40 today → 07:40 tomorrow, so the night shift's
+    after-midnight output (00:00–07:40) is counted on the day the shift started.
+    Keyed by line|month|seq|material."""
     conn = _get_db()
     col_map = {r[1]: r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
     c = _col_name
     needed = ["Production Line", "Production Month", "Sequence", "Material",
-              "Operation Short Text", "Posted Quantity", "Shift D/N"]
+              "Operation Short Text", "Posted Quantity", "Short Time Stamp"]
     if any(c(x) not in col_map for x in needed):
         conn.close(); return {"D": {}, "N": {}}
-    date_col = c("Working day") if c("Working day") in col_map else (
-        c("Posting Date") if c("Posting Date") in col_map else None)
-    if not date_col:
-        conn.close(); return {"D": {}, "N": {}}
-    # Range scan (index-friendly) instead of LIKE: stored timestamps sort
-    # lexicographically like their ISO date prefix.
+    ts_col = c("Short Time Stamp")
     try:
         next_day = (date.fromisoformat(date_iso) + timedelta(days=1)).isoformat()
-        where = [f'"{date_col}" >= ? AND "{date_col}" < ?']
-        params = [date_iso, next_day]
     except ValueError:
-        where = [f'"{date_col}" LIKE ?']
-        params = [date_iso + "%"]
+        conn.close(); return {"D": {}, "N": {}}
+    # Window = [date 07:40, next-day 07:40). The stored 'YYYY-MM-DD HH:MM:SS'
+    # timestamps sort lexicographically like this range (index-friendly).
+    where = [f'"{ts_col}" >= ? AND "{ts_col}" < ?']
+    params = [f"{date_iso} {SHIFT_DAY_START}", f"{next_day} {SHIFT_DAY_START}"]
     for name in ("Deletion Flag", "Cancel Date"):
         cc = c(name)
         if cc in col_map:
             where.append(f'IFNULL("{cc}", "") = ""')
     sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", "{c("Sequence")}", '
            f'"{c("Material")}", "{c("Operation Short Text")}", "{c("Posted Quantity")}", '
-           f'"{c("Shift D/N")}" FROM zpp0059_raw WHERE ' + " AND ".join(where))
+           f'"{ts_col}" FROM zpp0059_raw WHERE ' + " AND ".join(where))
     op_field = {"Brazing": "auto", "Cutting": "cutting"}
     out = {"D": {}, "N": {}}
-    for line, month_raw, seq_raw, mat, op, qty_raw, dn in conn.execute(sql, params):
+    for line, month_raw, seq_raw, mat, op, qty_raw, ts in conn.execute(sql, params):
         if not line:
             continue
         field = op_field.get((op or "").strip())
         if not field:
             continue
-        dn = (dn or "").strip().upper()
+        dn = _shift_by_time(str(ts or ""))
         if dn not in ("D", "N"):
             continue
         try:
