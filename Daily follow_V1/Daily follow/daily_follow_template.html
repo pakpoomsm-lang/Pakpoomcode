@@ -1249,13 +1249,12 @@
     .cs-clickable { cursor: pointer; }
     .cs-clickable:hover .cs-label { text-decoration: underline; }
     .cs-meas { margin: 4px 0 2px 22px; padding: 8px 10px; background: #f4f6fa; border-radius: 6px; font-size: 12px; }
-    .cs-meas-head { font-weight: 700; color: var(--ink); margin: 4px 0; }
-    .cs-meas-head:first-child { margin-top: 0; }
     .cs-meas-grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; }
     .cs-meas-k { color: #6b7280; }
     .cs-meas-v { color: var(--ink); font-weight: 600; text-align: right; }
     .cs-meta-grid { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #d5dae3; }
     .cs-meta-v { color: var(--ink); text-align: right; word-break: break-word; }
+    .cs-rec-sep { margin-top: 10px; padding-top: 10px; border-top: 1px solid #c8cdd8; }
     .blank { color: transparent; }
     
     .red { color: var(--late); font-weight: 700; }
@@ -1724,11 +1723,9 @@
     function renderCsMeas(box, recs) {
       box.replaceChildren();
       if (!recs.length) { box.textContent = 'ไม่พบค่าที่วัด'; return; }
-      for (const rec of recs) {
-        const head = document.createElement('div');
-        head.className = 'cs-meas-head';
-        head.textContent = `Lot ${rec.lot || '-'}` + (rec.result ? ` · ${rec.result}` : '');
-        box.appendChild(head);
+      recs.forEach((rec, i) => {
+        const block = document.createElement('div');
+        block.className = 'cs-rec' + (i > 0 ? ' cs-rec-sep' : '');
         // Context (วันที่/item/ชิ้นงาน/เครื่อง/ผู้ตรวจ) so each record is identifiable.
         if (rec.meta && rec.meta.length) {
           const mg = document.createElement('div');
@@ -1738,7 +1735,7 @@
             const v = document.createElement('span'); v.className = 'cs-meta-v'; v.textContent = value;
             mg.append(k, v);
           }
-          box.appendChild(mg);
+          block.appendChild(mg);
         }
         const grid = document.createElement('div');
         grid.className = 'cs-meas-grid';
@@ -1747,8 +1744,9 @@
           const v = document.createElement('span'); v.className = 'cs-meas-v'; v.textContent = value;
           grid.append(k, v);
         }
-        box.appendChild(grid);
-      }
+        block.appendChild(grid);
+        box.appendChild(block);
+      });
     }
 
     // --- Part incoming (HEI Smart Stock Management) -------------------------
