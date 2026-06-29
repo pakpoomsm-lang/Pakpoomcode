@@ -938,6 +938,13 @@
     .ct-matrix td:last-child { font-weight: 800; }
     .ct-matrix .ct-change td { color: #111827; }
     .ct-matrix .ct-grand td { background: #eef3ff; color: var(--primary-dark); font-weight: 800; }
+    .ct-matrix .ct-remain td { background: #f0fdf4; color: #0a8043; font-weight: 800; }
+    .ct-matrix .ct-remain td.cap-over { background: #fef2f2; color: #dc2626; }
+    .cap-btn {
+      margin-left: 4px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 5px;
+      background: #fff; color: var(--ink-soft); font: 700 10px/1.4 inherit; cursor: pointer;
+    }
+    .cap-btn.active { background: #0a8043; border-color: #0a8043; color: #fff; }
     .ct-editor-panel { width: min(1100px, 96vw); }
     .ct-editor-body { padding: 12px 18px; overflow: auto; }
     .ct-editor-grid {
@@ -3522,6 +3529,7 @@
       const counted = new Set();     // "line|seq" ที่บวก leadtime ไปแล้ว
       for (const r of sortedAll) {
         if (isDlv(r) || isHairPin(r)) continue;     // เริ่มเฉพาะงานที่ยังไม่ DLV
+        if (/^SRV/i.test(r.line || '')) continue;    // ไม่แนะนำงาน SRV (service)
         if (r.prodDate && r.prodDate > planCutoff) continue;  // เกินพรุ่งนี้ -> ไม่วางแผน
         const line = String(r.line || '').trim().toUpperCase();
         const seqKeyStr = `${line}|${r.seq}`;
@@ -3829,6 +3837,10 @@
     // process. (distinct items - 1) changes x 15 min, charged per process.
     let changeoverMin = Number(localStorage.getItem('dailyFollowChangeoverMin') || 15);
     if (!Number.isFinite(changeoverMin) || changeoverMin < 0) changeoverMin = 15;
+    // Available working hours per shift: NT (normal) vs OT. Remain capacity %
+    // for each process = 1 - (cycle time + model change loss) / these hours.
+    const CAPACITY_HOURS = { NT: 8.16, OT: 10.32 };
+    let capacityMode = localStorage.getItem('dailyFollowCapacityMode') === 'OT' ? 'OT' : 'NT';
     function renderCtItemTable(itemAgg, ctSec) {
       if (!els.ctItemTable) return;
       if (itemAgg.size === 0) { els.ctItemTable.hidden = true; return; }
@@ -3852,6 +3864,38 @@
         for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
         els.ctItemBody.appendChild(tr);
       }
+      appendRemainCapacityRow(p => cycleHr(p) + lossHr(p));
+    }
+    // Remain capacity per process = 1 - (cycle time + model change loss) / hours.
+    // NT/OT buttons in the label cell pick the available hours (8.16 / 10.32).
+    function appendRemainCapacityRow(totalHr) {
+      const cap = CAPACITY_HOURS[capacityMode];
+      const tr = document.createElement('tr');
+      tr.className = 'ct-remain';
+      const labelTd = document.createElement('td');
+      labelTd.append('Remain capacity ');
+      for (const mode of ['NT', 'OT']) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'cap-btn' + (capacityMode === mode ? ' active' : '');
+        b.textContent = mode;
+        b.title = mode === 'NT' ? 'Normal time = 8.16 hr' : 'OT = 10.32 hr';
+        b.addEventListener('click', () => {
+          capacityMode = mode;
+          localStorage.setItem('dailyFollowCapacityMode', mode);
+          updateSimReadout();
+        });
+        labelTd.appendChild(b);
+      }
+      tr.appendChild(labelTd);
+      for (const p of CT_PROCS) {
+        const td = document.createElement('td');
+        const remain = 1 - totalHr(p) / cap;
+        td.textContent = Math.round(remain * 100) + '%';
+        if (remain < 0) td.classList.add('cap-over');   // วางแผนเกินกำลัง
+        tr.appendChild(td);
+      }
+      els.ctItemBody.appendChild(tr);
     }
 
     function updateSimReadout() {
