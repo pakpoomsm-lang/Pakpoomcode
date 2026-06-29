@@ -469,6 +469,11 @@
     .dm-item.dm-sap[disabled] { opacity: .6; cursor: progress; }
     .dm-sep { height: 1px; background: var(--border); margin: 3px 4px; }
     .dm-toggle.vis-toggle::before { content: "\1F441\FE0E"; }
+    /* Auto-plan button: same shape as the toggles but no dropdown caret */
+    .dm-toggle.plan-toggle { background: #0a8043; box-shadow: 0 2px 6px rgba(10, 128, 67, .25); }
+    .dm-toggle.plan-toggle::before { content: "\2714"; }
+    .dm-toggle.plan-toggle::after { content: none; }
+    .dm-toggle.plan-toggle:hover { background: #0b6e3a; box-shadow: 0 4px 10px rgba(10, 128, 67, .3); }
     .dm-label { font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }
     .machine-counts { display: grid; gap: 4px; padding: 4px 12px 8px; }
     .machine-row {
@@ -1315,6 +1320,7 @@
             </label>
           </div>
           <div class="action-bar">
+            <button id="autoPlanBtn" class="dm-toggle plan-toggle" type="button" title="แนะนำการวางแผน: ติ๊กงานที่ยังไม่ DLV ไล่ตามลำดับ จนสะสม Assy LT ครบ 10 ชม. (ล่วงหน้าไลน์)">แนะนำการวางแผน</button>
             <div class="dm-wrap">
               <button id="visCtrlBtn" class="dm-toggle vis-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Show / hide rows">Visible control</button>
               <div id="visCtrlMenu" class="dm-menu" hidden>
@@ -1826,6 +1832,7 @@
       mcCutting: document.getElementById('mcCutting'),
       hideCnclBtn: document.getElementById('hideCnclBtn'), hideSkipBtn: document.getElementById('hideSkipBtn'),
       hideOldDlvBtn: document.getElementById('hideOldDlvBtn'),
+      autoPlanBtn: document.getElementById('autoPlanBtn'),
       visCtrlBtn: document.getElementById('visCtrlBtn'), visCtrlMenu: document.getElementById('visCtrlMenu'),
       freezeColumnSelect: document.getElementById('freezeColumnSelect'),
       dlvLineList: document.getElementById('dlvLineList'),
@@ -2234,6 +2241,7 @@
     function wireVisibilityMenu() {
       const showDlvBtn = document.getElementById('showDlvBtn');
       if (showDlvBtn) showDlvBtn.addEventListener('click', showAllHiddenDlv);
+      if (els.autoPlanBtn) els.autoPlanBtn.addEventListener('click', autoPlanByLead);
       if (els.visCtrlBtn) els.visCtrlBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const open = els.visCtrlMenu.hidden;
@@ -3485,6 +3493,25 @@
         if (!selected.has(r._id)) return false;
       }
       return any;
+    }
+    // Auto-plan: tick the not-yet-DLV jobs in display order, summing their
+    // Assy LT, and stop once the plan covers the line 10 hr ahead. Replaces the
+    // current shift's ticks so the planner gets a clean suggestion each click.
+    const AUTO_PLAN_LEAD_HOURS = 10;
+    function autoPlanByLead() {
+      selected.clear();
+      let acc = 0;
+      for (const r of filtered) {
+        if (isDlv(r) || isHairPin(r)) continue;   // เริ่มเฉพาะงานที่ยังไม่ DLV
+        const lt = num(computeLead(r));            // Assy LT (Hrs.); ว่าง -> 0
+        if (lt <= 0) continue;                      // ไม่มีค่า lead -> ข้าม
+        selected.add(r._id);
+        acc += lt;
+        if (acc >= AUTO_PLAN_LEAD_HOURS) break;     // ครบ 10 ชม.ล่วงหน้าไลน์
+      }
+      saveSelected();
+      renderWindow(true);
+      updateSimReadout();
     }
     function todayISO() {
       const d = new Date();
