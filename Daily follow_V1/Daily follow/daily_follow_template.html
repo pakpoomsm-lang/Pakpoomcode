@@ -460,6 +460,13 @@
     .dm-item.dm-check.on::before { content: "\2611"; color: var(--primary); }
     .dm-item:hover { background: #eef2f7; }
     .dm-item input { display: none; }
+    /* SAP pull buttons living inside the Data Management menu */
+    .dm-item.dm-sap { color: #0a8043; }
+    .dm-item.dm-sap::before { content: "\21BB"; color: #0a8043; }
+    .dm-item.dm-sap.dm-0022 { color: #1b5fb3; }
+    .dm-item.dm-sap.dm-0022::before { color: #1b5fb3; }
+    .dm-item.dm-sap.busy::before { animation: sapSpin .8s linear infinite; }
+    .dm-item.dm-sap[disabled] { opacity: .6; cursor: progress; }
     .dm-sep { height: 1px; background: var(--border); margin: 3px 4px; }
     .dm-toggle.vis-toggle::before { content: "\1F441\FE0E"; }
     .dm-label { font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }
@@ -1329,6 +1336,9 @@
             <div class="dm-wrap">
               <button id="dataMgmtBtn" class="dm-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Update data sources and display settings">Data Management</button>
               <div id="dataMgmtMenu" class="dm-menu" hidden>
+                <button id="zpp0059Btn" class="dm-item dm-sap" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
+                <button id="zpp0022Btn" class="dm-item dm-sap dm-0022" type="button" title="Pull the order list straight from SAP (runs transaction ZPP0022, then rebuilds the table automatically)">ZPP0022</button>
+                <div class="dm-sep"></div>
                 <label class="dm-item">Update Progress
                   <input id="importFile" type="file" accept=".xlsx,.xlsm">
                 </label>
@@ -1355,8 +1365,6 @@
                 <button id="dbViewBtn" class="dm-item" type="button" title="View the ZPP0059 database (all data collected from SAP)">&#128451; View Database</button>
               </div>
             </div>
-            <button id="zpp0022Btn" class="sap-btn sap-btn-0022" type="button" title="Pull the order list straight from SAP (runs transaction ZPP0022, then rebuilds the table automatically)">ZPP0022</button>
-            <button id="zpp0059Btn" class="sap-btn" type="button" title="Pull progress straight from SAP (runs transaction ZPP0059, then refreshes the table automatically)">ZPP0059</button>
           </div>
         </div>
         <!-- ZPP0059 date picker dialog -->
