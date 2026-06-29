@@ -172,9 +172,23 @@ ZPP0022_TABLE          = "zpp0022_raw"
 
 # AS/400 network-share base folder that SAP exports into. The mapped DRIVE
 # LETTER differs per PC (some map it as J:, the shop-floor PC maps it as Y:).
-# Override per machine with the SAP_EXPORT_BASE environment variable, e.g.
-#     set SAP_EXPORT_BASE=J:\7.541_HEI\Database follow
-SAP_EXPORT_BASE        = os.environ.get("SAP_EXPORT_BASE", r"Y:\7.541_HEI\Database follow")
+# Resolve like STOCK_DB: SAP_EXPORT_BASE env first, then the known drive
+# letters — first folder that exists wins. So each PC just works without env.
+_EXPORT_BASE_CANDIDATES = [
+    os.environ.get("SAP_EXPORT_BASE", ""),          # env override (blank → skip)
+    r"Y:\7.541_HEI\Database follow",                # shop-floor PC maps it as Y:
+    r"J:\7.541_HEI\Database follow",                # this PC maps it as J:
+]
+
+
+def _resolve_export_base():
+    for b in _EXPORT_BASE_CANDIDATES:
+        if b and Path(b).is_dir():
+            return b
+    return _EXPORT_BASE_CANDIDATES[1]  # default Y: if none mounted yet
+
+
+SAP_EXPORT_BASE        = _resolve_export_base()
 SAP_EXPORT_DIR_0022    = str(Path(SAP_EXPORT_BASE) / "ZPP0022")
 
 # --- First-lot check sheets --------------------------------------------------
@@ -1417,6 +1431,8 @@ def main():
         print("(เครื่องอื่นเข้าผ่าน IP ของเครื่องนี้ได้ — เปิด Firewall ขาเข้า"
               f" TCP {PORT} ด้วย)")
     print(f"SQLite database:     {DB_FILE}")
+    _base_found = Path(SAP_EXPORT_BASE).is_dir()
+    print(f"SAP export base:     {SAP_EXPORT_BASE}" + ("" if _base_found else "  (NOT mounted)"))
     _print_stock_db_status()
     print("Press Ctrl+C to stop.")
     try:
