@@ -1320,7 +1320,7 @@
             </label>
           </div>
           <div class="action-bar">
-            <button id="autoPlanBtn" class="dm-toggle plan-toggle" type="button" title="แนะนำการวางแผน: ติ๊กงานที่ยังไม่ DLV ไล่ตามลำดับ จนสะสม Assy LT ครบ 10 ชม. (ล่วงหน้าไลน์)">แนะนำการวางแผน</button>
+            <button id="autoPlanBtn" class="dm-toggle plan-toggle" type="button" title="แนะนำการวางแผน: ติ๊กงานที่ยังไม่ DLV ทุกไลน์ ไล่ตามลำดับ จนแต่ละไลน์สะสม Assy LT ครบ 10 ชม. (ล่วงหน้าไลน์)">แนะนำการวางแผน</button>
             <div class="dm-wrap">
               <button id="visCtrlBtn" class="dm-toggle vis-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="Show / hide rows">Visible control</button>
               <div id="visCtrlMenu" class="dm-menu" hidden>
@@ -3494,20 +3494,23 @@
       }
       return any;
     }
-    // Auto-plan: tick the not-yet-DLV jobs in display order, summing their
-    // Assy LT, and stop once the plan covers the line 10 hr ahead. Replaces the
+    // Auto-plan every line: tick the not-yet-DLV jobs in production order,
+    // accumulating Assy LT per line, and stop each line once it covers 10 hr
+    // ahead. Works on all lines (ignores the LINE filter) and replaces the
     // current shift's ticks so the planner gets a clean suggestion each click.
     const AUTO_PLAN_LEAD_HOURS = 10;
     function autoPlanByLead() {
+      if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
       selected.clear();
-      let acc = 0;
-      for (const r of filtered) {
-        if (isDlv(r) || isHairPin(r)) continue;   // เริ่มเฉพาะงานที่ยังไม่ DLV
-        const lt = num(computeLead(r));            // Assy LT (Hrs.); ว่าง -> 0
-        if (lt <= 0) continue;                      // ไม่มีค่า lead -> ข้าม
+      const accByLine = new Map();   // line -> สะสม Assy LT
+      for (const r of sortedAll) {
+        if (isDlv(r) || isHairPin(r)) continue;     // เริ่มเฉพาะงานที่ยังไม่ DLV
+        const line = String(r.line || '').trim().toUpperCase();
+        if ((accByLine.get(line) || 0) >= AUTO_PLAN_LEAD_HOURS) continue;  // ไลน์นี้ครบแล้ว
+        const lt = num(computeLead(r));             // Assy LT (Hrs.); ว่าง -> 0
+        if (lt <= 0) continue;                       // ไม่มีค่า lead -> ข้าม
         selected.add(r._id);
-        acc += lt;
-        if (acc >= AUTO_PLAN_LEAD_HOURS) break;     // ครบ 10 ชม.ล่วงหน้าไลน์
+        accByLine.set(line, (accByLine.get(line) || 0) + lt);  // ครบ 10 ชม.ล่วงหน้าไลน์
       }
       saveSelected();
       renderWindow(true);
