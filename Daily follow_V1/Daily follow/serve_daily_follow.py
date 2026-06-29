@@ -282,6 +282,7 @@ def load_checksheets():
 # Resolution: STOCK_DB env first, then candidate paths (first existing wins).
 _STOCK_DB_CANDIDATES = [
     Path(os.environ.get("STOCK_DB", "")),                    # env override (blank → skip)
+    Path(r"W:\PD\2.HEAT INDOOR\12.Pakpoom\HEI Smart Stock Management-20260519T005653Z-3-001\HEI Smart Stock Management\incoming.db"),
     Path(r"W:\PD\2.HEAT INDOOR\13.Suphamat P\HEI Smart Stock Management\incoming.db"),
     Path(r"Y:\PD\2.HEAT INDOOR\13.Suphamat P\HEI Smart Stock Management\incoming.db"),
     Path(r"J:\PD\2.HEAT INDOOR\13.Suphamat P\HEI Smart Stock Management\incoming.db"),
