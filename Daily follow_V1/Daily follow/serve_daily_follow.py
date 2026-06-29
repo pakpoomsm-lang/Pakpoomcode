@@ -105,11 +105,10 @@ session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").setFocus
 session.findById("wnd[0]/usr/ctxtS_LINE3-LOW").caretPosition = 3
 session.findById("wnd[0]").sendVKey 8
 session.findById("wnd[0]").sendVKey 33
-' Choose the FULL layout "/PP ASSY ALL" by name instead of by row position.
-' Row numbers shift whenever SAP layouts are added/removed (the recording
-' happened to land on row 10 = "/TPP&PAINT", the short layout). We scan the
-' layout list, match the technical name first, then the description, and only
-' fall back to a fixed row if neither is found.
+' Choose the layout "/DPP" (Daily progress production HEI) by name instead of
+' by row position. Row numbers shift whenever SAP layouts are added/removed, so
+' we scan the layout list, match the technical name first, then the description,
+' and only fall back to a fixed row if neither is found.
 Dim lShell, lRow, lFound, lName, lText
 Set lShell = session.findById("wnd[1]/usr/subSUB_CONFIGURATION:SAPLSALV_CUL_LAYOUT_CHOOSE:0500/cntlD500_CONTAINER/shellcont/shell")
 lFound = -1
@@ -119,7 +118,7 @@ For lRow = 0 To lShell.RowCount - 1
    lText = ""
    lName = Trim(lShell.GetCellValue(lRow, "VARIANT"))
    lText = Trim(lShell.GetCellValue(lRow, "TEXT"))
-   If lName = "/PP ASSY ALL" Or lText = "PP ASSY ALL LINE (Defalt)" Then
+   If lName = "/DPP" Or lText = "Daily progress production HEI" Then
       lFound = lRow
       Exit For
    End If
