@@ -1478,18 +1478,6 @@
             </div>
           </div>
           <div class="cycle-card" id="cycleCard">
-            <div class="ct-breakdown" id="ctBreakdown" title="ผลรวม Assy Order × CT ของแถวที่ติ๊ก แยกตาม process (หน่วย: ชั่วโมง) · ใช้ CT ตัวมากสุดต่อ material">
-              <span class="ct-head">Cycle Time (hr)</span>
-              <span class="ct-proc"><span class="ct-proc-name">Finpress</span><span class="ct-proc-val" id="ctFinpress">0</span></span>
-              <span class="ct-proc"><span class="ct-proc-name">HP Bender</span><span class="ct-proc-val" id="ctHpbender">0</span></span>
-              <span class="ct-proc"><span class="ct-proc-name">Expander</span><span class="ct-proc-val" id="ctExpander">0</span></span>
-              <span class="ct-proc"><span class="ct-proc-name">Auto-Brazing</span><span class="ct-proc-val" id="ctAutoBrazing">0</span></span>
-              <span class="ct-proc"><span class="ct-proc-name">Cutting</span><span class="ct-proc-val" id="ctCutting">0</span></span>
-              <button id="cycleCardCollapse" class="card-collapse" type="button" aria-expanded="true" aria-label="Hide Cycle Time" title="Hide Cycle Time">
-                <svg class="eye-open" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>
-                <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 6.2A10.8 10.8 0 0 1 12 6c6.5 0 10 6 10 6a16.9 16.9 0 0 1-3.1 3.8M6.3 6.3C3.5 8.2 2 12 2 12s3.5 6 10 6a10.5 10.5 0 0 0 3.2-.5"></path></svg>
-              </button>
-            </div>
             <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
               <thead>
                 <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th></tr>
@@ -1823,9 +1811,6 @@
       targetSave: document.getElementById('targetSave'),
       workHour: document.getElementById('workHour'), prodBadge: document.getElementById('prodBadge'),
       simClear: document.getElementById('simClear'), hideHairBtn: document.getElementById('hideHairBtn'),
-      ctFinpress: document.getElementById('ctFinpress'), ctHpbender: document.getElementById('ctHpbender'),
-      ctExpander: document.getElementById('ctExpander'), ctAutoBrazing: document.getElementById('ctAutoBrazing'),
-      ctCutting: document.getElementById('ctCutting'),
       missingCtCount: document.getElementById('missingCtCount'),
       editMissingCtBtn: document.getElementById('editMissingCtBtn'),
       changeoverMinInput: document.getElementById('changeoverMinInput'),
@@ -3821,12 +3806,8 @@
 
     function ctHr(sec) { return (Math.round((sec / 3600) * 100) / 100).toLocaleString(); }
     function renderCtBreakdown(ctSec, missing) {
-      // Wall-clock hours = work seconds / machines running in parallel / 3600.
-      els.ctFinpress.textContent = ctHr(ctSec.finpress / machinesOf('finpress'));
-      els.ctHpbender.textContent = ctHr(ctSec.hpbender / machinesOf('hpbender'));
-      els.ctExpander.textContent = ctHr(ctSec.expander / machinesOf('expander'));
-      els.ctAutoBrazing.textContent = ctHr(ctSec.autoBrazing / machinesOf('autoBrazing'));
-      els.ctCutting.textContent = ctHr(ctSec.cutting / machinesOf('cutting'));
+      // The inline per-process chips were removed; only the "Edit Missing CT"
+      // badge in Data Management still reflects how many ticked rows lack a CT.
       if (els.missingCtCount) {
         els.missingCtCount.textContent = missing ? `(${missing} rows)` : '(0)';
         els.missingCtCount.style.color = missing ? '#d97706' : '#16a34a';
