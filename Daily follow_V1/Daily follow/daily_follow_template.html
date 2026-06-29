@@ -1801,9 +1801,10 @@
         top.append(partEl, qtyEl);
         // Global remaining stock for this part (received − dispatched − deductions).
         if (it.balance !== null && it.balance !== undefined) {
+          const low = it.balance <= 0;
           const balEl = document.createElement('span');
-          balEl.className = 'inc-balance' + (it.balance <= 0 ? ' neg' : '');
-          balEl.textContent = 'คงเหลือ ' + it.balance;
+          balEl.className = 'inc-balance' + (low ? ' neg' : '');
+          balEl.textContent = (low ? '⚠️ ' : '') + 'คงเหลือ ' + it.balance;
           balEl.title = 'Stock คงเหลือรวมทุกไลน์ของ part นี้';
           top.appendChild(balEl);
         }
