@@ -2,7 +2,7 @@
 chcp 65001 >nul
 title Expander First Lot + Cutting Server :3001
 
-cd /d "W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"
+cd /d "W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process"
 
 echo.
 echo  ================================================
