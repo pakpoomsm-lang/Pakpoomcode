@@ -242,6 +242,20 @@ CHECKSHEET_MEAS = {
     "hp_insert": [("fin_pitch", "Fin pitch")],
 }
 
+# Context shown above the measured values so each record is identifiable (which
+# item / machine / who checked). The first entry is the timestamp column —
+# trimmed to the date part in the detail loader.
+CHECKSHEET_META = {
+    "cutting":   [("saved_at", "วันที่"), ("tag_fg_no1", "Item"), ("item_type", "Type"),
+                  ("mc_line", "เครื่อง"), ("id_card", "ผู้ตรวจ")],
+    "fp":        [("saved_at", "วันที่"), ("item", "Item"), ("desc1", "ชิ้นงาน"),
+                  ("mc", "เครื่อง"), ("checker", "ผู้ตรวจ")],
+    "hp":        [("saved_at", "วันที่"), ("item", "Item"), ("item_fg", "ชิ้นงาน"),
+                  ("mc", "เครื่อง"), ("checker", "ผู้ตรวจ")],
+    "hp_insert": [("created_at", "วันที่"), ("item_fin", "Item"), ("item_wip", "WIP"),
+                  ("machine_finpress", "เครื่อง"), ("name_checker", "ผู้ตรวจ")],
+}
+
 
 def _cs_month(value):
     """Check-sheet prod_month 'MM/YYYY' -> 'M.YYYY' to match build's month_display."""
@@ -305,15 +319,18 @@ def load_checksheets():
 def load_checksheet_detail(line, seq, month, proc):
     """Measured values for one process of one (line, month, seq), newest first.
 
-    Returns a list of records: {"lot", "result", "savedAt", "values": [{label, value}]}.
-    Only measured numbers are returned (blank ones skipped); model/spec fields are not.
-    Filtering mirrors load_checksheets() so the rows match what the badge counted.
+    Returns a list of records:
+      {"lot", "result", "savedAt", "meta": [{label, value}], "values": [{label, value}]}.
+    `meta` is context (วันที่/item/ชิ้นงาน/เครื่อง/ผู้ตรวจ) so each record is identifiable;
+    `values` is the measured numbers only (blank ones skipped). Filtering mirrors
+    load_checksheets() so the rows match what the badge counted.
     """
     src = next((s for s in CHECKSHEET_SOURCES if s[0] == proc), None)
     meas = CHECKSHEET_MEAS.get(proc)
     if not src or not meas:
         return []
     _, fname, table, lcol, scol, mcol, rcol, tcol = src
+    meta = CHECKSHEET_META.get(proc, [])
     db = FIRSTLOT_DIR / fname
     if not db.is_file() or db.stat().st_size == 0:
         return []
@@ -324,7 +341,8 @@ def load_checksheet_detail(line, seq, month, proc):
         return []
 
     # Build the column list (de-duped, order preserved) for one SELECT.
-    cols = [lcol, scol, rcol, "lot", tcol] + ([mcol] if mcol else []) + [c for c, _ in meas]
+    cols = ([lcol, scol, rcol, "lot", tcol] + ([mcol] if mcol else [])
+            + [c for c, _ in meta] + [c for c, _ in meas])
     seen, ordered = set(), []
     for c in cols:
         if c not in seen:
@@ -353,10 +371,19 @@ def load_checksheet_detail(line, seq, month, proc):
                     values.append({"label": label, "value": s})
             if not values:
                 continue
+            meta_out = []
+            for col, label in meta:
+                v = rec.get(col)
+                s = "" if v is None else str(v).strip()
+                if col == tcol:
+                    s = s[:10]   # date part only, drop the time
+                if s:
+                    meta_out.append({"label": label, "value": s})
             out.append({
                 "lot": str(rec.get("lot") or "").strip(),
                 "result": str(rec.get(rcol) or "").strip().upper(),
                 "savedAt": str(rec.get(tcol) or "").strip(),
+                "meta": meta_out,
                 "values": values,
             })
         conn.close()

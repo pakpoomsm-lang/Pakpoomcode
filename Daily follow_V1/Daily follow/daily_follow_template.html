@@ -1254,6 +1254,8 @@
     .cs-meas-grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; }
     .cs-meas-k { color: #6b7280; }
     .cs-meas-v { color: var(--ink); font-weight: 600; text-align: right; }
+    .cs-meta-grid { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #d5dae3; }
+    .cs-meta-v { color: var(--ink); text-align: right; word-break: break-word; }
     .blank { color: transparent; }
     
     .red { color: var(--late); font-weight: 700; }
@@ -1727,6 +1729,17 @@
         head.className = 'cs-meas-head';
         head.textContent = `Lot ${rec.lot || '-'}` + (rec.result ? ` · ${rec.result}` : '');
         box.appendChild(head);
+        // Context (วันที่/item/ชิ้นงาน/เครื่อง/ผู้ตรวจ) so each record is identifiable.
+        if (rec.meta && rec.meta.length) {
+          const mg = document.createElement('div');
+          mg.className = 'cs-meas-grid cs-meta-grid';
+          for (const { label, value } of rec.meta) {
+            const k = document.createElement('span'); k.className = 'cs-meas-k'; k.textContent = label;
+            const v = document.createElement('span'); v.className = 'cs-meta-v'; v.textContent = value;
+            mg.append(k, v);
+          }
+          box.appendChild(mg);
+        }
         const grid = document.createElement('div');
         grid.className = 'cs-meas-grid';
         for (const { label, value } of rec.values) {
