@@ -1339,7 +1339,7 @@
               <button id="fillCapBtn" class="dm-toggle fill-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="เติมงานจนเต็ม capacity (เปิดใช้เมื่อยังมี capacity เหลือ)">เติม Capacity</button>
               <div id="fillCapMenu" class="dm-menu" hidden>
                 <button id="fillSrvBtn" class="dm-item" type="button" title="เดินงาน SRV เพิ่มจนเต็ม capacity (ไม่จำกัดวัน) · เลือก item ที่วางแผนแล้วก่อน">เดินงาน SRV เพิ่ม</button>
-                <button id="fillBootBtn" class="dm-item" type="button" title="Boot productivity: เดินงานผลิตเพิ่มเกิน 10 ชม. (ไม่เกิน 3 วัน) จนเต็ม capacity · เลือก item ที่วางแผนแล้วก่อน">Boot productivity (≤3 วัน)</button>
+                <button id="fillBootBtn" class="dm-item" type="button" title="Boot productivity: เดินงานผลิตเพิ่มเกินเพดานการแนะนำ (ล่วงหน้าอีกไม่เกิน 1 วัน) จนเต็ม capacity · เลือก item ที่วางแผนแล้วก่อน">Boot productivity</button>
               </div>
             </div>
             <div class="dm-wrap">
@@ -3545,6 +3545,7 @@
       for (const r of sortedAll) {
         if (isDlv(r) || isHairPin(r)) continue;     // เริ่มเฉพาะงานที่ยังไม่ DLV
         if (/^SRV/i.test(r.line || '')) continue;    // ไม่แนะนำงาน SRV (service)
+        if (num(valueOf(r, 'fg')) > 0) continue;     // มียอด FG แล้ว (ผลิตเสร็จขั้น FG) -> ไม่แนะนำ
         if (r.prodDate && r.prodDate > planCutoff) continue;  // เกินพรุ่งนี้ -> ไม่วางแผน
         const line = String(r.line || '').trim().toUpperCase();
         const seqKeyStr = `${line}|${r.seq}`;
