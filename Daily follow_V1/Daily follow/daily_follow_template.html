@@ -3506,11 +3506,10 @@
       for (const r of sortedAll) {
         if (isDlv(r) || isHairPin(r)) continue;     // เริ่มเฉพาะงานที่ยังไม่ DLV
         const line = String(r.line || '').trim().toUpperCase();
-        if ((accByLine.get(line) || 0) >= AUTO_PLAN_LEAD_HOURS) continue;  // ไลน์นี้ครบแล้ว
-        const lt = num(computeLead(r));             // Assy LT (Hrs.); ว่าง -> 0
-        if (lt <= 0) continue;                       // ไม่มีค่า lead -> ข้าม
+        if ((accByLine.get(line) || 0) >= AUTO_PLAN_LEAD_HOURS) continue;  // ไลน์นี้ครบ 10 ชม.แล้ว
+        // ติ๊กทุกแถว non-DLV แม้ Assy LT ว่าง (นับเป็น 0 ชม. แต่ยังวางแผนไว้)
         selected.add(r._id);
-        accByLine.set(line, (accByLine.get(line) || 0) + lt);  // ครบ 10 ชม.ล่วงหน้าไลน์
+        accByLine.set(line, (accByLine.get(line) || 0) + num(computeLead(r)));
       }
       saveSelected();
       renderWindow(true);
