@@ -1012,6 +1012,8 @@
       accent-color: var(--primary);
       cursor: pointer;
     }
+    /* งานที่มาจาก Boot productivity — ติ๊กถูกสีเหลืองโทนเข้ม */
+    .rowchk.boot-chk { accent-color: #b8860b; }
     tbody tr:hover td.selcol { background: #dfeaff; }
     .subbar {
       display: flex;
@@ -1915,8 +1917,9 @@
     const SIM_SHIFTS = ['A', 'B'];
     let activeSimShift = localStorage.getItem('dailyFollowSimShift') || 'A';
     if (!SIM_SHIFTS.includes(activeSimShift)) activeSimShift = 'A';
-    let simShifts = { A: { sel: new Set(), wh: '', manual: false }, B: { sel: new Set(), wh: '', manual: false } };
+    let simShifts = { A: { sel: new Set(), boot: new Set(), wh: '', manual: false }, B: { sel: new Set(), boot: new Set(), wh: '', manual: false } };
     let selected = simShifts[activeSimShift].sel;
+    let bootSelected = simShifts[activeSimShift].boot;   // ids ที่มาจาก Boot productivity (ติ๊กสีเหลือง)
     let simPlanDate = todayISO();
     let actProdDate = todayISO();
     let actProd = { D: {}, N: {} };   // production by shift for actProdDate (from server)
@@ -2310,6 +2313,7 @@
     function wireSimulator() {
       els.simClear.addEventListener('click', () => {
         selected.clear();
+        bootSelected.clear();
         saveSelected();
         if (els.selAll) { els.selAll.checked = false; els.selAll.indeterminate = false; }
         renderWindow(true);
@@ -2365,11 +2369,11 @@
           for (let i = a; i <= b; i++) {
             const r = filtered[i];
             if (!r || isHairPin(r)) continue;
-            if (cb.checked) selected.add(r._id); else selected.delete(r._id);
+            if (cb.checked) selected.add(r._id); else { selected.delete(r._id); bootSelected.delete(r._id); }
           }
           renderWindow(true);
         } else {
-          if (cb.checked) selected.add(row._id); else selected.delete(row._id);
+          if (cb.checked) selected.add(row._id); else { selected.delete(row._id); bootSelected.delete(row._id); }
         }
         lastChkIdx = idx;
         saveSelected();
@@ -3420,7 +3424,7 @@
           chk.addEventListener('click', (e) => e.stopPropagation());
           chk.addEventListener('change', () => {
             if (chk.checked) for (const r of filtered) { if (!isHairPin(r)) selected.add(r._id); }
-            else for (const r of filtered) selected.delete(r._id);
+            else for (const r of filtered) { selected.delete(r._id); bootSelected.delete(r._id); }
             saveSelected();
             renderWindow(true);
             updateSimReadout();
@@ -3533,6 +3537,7 @@
     function autoPlanByLead() {
       if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
       selected.clear();
+      bootSelected.clear();
       // วางแผนล่วงหน้าได้ไม่เกิน 1 วันจาก Working date (เช่น 29 -> ถึงงานวันที่ 30)
       const planCutoff = addDaysISO(simPlanDate || todayISO(), 1);
       const accByLine = new Map();   // line -> สะสม leadtime จำลอง (ชม.)
@@ -3594,7 +3599,9 @@
       const cap = CAPACITY_HOURS[capacityMode];
       const plannedItems = new Set();
       for (const id of selected) { const r = byId.get(id); if (r) plannedItems.add(r.item); }
-      const bootCutoff = addDaysISO(simPlanDate || todayISO(), 3);
+      // boot เพิ่มได้อีกไม่เกิน 1 วันจากเพดานการแนะนำ (ซึ่งอยู่ที่ +1) → รวม +2 วัน
+      // เช่น Working date 29 -> boot ได้ถึงงานวันที่ 1 ของเดือนถัดไป
+      const bootCutoff = addDaysISO(simPlanDate || todayISO(), 2);
       const cand = [];
       for (const r of sortedAll) {
         if (selected.has(r._id) || isHairPin(r)) continue;
@@ -3603,7 +3610,7 @@
           if (!isSrv) continue;                                  // SRV ไม่จำกัดวัน
         } else {
           if (isSrv || isDlv(r)) continue;                       // boot = งานผลิตที่ยังไม่ DLV
-          if (r.prodDate && r.prodDate > bootCutoff) continue;   // ไม่เกิน 3 วัน
+          if (r.prodDate && r.prodDate > bootCutoff) continue;   // ไม่เกินอีก 1 วัน
         }
         cand.push(r);
       }
@@ -3612,7 +3619,8 @@
       for (const r of cand) {
         selected.add(r._id);
         const tot = processTotals(selected);
-        if (CT_PROCS.some(p => tot[p] > cap)) selected.delete(r._id);  // ไม่ฟิต → ลองตัวถัดไป
+        if (CT_PROCS.some(p => tot[p] > cap)) { selected.delete(r._id); continue; }  // ไม่ฟิต → ลองตัวถัดไป
+        if (kind === 'boot') bootSelected.add(r._id);   // ติ๊กถูกสีเหลืองสำหรับ boot
       }
       saveSelected();
       renderWindow(true);
@@ -3630,8 +3638,8 @@
       simShifts[activeSimShift].wh = els.workHour.value;
       const store = loadSimPlanStore();
       store[simPlanDate] = {
-        A: { sel: [...simShifts.A.sel], wh: simShifts.A.wh },
-        B: { sel: [...simShifts.B.sel], wh: simShifts.B.wh }
+        A: { sel: [...simShifts.A.sel], boot: [...simShifts.A.boot], wh: simShifts.A.wh },
+        B: { sel: [...simShifts.B.sel], boot: [...simShifts.B.boot], wh: simShifts.B.wh }
       };
       localStorage.setItem('dailyFollowSimPlan', JSON.stringify(store));
       localStorage.setItem('dailyFollowSimShift', activeSimShift);
@@ -3647,17 +3655,24 @@
         const saved = plan[s] || {};
         const set = new Set();
         for (const id of (saved.sel || [])) { if (byId.has(id)) set.add(id); }
+        const boot = new Set();
+        for (const id of (saved.boot || [])) { if (byId.has(id)) boot.add(id); }
         simShifts[s].sel = set;
+        simShifts[s].boot = boot;
         simShifts[s].wh = (saved.wh != null) ? saved.wh : '';
         simShifts[s].manual = false;   // a freshly loaded day is not a manual override
       }
       selected = simShifts[activeSimShift].sel;
+      bootSelected = simShifts[activeSimShift].boot;
       if (els.workHour) els.workHour.value = simShifts[activeSimShift].wh || '';
     }
     function clearAllSimSelections() {
       simShifts.A.sel.clear();
       simShifts.B.sel.clear();
+      simShifts.A.boot.clear();
+      simShifts.B.boot.clear();
       selected = simShifts[activeSimShift].sel;
+      bootSelected = simShifts[activeSimShift].boot;
     }
     function updateSimShiftLabel() {
       if (els.simWorkTitle) els.simWorkTitle.textContent = 'Working ' + activeSimShift;
@@ -3670,6 +3685,7 @@
       simShifts[activeSimShift].wh = els.workHour.value;
       activeSimShift = shift;
       selected = simShifts[shift].sel;
+      bootSelected = simShifts[shift].boot;
       els.workHour.value = simShifts[shift].wh || '';
       if (els.simTabs) {
         els.simTabs.querySelectorAll('.sim-tab').forEach(b =>
@@ -4071,7 +4087,7 @@
           if (!locked) {
             const chk = document.createElement('input');
             chk.type = 'checkbox';
-            chk.className = 'rowchk';
+            chk.className = 'rowchk' + (bootSelected.has(row._id) ? ' boot-chk' : '');
             chk.checked = selected.has(row._id);
             td.appendChild(chk);
           }
