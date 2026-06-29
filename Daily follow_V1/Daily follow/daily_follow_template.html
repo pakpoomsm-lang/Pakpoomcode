@@ -474,11 +474,17 @@
     .dm-toggle.plan-toggle::before { content: "\2714"; }
     .dm-toggle.plan-toggle::after { content: none; }
     .dm-toggle.plan-toggle:hover { background: #0b6e3a; box-shadow: 0 4px 10px rgba(10, 128, 67, .3); }
-    /* Fill-to-capacity button (SRV / Boot) */
-    .dm-toggle.fill-toggle { background: #b45309; box-shadow: 0 2px 6px rgba(180, 83, 9, .25); min-width: 150px; }
-    .dm-toggle.fill-toggle::before { content: "\26A1"; }
-    .dm-toggle.fill-toggle:hover { background: #92400e; box-shadow: 0 4px 10px rgba(180, 83, 9, .3); }
-    .dm-toggle.fill-toggle[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; }
+    /* Split plan button: main = แนะนำการวางแผน, caret ▾ = เติม capacity menu */
+    .dm-toggle.plan-main { min-width: 0; border-radius: 8px 0 0 8px; padding: 0 14px; }
+    .plan-caret {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 38px; margin-left: 1px; border: none; cursor: pointer;
+      background: #0a8043; color: #fff; font-size: 12px;
+      border-radius: 0 8px 8px 0; box-shadow: 0 2px 6px rgba(10, 128, 67, .25);
+      transition: background .15s, box-shadow .15s;
+    }
+    .plan-caret:hover { background: #0b6e3a; box-shadow: 0 4px 10px rgba(10, 128, 67, .3); }
+    .plan-caret[disabled] { opacity: .5; cursor: not-allowed; box-shadow: none; }
     .dm-label { font: 700 10.5px/1.4 inherit; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 4px 12px 2px; }
     .machine-counts { display: grid; gap: 4px; padding: 4px 12px 8px; }
     .machine-row {
@@ -1345,12 +1351,12 @@
             </label>
           </div>
           <div class="action-bar">
-            <button id="autoPlanBtn" class="dm-toggle plan-toggle" type="button" title="แนะนำการวางแผน: ติ๊กงานที่ยังไม่ DLV ทุกไลน์ ไล่ตามลำดับ จนแต่ละไลน์ได้ leadtime จำลอง (Assy Order × Speed) ครบ 10 ชม.ล่วงหน้า · ไม่เกินงานของวันถัดไป (ล่วงหน้า 1 วันจาก Working date)">แนะนำการวางแผน</button>
             <div class="dm-wrap">
-              <button id="fillCapBtn" class="dm-toggle fill-toggle" type="button" aria-haspopup="true" aria-expanded="false" title="เติมงานจนเต็ม capacity (เปิดใช้เมื่อยังมี capacity เหลือ)">เติม Capacity</button>
+              <button id="autoPlanBtn" class="dm-toggle plan-toggle plan-main" type="button" title="แนะนำการวางแผน: ติ๊กงานที่ยังไม่ DLV ทุกไลน์ ไล่ตามลำดับ จนแต่ละไลน์ได้ leadtime จำลอง (Assy Order × Speed) ครบ 10 ชม.ล่วงหน้า · ไม่เกินงานของวันถัดไป (ล่วงหน้า 1 วันจาก Working date)">แนะนำการวางแผน</button>
+              <button id="fillCapBtn" class="plan-caret" type="button" aria-haspopup="true" aria-expanded="false" title="เติมงานจนเต็ม capacity ต่อจากแผน (เปิดใช้เมื่อยังมี capacity เหลือ)">&#9662;</button>
               <div id="fillCapMenu" class="dm-menu" hidden>
-                <button id="fillSrvBtn" class="dm-item" type="button" title="เดินงาน SRV เพิ่มจนเต็ม capacity (ไม่จำกัดวัน) · เลือก item ที่วางแผนแล้วก่อน">เดินงาน SRV เพิ่ม</button>
-                <button id="fillBootBtn" class="dm-item" type="button" title="Boot productivity: เดินงานผลิตเพิ่มเกินเพดานการแนะนำ (ล่วงหน้าอีกไม่เกิน 1 วัน) จนเต็ม capacity · เลือก item ที่วางแผนแล้วก่อน">Boot productivity</button>
+                <button id="fillBootBtn" class="dm-item" type="button" title="Boot productivity: เดินงานผลิตเพิ่มเกินเพดานการแนะนำ (ล่วงหน้าอีกไม่เกิน 1 วัน) จนเต็ม capacity · เลือก item ที่วางแผนแล้วก่อน">เติม Boot productivity</button>
+                <button id="fillSrvBtn" class="dm-item" type="button" title="เดินงาน SRV เพิ่มจนเต็ม capacity (ไม่จำกัดวัน) · เลือก item ที่วางแผนแล้วก่อน">เติม SRV</button>
               </div>
             </div>
             <div class="dm-wrap">
