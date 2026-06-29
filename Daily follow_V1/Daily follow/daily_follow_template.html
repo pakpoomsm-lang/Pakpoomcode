@@ -4202,10 +4202,15 @@
         if (field === 'incoming') {
           const items = incStatus(row);
           if (items) {
+            // Flag the lot right on the badge if any part is out of / negative stock.
+            const lowParts = items.filter(it => it.balance !== null && it.balance !== undefined && it.balance <= 0);
+            const low = lowParts.length > 0;
             const b = document.createElement('span');
-            b.className = 'badge clickable ok';
-            b.textContent = 'Stock';
-            b.title = `${items.length} part เข้าแล้ว — คลิกดูรายละเอียด`;
+            b.className = 'badge clickable ' + (low ? 'warn' : 'ok');
+            b.textContent = (low ? '⚠️ ' : '') + 'Stock';
+            b.title = low
+              ? `${lowParts.length} part คงเหลือ ≤ 0 (${lowParts.map(it => it.part).join(', ')}) — คลิกดูรายละเอียด`
+              : `${items.length} part เข้าแล้ว — คลิกดูรายละเอียด`;
             b.addEventListener('click', (e) => { e.stopPropagation(); openIncDetail(items, row); });
             td.appendChild(b);
           } else {
