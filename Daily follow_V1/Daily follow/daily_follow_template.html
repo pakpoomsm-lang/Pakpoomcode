@@ -1246,6 +1246,14 @@
     .cs-result.ok { color: #138a55; }
     .cs-result.ng { color: #c0392b; }
     .cs-result.miss { color: #8892a4; }
+    .cs-clickable { cursor: pointer; }
+    .cs-clickable:hover .cs-label { text-decoration: underline; }
+    .cs-meas { margin: 4px 0 2px 22px; padding: 8px 10px; background: #f4f6fa; border-radius: 6px; font-size: 12px; }
+    .cs-meas-head { font-weight: 700; color: var(--ink); margin: 4px 0; }
+    .cs-meas-head:first-child { margin-top: 0; }
+    .cs-meas-grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; }
+    .cs-meas-k { color: #6b7280; }
+    .cs-meas-v { color: var(--ink); font-weight: 600; text-align: right; }
     .blank { color: transparent; }
     
     .red { color: var(--late); font-weight: 700; }
@@ -1646,9 +1654,9 @@
       const detail = [];
       for (const [key, label] of CHECK_PROCS) {
         const v = procs[key];
-        if (v === 'OK') { have++; detail.push({ label, result: 'OK' }); }
-        else if (v === 'NG') { ng = true; detail.push({ label, result: 'NG' }); }
-        else { missing.push(label); detail.push({ label, result: null }); }
+        if (v === 'OK') { have++; detail.push({ key, label, result: 'OK' }); }
+        else if (v === 'NG') { ng = true; detail.push({ key, label, result: 'NG' }); }
+        else { missing.push(label); detail.push({ key, label, result: null }); }
       }
       const need = CHECK_PROCS.length;
       if (have === 0 && !ng) return { state: 'none', detail };
@@ -1663,7 +1671,9 @@
       if (!ovl) return;
       title.textContent = `Check Sheet — Line ${row.line}  Seq ${row.seq}  (${row.month})`;
       list.replaceChildren();
-      for (const { label, result } of (cs.detail || [])) {
+      for (const { key, label, result } of (cs.detail || [])) {
+        const wrap = document.createElement('div');
+        wrap.className = 'cs-item';
         const div = document.createElement('div');
         div.className = 'cs-row';
         const dot = document.createElement('span');
@@ -1676,9 +1686,56 @@
         res.className = 'cs-result ' + cls;
         res.textContent = result === 'OK' ? '✓ OK' : result === 'NG' ? '✗ NG' : 'ยังไม่มี';
         div.append(dot, lbl, res);
-        list.appendChild(div);
+        wrap.appendChild(div);
+        // A process with a recorded result can be expanded to show its measured
+        // values (loaded on first click from /api/checksheet-detail).
+        if (result) {
+          const box = document.createElement('div');
+          box.className = 'cs-meas';
+          box.hidden = true;
+          div.classList.add('cs-clickable');
+          div.title = 'คลิกดูค่าที่วัด';
+          let loaded = false;
+          div.addEventListener('click', async () => {
+            box.hidden = !box.hidden;
+            if (loaded || box.hidden) return;
+            loaded = true;
+            box.textContent = 'กำลังโหลด…';
+            renderCsMeas(box, await fetchCsMeas(row, key));
+          });
+          wrap.appendChild(box);
+        }
+        list.appendChild(wrap);
       }
       ovl.hidden = false;
+    }
+    async function fetchCsMeas(row, proc) {
+      try {
+        const qs = new URLSearchParams({
+          line: row.line || '', seq: row.seq || '', month: row.month || '', proc,
+        });
+        const resp = await fetch('/api/checksheet-detail?' + qs.toString(), { cache: 'no-store' });
+        if (!resp.ok) return [];
+        return (await resp.json()).records || [];
+      } catch (e) { return []; }
+    }
+    function renderCsMeas(box, recs) {
+      box.replaceChildren();
+      if (!recs.length) { box.textContent = 'ไม่พบค่าที่วัด'; return; }
+      for (const rec of recs) {
+        const head = document.createElement('div');
+        head.className = 'cs-meas-head';
+        head.textContent = `Lot ${rec.lot || '-'}` + (rec.result ? ` · ${rec.result}` : '');
+        box.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'cs-meas-grid';
+        for (const { label, value } of rec.values) {
+          const k = document.createElement('span'); k.className = 'cs-meas-k'; k.textContent = label;
+          const v = document.createElement('span'); v.className = 'cs-meas-v'; v.textContent = value;
+          grid.append(k, v);
+        }
+        box.appendChild(grid);
+      }
     }
 
     // --- Part incoming (HEI Smart Stock Management) -------------------------

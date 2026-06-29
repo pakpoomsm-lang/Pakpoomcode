@@ -228,6 +228,21 @@ CHECKSHEET_SOURCES = [
 ]
 
 
+# Measured values surfaced per process in the check-sheet detail popup. Only the
+# numbers actually measured on the floor — model/spec/vendor fields are left out
+# on purpose (the user wants raw measurements, not per-model detail).
+CHECKSHEET_MEAS = {
+    "cutting":   [("insulation_qty", "Insulation qty"), ("cutting_pcs", "Cutting pcs"),
+                  ("lay_down_side", "Lay down side"), ("lay_down_middle", "Lay down middle")],
+    "fp":        [("fp1", "FP1"), ("fp2", "FP2"), ("fp3", "FP3"), ("fp4", "FP4"), ("fp_avg", "FP avg"),
+                  ("ff1", "FF1"), ("ff2", "FF2"), ("ff3", "FF3"), ("ff4", "FF4"), ("ff_avg", "FF avg"),
+                  ("sc1", "SC1"), ("sc2", "SC2"), ("sc3", "SC3"), ("sc4", "SC4"), ("sc_avg", "SC avg"),
+                  ("qty_fin", "Qty fin")],
+    "hp":        [("avg_l1", "Avg L1"), ("avg_l2", "Avg L2"), ("avg_diff", "Avg diff"), ("avg_flat", "Avg flat")],
+    "hp_insert": [("fin_pitch", "Fin pitch")],
+}
+
+
 def _cs_month(value):
     """Check-sheet prod_month 'MM/YYYY' -> 'M.YYYY' to match build's month_display."""
     raw = str(value or "").strip()
@@ -285,6 +300,69 @@ def load_checksheets():
         except sqlite3.Error:
             continue  # skip a missing/locked/corrupt DB rather than break the page
     return by_key
+
+
+def load_checksheet_detail(line, seq, month, proc):
+    """Measured values for one process of one (line, month, seq), newest first.
+
+    Returns a list of records: {"lot", "result", "savedAt", "values": [{label, value}]}.
+    Only measured numbers are returned (blank ones skipped); model/spec fields are not.
+    Filtering mirrors load_checksheets() so the rows match what the badge counted.
+    """
+    src = next((s for s in CHECKSHEET_SOURCES if s[0] == proc), None)
+    meas = CHECKSHEET_MEAS.get(proc)
+    if not src or not meas:
+        return []
+    _, fname, table, lcol, scol, mcol, rcol, tcol = src
+    db = FIRSTLOT_DIR / fname
+    if not db.is_file() or db.stat().st_size == 0:
+        return []
+    want_line = str(line or "").strip().upper()
+    want_seq = bdf.seq_key(seq)
+    want_month = str(month or "").strip()
+    if not want_line or not want_seq:
+        return []
+
+    # Build the column list (de-duped, order preserved) for one SELECT.
+    cols = [lcol, scol, rcol, "lot", tcol] + ([mcol] if mcol else []) + [c for c, _ in meas]
+    seen, ordered = set(), []
+    for c in cols:
+        if c not in seen:
+            seen.add(c)
+            ordered.append(c)
+
+    out = []
+    try:
+        conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+        cur = conn.execute(f"SELECT {', '.join(ordered)} FROM {table} ORDER BY {tcol} DESC")
+        names = [d[0] for d in cur.description]
+        for r in cur:
+            rec = dict(zip(names, r))
+            if str(rec.get(lcol) or "").strip().upper() != want_line:
+                continue
+            if bdf.seq_key(rec.get(scol)) != want_seq:
+                continue
+            rmonth = _cs_month(rec.get(mcol)) if mcol else _ts_month(rec.get(tcol))
+            if want_month and rmonth != want_month:
+                continue
+            values = []
+            for col, label in meas:
+                v = rec.get(col)
+                s = "" if v is None else str(v).strip()
+                if s:
+                    values.append({"label": label, "value": s})
+            if not values:
+                continue
+            out.append({
+                "lot": str(rec.get("lot") or "").strip(),
+                "result": str(rec.get(rcol) or "").strip().upper(),
+                "savedAt": str(rec.get(tcol) or "").strip(),
+                "values": values,
+            })
+        conn.close()
+    except sqlite3.Error:
+        return []
+    return out
 
 
 # --- Part incoming (HEI Smart Stock Management) ------------------------------
@@ -1283,6 +1361,18 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 by_key = load_checksheets()
                 self._send(200, json.dumps({"byKey": by_key}))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/checksheet-detail":
+            try:
+                recs = load_checksheet_detail(
+                    query.get("line", [""])[0],
+                    query.get("seq", [""])[0],
+                    query.get("month", [""])[0],
+                    (query.get("proc", [""])[0] or "").strip(),
+                )
+                self._send(200, json.dumps({"records": recs}, ensure_ascii=False))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return
