@@ -416,6 +416,66 @@ def _resolve_stock_db():
 
 
 STOCK_DB = _resolve_stock_db()
+# Dispatched parts (used for the remaining-stock balance) live in mecp.db next
+# to incoming.db. Blank/missing → balance falls back to received qty only.
+MECP_DB = STOCK_DB.parent / "mecp.db"
+
+
+def _th_date(value):
+    """Thai 'DD/MM/YYYY' -> 'YYYY-MM-DD' for comparing dispatch vs first-receive."""
+    try:
+        d, m, y = str(value or "").strip().split("/")
+        return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+    except (ValueError, AttributeError):
+        return ""
+
+
+def load_stock_balance():
+    """Remaining stock per part_no, mirroring the stock app's /api/incoming/stock
+    so the numbers match: received (incoming) − dispatched (mecp orders that are
+    'จัดและส่งแล้ว', counted only on/after the part's first receive) − deductions.
+    Returns {part_no: net_qty}. Reads both DBs read-only; degrades to received-only
+    when mecp.db is absent."""
+    if not STOCK_DB.is_file() or STOCK_DB.stat().st_size == 0:
+        return {}
+    try:
+        conn = sqlite3.connect(f"file:{STOCK_DB.as_posix()}?mode=ro", uri=True)
+        received, first_recv = {}, {}
+        for pn, qty, first in conn.execute(
+            "SELECT part_no, SUM(qty), MIN(receive_date) FROM incoming "
+            "WHERE part_no IS NOT NULL AND part_no != '' GROUP BY part_no"
+        ):
+            key = str(pn or "").strip()
+            received[key] = int(qty or 0)
+            first_recv[key] = str(first or "")
+        deduct = {}
+        try:
+            for pn, total in conn.execute(
+                "SELECT part_no, SUM(qty) FROM deductions GROUP BY part_no"
+            ):
+                deduct[str(pn or "").strip()] = int(total or 0)
+        except sqlite3.Error:
+            pass  # deductions table missing → nothing deducted
+        dispatch = {}
+        if MECP_DB.is_file() and MECP_DB.stat().st_size:
+            conn.execute("ATTACH DATABASE ? AS mecp", (f"file:{MECP_DB.as_posix()}?mode=ro",))
+            rows = conn.execute(
+                "SELECT item_code, qty, COALESCE(confirm_date, date) FROM mecp.orders "
+                "WHERE work_status = 'จัดและส่งแล้ว' AND item_code IS NOT NULL AND item_code != ''"
+            ).fetchall()
+            conn.execute("DETACH DATABASE mecp")
+            for pn, qty, ddate in rows:
+                key = str(pn or "").strip()
+                fr = first_recv.get(key, "")
+                # A part with receive history only counts dispatch on/after first receive.
+                if fr and not (_th_date(ddate) and _th_date(ddate) >= _th_date(fr)):
+                    continue
+                dispatch[key] = dispatch.get(key, 0) + int(qty or 0)
+        conn.close()
+    except sqlite3.Error:
+        return {}
+    parts = set(received) | set(dispatch) | set(deduct)
+    return {pn: received.get(pn, 0) - dispatch.get(pn, 0) - deduct.get(pn, 0) for pn in parts}
 
 
 def _print_stock_db_status():
@@ -489,6 +549,7 @@ def load_incoming():
             if receive_date:
                 entry["last"] = str(receive_date)
         conn.close()
+        balance = load_stock_balance()   # global remaining stock per part_no
         for key, bucket in parts.items():
             by_key[key] = [
                 {
@@ -497,6 +558,7 @@ def load_incoming():
                     "partType": desc_map.get(p, ("", ""))[1],
                     "qty": bdf.clean_qty(v["qty"]),
                     "last": v["last"],
+                    "balance": balance.get(p),   # None if part not in balance map
                 }
                 for p, v in bucket.items()
             ]

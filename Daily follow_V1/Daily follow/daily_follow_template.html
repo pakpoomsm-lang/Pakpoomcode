@@ -1231,6 +1231,8 @@
     .inc-row-top { display: flex; align-items: baseline; gap: 8px; }
     .inc-part { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
     .inc-qty { font-size: 13px; font-weight: 700; color: #138a55; white-space: nowrap; }
+    .inc-balance { font-size: 12px; font-weight: 700; color: #5b6a8a; background: #eef1f8; border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
+    .inc-balance.neg { color: #c0392b; background: #fdecea; }
     .inc-meta { font-size: 11px; color: #8892a4; display: flex; gap: 10px; padding-left: 2px; }
     .inc-type { font-size: 11px; font-weight: 600; color: #5b6a8a; background: #eef1f8; border-radius: 3px; padding: 1px 5px; }
     .cs-list { padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -1797,6 +1799,14 @@
         qtyEl.className = 'inc-qty';
         qtyEl.textContent = it.qty + ' PC';
         top.append(partEl, qtyEl);
+        // Global remaining stock for this part (received − dispatched − deductions).
+        if (it.balance !== null && it.balance !== undefined) {
+          const balEl = document.createElement('span');
+          balEl.className = 'inc-balance' + (it.balance <= 0 ? ' neg' : '');
+          balEl.textContent = 'คงเหลือ ' + it.balance;
+          balEl.title = 'Stock คงเหลือรวมทุกไลน์ของ part นี้';
+          top.appendChild(balEl);
+        }
 
         // bottom row: description + part_type badge + receive date
         const meta = document.createElement('div');
