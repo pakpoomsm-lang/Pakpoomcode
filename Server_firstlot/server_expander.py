@@ -9,9 +9,9 @@ from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-_FL_DIR     = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\public"
+_FL_DIR     = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\public"
 _PC_DIR     = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\JPEG FILE"
-_ITEMS_JSON = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\public\data\items.json"
+_ITEMS_JSON = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\public\data\items.json"
 EXPANDER_DB  = r"W:\PD\2.HEAT INDOOR\12.Pakpoom\mecp-python\expander_records.db"
 MASTER_XLSX  = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Master data HEI.xlsx"
 PEOPLE_XLSX  = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Data Man MC Mat.xlsx"
@@ -476,7 +476,7 @@ async def api_delete_all(request: Request):
 # ── Cutting Check ──────────────────────────────────────────────────────────────
 _CUT_DIR = r"W:\PD\2.HEAT INDOOR\13.Suphamat P"
 _OLD_CUT_DB = os.path.join(_CUT_DIR, "expander_records.db")   # legacy shared location
-_CUT_DB  = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\cutting_records.db"
+_CUT_DB  = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\cutting_records.db"
 _JPEG_DIR = os.path.join(_CUT_DIR, "JPEG FILE")
 
 def _sync_table_from_old(new_con, table, old_db_path):
@@ -734,7 +734,7 @@ async def cutting_api_export_excel():
 
 # ── HP Check ──────────────────────────────────────────────────────────────────
 _OLD_HP_DB = EXPANDER_DB   # legacy: hp_records lived in the shared Expander DB
-_HP_DB     = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\hp_records.db"
+_HP_DB     = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\hp_records.db"
 
 def hp_get_db():
     con = sqlite3.connect(_HP_DB)
@@ -1019,7 +1019,7 @@ async def hp_api_bulk_delete(request: Request):
 # FP FIRST LOT CONFIRMATION
 # ══════════════════════════════════════════════════════════════════════════════
 _FP_DIR  = _FL_DIR   # serve HTML from same public/ folder
-_FP_DB   = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\fp_records.db"
+_FP_DB   = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\fp_records.db"
 
 # ── Spec list (Master speclist.xlsm) ──────────────────────────────────────────
 _FP_SPECLIST_PATH      = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Master speclist.xlsm"
@@ -1802,7 +1802,7 @@ async def api_machine_records(mtype: str, mnum: int):
 # ══════════════════════════════════════════════════════════════════════════════
 # HAIRPIN INSERT FIRST LOT (CH-541-04-01)  —  /hp_insert/firstlot
 # ══════════════════════════════════════════════════════════════════════════════
-_HPINS_DB         = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\hp_insert_records.db"
+_HPINS_DB         = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\hp_insert_records.db"
 _HPINS_SPECLIST   = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Master speclist.xlsm"
 _HPINS_HEI_SHEET  = 'Master Review-2025 (2)'
 _HPINS_SPEC_SHEET = 'Speclistnew'
@@ -2074,7 +2074,7 @@ async def hpins_api_save(request: Request):
 # OVEN OIL FIRST LOT  —  /oven/firstlot
 #   Temp-sensor check (Set vs Actual ± tolerance) recorded per time-slot.
 # ══════════════════════════════════════════════════════════════════════════════
-_OVEN_DB = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot\oven_records.db"
+_OVEN_DB = r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process\oven_records.db"
 
 def oven_get_db():
     con = sqlite3.connect(_OVEN_DB)

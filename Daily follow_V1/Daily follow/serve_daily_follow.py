@@ -202,9 +202,9 @@ SAP_EXPORT_DIR_0022    = str(Path(SAP_EXPORT_BASE) / "ZPP0022")
 #      least one expected DB wins. Covers drive-letter differences across PCs.
 _FIRSTLOT_CANDIDATES = [
     Path(os.environ.get("FIRSTLOT_DIR", "")),               # env override (blank → skip)
-    Path(r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"),
-    Path(r"Y:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"),
-    Path(r"J:\PD\2.HEAT INDOOR\13.Suphamat P\Server_firstlot"),
+    Path(r"W:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process"),
+    Path(r"Y:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process"),
+    Path(r"J:\PD\2.HEAT INDOOR\13.Suphamat P\Program First lot all process"),
     ROOT.parent.parent / "Server_firstlot",                 # dev: repo sibling folder
 ]
 _PROBE_DB = "cutting_records.db"   # existence check — all 4 DBs live in the same folder
