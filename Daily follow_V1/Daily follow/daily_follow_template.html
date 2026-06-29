@@ -1231,6 +1231,8 @@
     .inc-row-top { display: flex; align-items: baseline; gap: 8px; }
     .inc-part { font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; }
     .inc-qty { font-size: 13px; font-weight: 700; color: #138a55; white-space: nowrap; }
+    .inc-balance { font-size: 12px; font-weight: 700; color: #5b6a8a; background: #eef1f8; border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
+    .inc-balance.neg { color: #c0392b; background: #fdecea; }
     .inc-meta { font-size: 11px; color: #8892a4; display: flex; gap: 10px; padding-left: 2px; }
     .inc-type { font-size: 11px; font-weight: 600; color: #5b6a8a; background: #eef1f8; border-radius: 3px; padding: 1px 5px; }
     .cs-list { padding: 14px 20px 18px; display: flex; flex-direction: column; gap: 10px; }
@@ -1246,6 +1248,15 @@
     .cs-result.ok { color: #138a55; }
     .cs-result.ng { color: #c0392b; }
     .cs-result.miss { color: #8892a4; }
+    .cs-clickable { cursor: pointer; }
+    .cs-clickable:hover .cs-label { text-decoration: underline; }
+    .cs-meas { margin: 4px 0 2px 22px; padding: 8px 10px; background: #f4f6fa; border-radius: 6px; font-size: 12px; }
+    .cs-meas-grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; }
+    .cs-meas-k { color: #6b7280; }
+    .cs-meas-v { color: var(--ink); font-weight: 600; text-align: right; }
+    .cs-meta-grid { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #d5dae3; }
+    .cs-meta-v { color: var(--ink); text-align: right; word-break: break-word; }
+    .cs-rec-sep { margin-top: 10px; padding-top: 10px; border-top: 1px solid #c8cdd8; }
     .blank { color: transparent; }
     
     .red { color: var(--late); font-weight: 700; }
@@ -1646,9 +1657,9 @@
       const detail = [];
       for (const [key, label] of CHECK_PROCS) {
         const v = procs[key];
-        if (v === 'OK') { have++; detail.push({ label, result: 'OK' }); }
-        else if (v === 'NG') { ng = true; detail.push({ label, result: 'NG' }); }
-        else { missing.push(label); detail.push({ label, result: null }); }
+        if (v === 'OK') { have++; detail.push({ key, label, result: 'OK' }); }
+        else if (v === 'NG') { ng = true; detail.push({ key, label, result: 'NG' }); }
+        else { missing.push(label); detail.push({ key, label, result: null }); }
       }
       const need = CHECK_PROCS.length;
       if (have === 0 && !ng) return { state: 'none', detail };
@@ -1663,7 +1674,9 @@
       if (!ovl) return;
       title.textContent = `Check Sheet — Line ${row.line}  Seq ${row.seq}  (${row.month})`;
       list.replaceChildren();
-      for (const { label, result } of (cs.detail || [])) {
+      for (const { key, label, result } of (cs.detail || [])) {
+        const wrap = document.createElement('div');
+        wrap.className = 'cs-item';
         const div = document.createElement('div');
         div.className = 'cs-row';
         const dot = document.createElement('span');
@@ -1676,9 +1689,66 @@
         res.className = 'cs-result ' + cls;
         res.textContent = result === 'OK' ? '✓ OK' : result === 'NG' ? '✗ NG' : 'ยังไม่มี';
         div.append(dot, lbl, res);
-        list.appendChild(div);
+        wrap.appendChild(div);
+        // A process with a recorded result can be expanded to show its measured
+        // values (loaded on first click from /api/checksheet-detail).
+        if (result) {
+          const box = document.createElement('div');
+          box.className = 'cs-meas';
+          box.hidden = true;
+          div.classList.add('cs-clickable');
+          div.title = 'คลิกดูค่าที่วัด';
+          let loaded = false;
+          div.addEventListener('click', async () => {
+            box.hidden = !box.hidden;
+            if (loaded || box.hidden) return;
+            loaded = true;
+            box.textContent = 'กำลังโหลด…';
+            renderCsMeas(box, await fetchCsMeas(row, key));
+          });
+          wrap.appendChild(box);
+        }
+        list.appendChild(wrap);
       }
       ovl.hidden = false;
+    }
+    async function fetchCsMeas(row, proc) {
+      try {
+        const qs = new URLSearchParams({
+          line: row.line || '', seq: row.seq || '', month: row.month || '', proc,
+        });
+        const resp = await fetch('/api/checksheet-detail?' + qs.toString(), { cache: 'no-store' });
+        if (!resp.ok) return [];
+        return (await resp.json()).records || [];
+      } catch (e) { return []; }
+    }
+    function renderCsMeas(box, recs) {
+      box.replaceChildren();
+      if (!recs.length) { box.textContent = 'ไม่พบค่าที่วัด'; return; }
+      recs.forEach((rec, i) => {
+        const block = document.createElement('div');
+        block.className = 'cs-rec' + (i > 0 ? ' cs-rec-sep' : '');
+        // Context (วันที่/item/ชิ้นงาน/เครื่อง/ผู้ตรวจ) so each record is identifiable.
+        if (rec.meta && rec.meta.length) {
+          const mg = document.createElement('div');
+          mg.className = 'cs-meas-grid cs-meta-grid';
+          for (const { label, value } of rec.meta) {
+            const k = document.createElement('span'); k.className = 'cs-meas-k'; k.textContent = label;
+            const v = document.createElement('span'); v.className = 'cs-meta-v'; v.textContent = value;
+            mg.append(k, v);
+          }
+          block.appendChild(mg);
+        }
+        const grid = document.createElement('div');
+        grid.className = 'cs-meas-grid';
+        for (const { label, value } of rec.values) {
+          const k = document.createElement('span'); k.className = 'cs-meas-k'; k.textContent = label;
+          const v = document.createElement('span'); v.className = 'cs-meas-v'; v.textContent = value;
+          grid.append(k, v);
+        }
+        block.appendChild(grid);
+        box.appendChild(block);
+      });
     }
 
     // --- Part incoming (HEI Smart Stock Management) -------------------------
@@ -1729,6 +1799,15 @@
         qtyEl.className = 'inc-qty';
         qtyEl.textContent = it.qty + ' PC';
         top.append(partEl, qtyEl);
+        // Global remaining stock for this part (received − dispatched − deductions).
+        if (it.balance !== null && it.balance !== undefined) {
+          const low = it.balance <= 0;
+          const balEl = document.createElement('span');
+          balEl.className = 'inc-balance' + (low ? ' neg' : '');
+          balEl.textContent = (low ? '⚠️ ' : '') + 'คงเหลือ ' + it.balance;
+          balEl.title = 'Stock คงเหลือรวมทุกไลน์ของ part นี้';
+          top.appendChild(balEl);
+        }
 
         // bottom row: description + part_type badge + receive date
         const meta = document.createElement('div');
@@ -4123,10 +4202,15 @@
         if (field === 'incoming') {
           const items = incStatus(row);
           if (items) {
+            // Flag the lot right on the badge if any part is out of / negative stock.
+            const lowParts = items.filter(it => it.balance !== null && it.balance !== undefined && it.balance <= 0);
+            const low = lowParts.length > 0;
             const b = document.createElement('span');
-            b.className = 'badge clickable ok';
-            b.textContent = 'Stock';
-            b.title = `${items.length} part เข้าแล้ว — คลิกดูรายละเอียด`;
+            b.className = 'badge clickable ' + (low ? 'warn' : 'ok');
+            b.textContent = (low ? '⚠️ ' : '') + 'Stock';
+            b.title = low
+              ? `${lowParts.length} part คงเหลือ ≤ 0 (${lowParts.map(it => it.part).join(', ')}) — คลิกดูรายละเอียด`
+              : `${items.length} part เข้าแล้ว — คลิกดูรายละเอียด`;
             b.addEventListener('click', (e) => { e.stopPropagation(); openIncDetail(items, row); });
             td.appendChild(b);
           } else {

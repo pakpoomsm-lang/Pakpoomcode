@@ -228,6 +228,35 @@ CHECKSHEET_SOURCES = [
 ]
 
 
+# Measured values surfaced per process in the check-sheet detail popup. Only the
+# numbers actually measured on the floor — model/spec/vendor fields are left out
+# on purpose (the user wants raw measurements, not per-model detail).
+CHECKSHEET_MEAS = {
+    "cutting":   [("insulation_qty", "Insulation qty"), ("cutting_pcs", "Cutting pcs"),
+                  ("lay_down_side", "Lay down side"), ("lay_down_middle", "Lay down middle")],
+    "fp":        [("fp1", "FP1"), ("fp2", "FP2"), ("fp3", "FP3"), ("fp4", "FP4"), ("fp_avg", "FP avg"),
+                  ("ff1", "FF1"), ("ff2", "FF2"), ("ff3", "FF3"), ("ff4", "FF4"), ("ff_avg", "FF avg"),
+                  ("sc1", "SC1"), ("sc2", "SC2"), ("sc3", "SC3"), ("sc4", "SC4"), ("sc_avg", "SC avg"),
+                  ("qty_fin", "Qty fin")],
+    "hp":        [("avg_l1", "Avg L1"), ("avg_l2", "Avg L2"), ("avg_diff", "Avg diff"), ("avg_flat", "Avg flat")],
+    "hp_insert": [("fin_pitch", "Fin pitch")],
+}
+
+# Context shown above the measured values so each record is identifiable (which
+# item / machine / who checked). The first entry is the timestamp column —
+# trimmed to the date part in the detail loader.
+CHECKSHEET_META = {
+    "cutting":   [("saved_at", "วันที่"), ("tag_fg_no1", "Item"), ("item_type", "Type"),
+                  ("mc_line", "เครื่อง"), ("id_card", "ผู้ตรวจ")],
+    "fp":        [("saved_at", "วันที่"), ("item", "Item"), ("desc1", "ชิ้นงาน"),
+                  ("mc", "เครื่อง"), ("checker", "ผู้ตรวจ")],
+    "hp":        [("saved_at", "วันที่"), ("item", "Item"), ("item_fg", "ชิ้นงาน"),
+                  ("mc", "เครื่อง"), ("checker", "ผู้ตรวจ")],
+    "hp_insert": [("created_at", "วันที่"), ("item_fin", "Item"), ("item_wip", "WIP"),
+                  ("machine_finpress", "เครื่อง"), ("name_checker", "ผู้ตรวจ")],
+}
+
+
 def _cs_month(value):
     """Check-sheet prod_month 'MM/YYYY' -> 'M.YYYY' to match build's month_display."""
     raw = str(value or "").strip()
@@ -287,6 +316,82 @@ def load_checksheets():
     return by_key
 
 
+def load_checksheet_detail(line, seq, month, proc):
+    """Measured values for one process of one (line, month, seq), newest first.
+
+    Returns a list of records:
+      {"lot", "result", "savedAt", "meta": [{label, value}], "values": [{label, value}]}.
+    `meta` is context (วันที่/item/ชิ้นงาน/เครื่อง/ผู้ตรวจ) so each record is identifiable;
+    `values` is the measured numbers only (blank ones skipped). Filtering mirrors
+    load_checksheets() so the rows match what the badge counted.
+    """
+    src = next((s for s in CHECKSHEET_SOURCES if s[0] == proc), None)
+    meas = CHECKSHEET_MEAS.get(proc)
+    if not src or not meas:
+        return []
+    _, fname, table, lcol, scol, mcol, rcol, tcol = src
+    meta = CHECKSHEET_META.get(proc, [])
+    db = FIRSTLOT_DIR / fname
+    if not db.is_file() or db.stat().st_size == 0:
+        return []
+    want_line = str(line or "").strip().upper()
+    want_seq = bdf.seq_key(seq)
+    want_month = str(month or "").strip()
+    if not want_line or not want_seq:
+        return []
+
+    # Build the column list (de-duped, order preserved) for one SELECT.
+    cols = ([lcol, scol, rcol, "lot", tcol] + ([mcol] if mcol else [])
+            + [c for c, _ in meta] + [c for c, _ in meas])
+    seen, ordered = set(), []
+    for c in cols:
+        if c not in seen:
+            seen.add(c)
+            ordered.append(c)
+
+    out = []
+    try:
+        conn = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+        cur = conn.execute(f"SELECT {', '.join(ordered)} FROM {table} ORDER BY {tcol} DESC")
+        names = [d[0] for d in cur.description]
+        for r in cur:
+            rec = dict(zip(names, r))
+            if str(rec.get(lcol) or "").strip().upper() != want_line:
+                continue
+            if bdf.seq_key(rec.get(scol)) != want_seq:
+                continue
+            rmonth = _cs_month(rec.get(mcol)) if mcol else _ts_month(rec.get(tcol))
+            if want_month and rmonth != want_month:
+                continue
+            values = []
+            for col, label in meas:
+                v = rec.get(col)
+                s = "" if v is None else str(v).strip()
+                if s:
+                    values.append({"label": label, "value": s})
+            if not values:
+                continue
+            meta_out = []
+            for col, label in meta:
+                v = rec.get(col)
+                s = "" if v is None else str(v).strip()
+                if col == tcol:
+                    s = s[:10]   # date part only, drop the time
+                if s:
+                    meta_out.append({"label": label, "value": s})
+            out.append({
+                "lot": str(rec.get("lot") or "").strip(),
+                "result": str(rec.get(rcol) or "").strip().upper(),
+                "savedAt": str(rec.get(tcol) or "").strip(),
+                "meta": meta_out,
+                "values": values,
+            })
+        conn.close()
+    except sqlite3.Error:
+        return []
+    return out
+
+
 # --- Part incoming (HEI Smart Stock Management) ------------------------------
 # The warehouse receiving app stores every scanned-in part in incoming.db. We
 # read it (read-only) to show, per row, which parts have physically arrived for
@@ -311,6 +416,66 @@ def _resolve_stock_db():
 
 
 STOCK_DB = _resolve_stock_db()
+# Dispatched parts (used for the remaining-stock balance) live in mecp.db next
+# to incoming.db. Blank/missing → balance falls back to received qty only.
+MECP_DB = STOCK_DB.parent / "mecp.db"
+
+
+def _th_date(value):
+    """Thai 'DD/MM/YYYY' -> 'YYYY-MM-DD' for comparing dispatch vs first-receive."""
+    try:
+        d, m, y = str(value or "").strip().split("/")
+        return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
+    except (ValueError, AttributeError):
+        return ""
+
+
+def load_stock_balance():
+    """Remaining stock per part_no, mirroring the stock app's /api/incoming/stock
+    so the numbers match: received (incoming) − dispatched (mecp orders that are
+    'จัดและส่งแล้ว', counted only on/after the part's first receive) − deductions.
+    Returns {part_no: net_qty}. Reads both DBs read-only; degrades to received-only
+    when mecp.db is absent."""
+    if not STOCK_DB.is_file() or STOCK_DB.stat().st_size == 0:
+        return {}
+    try:
+        conn = sqlite3.connect(f"file:{STOCK_DB.as_posix()}?mode=ro", uri=True)
+        received, first_recv = {}, {}
+        for pn, qty, first in conn.execute(
+            "SELECT part_no, SUM(qty), MIN(receive_date) FROM incoming "
+            "WHERE part_no IS NOT NULL AND part_no != '' GROUP BY part_no"
+        ):
+            key = str(pn or "").strip()
+            received[key] = int(qty or 0)
+            first_recv[key] = str(first or "")
+        deduct = {}
+        try:
+            for pn, total in conn.execute(
+                "SELECT part_no, SUM(qty) FROM deductions GROUP BY part_no"
+            ):
+                deduct[str(pn or "").strip()] = int(total or 0)
+        except sqlite3.Error:
+            pass  # deductions table missing → nothing deducted
+        dispatch = {}
+        if MECP_DB.is_file() and MECP_DB.stat().st_size:
+            conn.execute("ATTACH DATABASE ? AS mecp", (f"file:{MECP_DB.as_posix()}?mode=ro",))
+            rows = conn.execute(
+                "SELECT item_code, qty, COALESCE(confirm_date, date) FROM mecp.orders "
+                "WHERE work_status = 'จัดและส่งแล้ว' AND item_code IS NOT NULL AND item_code != ''"
+            ).fetchall()
+            conn.execute("DETACH DATABASE mecp")
+            for pn, qty, ddate in rows:
+                key = str(pn or "").strip()
+                fr = first_recv.get(key, "")
+                # A part with receive history only counts dispatch on/after first receive.
+                if fr and not (_th_date(ddate) and _th_date(ddate) >= _th_date(fr)):
+                    continue
+                dispatch[key] = dispatch.get(key, 0) + int(qty or 0)
+        conn.close()
+    except sqlite3.Error:
+        return {}
+    parts = set(received) | set(dispatch) | set(deduct)
+    return {pn: received.get(pn, 0) - dispatch.get(pn, 0) - deduct.get(pn, 0) for pn in parts}
 
 
 def _print_stock_db_status():
@@ -384,6 +549,7 @@ def load_incoming():
             if receive_date:
                 entry["last"] = str(receive_date)
         conn.close()
+        balance = load_stock_balance()   # global remaining stock per part_no
         for key, bucket in parts.items():
             by_key[key] = [
                 {
@@ -392,6 +558,7 @@ def load_incoming():
                     "partType": desc_map.get(p, ("", ""))[1],
                     "qty": bdf.clean_qty(v["qty"]),
                     "last": v["last"],
+                    "balance": balance.get(p),   # None if part not in balance map
                 }
                 for p, v in bucket.items()
             ]
@@ -1283,6 +1450,18 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 by_key = load_checksheets()
                 self._send(200, json.dumps({"byKey": by_key}))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/checksheet-detail":
+            try:
+                recs = load_checksheet_detail(
+                    query.get("line", [""])[0],
+                    query.get("seq", [""])[0],
+                    query.get("month", [""])[0],
+                    (query.get("proc", [""])[0] or "").strip(),
+                )
+                self._send(200, json.dumps({"records": recs}, ensure_ascii=False))
             except Exception as exc:
                 self._send(500, json.dumps({"error": str(exc)}))
             return
