@@ -370,6 +370,8 @@ tr.selected{background:#fff5f5 !important;}
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-reload" onclick="refreshAll()">🔄 รีเฟรช</button>
+        <button class="btn-csv" id="btnImport" style="display:none;background:var(--blue)" onclick="document.getElementById('importFile').click()">📥 Import Excel</button>
+        <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
         <button class="btn-csv" onclick="exportCSV()">⬇️ Export CSV</button>
       </div>
     </div>
@@ -518,6 +520,9 @@ function switchDB(db) {
 
   // selection bar
   document.getElementById('selBar').classList.remove('show');
+
+  // import (incoming เท่านั้น)
+  document.getElementById('btnImport').style.display = isMecp ? 'none' : '';
 
   refreshAll();
 }
@@ -814,7 +819,10 @@ function renderIncoming() {
       <td>${doShort}</td>
       <td class="c-mono">${o.pro_month||'—'}</td>
       <td style="font-size:11px">${o.employee||'—'}</td>
-      <td><button class="btn-del-row" onclick="confirmDeleteIncOne('${o.id}')">🗑️</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-del-row" style="border-color:var(--blue-bd);color:var(--blue)" onclick="editIncQty('${o.id}',${o.qty||0})">✏️</button>
+        <button class="btn-del-row" onclick="confirmDeleteIncOne('${o.id}')">🗑️</button>
+      </td>
     </tr>`;
   }).join('');
   document.getElementById('tbody').innerHTML = `<table>
@@ -828,6 +836,23 @@ function renderIncoming() {
     <tbody>${rows}</tbody>
   </table>`;
   renderPager(total);
+}
+
+// ── EDIT: incoming.db (แก้จำนวน) ──
+async function editIncQty(id, current) {
+  const v = prompt('แก้ไขจำนวน (ชิ้น):', current);
+  if (v === null) return;
+  const qty = parseInt(v, 10);
+  if (isNaN(qty) || qty < 0) { showToast('⚠️ จำนวนไม่ถูกต้อง'); return; }
+  try {
+    const res = await fetch(`/api/incoming/${encodeURIComponent(id)}/qty`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ qty })
+    });
+    const j = await res.json();
+    if (res.ok && j.ok !== false) { showToast(`✏️ แก้ไขจำนวนเป็น ${qty}`); fetchIncStats(); fetchIncoming(); }
+    else showToast('❌ ' + (j.error||'แก้ไขไม่สำเร็จ'));
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 // ── DELETE: incoming.db ──
@@ -883,6 +908,26 @@ function exportIncCSV() {
   a.download = `MECP_Incoming_${new Date().toLocaleDateString('th-TH').replace(/\//g,'-')}.csv`;
   a.click();
   showToast('✅ Export CSV สำเร็จ!');
+}
+
+// ── IMPORT EXCEL: incoming.db ──
+async function importExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';  // reset เพื่อให้เลือกไฟล์เดิมซ้ำได้
+  showToast('⏳ กำลังนำเข้า...');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/incoming/import', { method:'POST', body: fd });
+    const j = await res.json();
+    if (j.ok) {
+      showToast(`✅ นำเข้า ${j.imported} รายการ${j.skipped?` · ข้าม ${j.skipped}`:''}`);
+      fetchIncStats(); fetchIncoming();
+    } else {
+      showToast('❌ ' + (j.error||'นำเข้าไม่สำเร็จ'));
+    }
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 // ══════════════════════════════════════════
