@@ -999,6 +999,36 @@ async def api_incoming_stock(line: str = Query(None)):
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
+@app.post("/api/incoming/stock/adjust")
+async def api_incoming_stock_adjust(request: Request):
+    """ปรับยอด stock คงเหลือของ part หนึ่ง — บันทึกส่วนต่างลงตาราง deductions
+       delta > 0 = เพิ่ม stock, delta < 0 = ลด stock
+       (net = รับเข้า − จ่ายออก − SUM(deductions) จึงใส่ deduction = -delta)"""
+    try:
+        import uuid
+        body = await request.json()
+        part_no = str(body.get("part_no", "")).strip()
+        delta   = int(body.get("delta"))
+        reason  = str(body.get("reason", "") or "ปรับด้วยตนเอง").strip()
+        if not part_no:
+            return JSONResponse({"ok": False, "error": "ต้องระบุ part_no"}, status_code=400)
+        if delta == 0:
+            return JSONResponse({"ok": False, "error": "ส่วนต่างต้องไม่เป็น 0"}, status_code=400)
+        now = datetime.now()
+        conn = sqlite3.connect(INCOMING_DB)
+        conn.execute(
+            "INSERT INTO deductions (id, part_no, qty, reason, ref_order_id, date, timestamp) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), part_no, -delta, reason,
+             "manual_adjust", now.strftime("%d/%m/%Y"), now.isoformat())
+        )
+        conn.commit(); conn.close()
+        return JSONResponse({"ok": True, "part_no": part_no, "delta": delta})
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "error": "delta ต้องเป็นตัวเลข"}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
 @app.delete("/api/incoming/{rec_id}")
 async def api_incoming_delete(rec_id: str):
     try:
