@@ -2993,9 +2993,10 @@
       const speed = DATA.speedByModel[`${line}|${code}|${model}`] ?? DATA.speedByLine[line] ?? '';
       const month = monthDisplay(at('month'));
       const assyOrderNo = cleanText(at('assyOrder'));
-      const head = `${line}|${month}|${cleanNumber(at('seq'))}`;
-      const matp = (DATA.progressMat && DATA.progressMat[`${head}|${item}`]) || {};
-      const hpVal = DATA.progressLot ? DATA.progressLot[`${head}|${assyOrderNo}`] : undefined;
+      const prodOrder = cleanText(at('productionOrder'));
+      // Join progress by the SAP order number (stable), not line|month|seq.
+      const matp = (DATA.progressMat && DATA.progressMat[prodOrder]) || {};
+      const hpVal = DATA.progressLot ? DATA.progressLot[assyOrderNo] : undefined;
       const fin = finalQty(route.attribute2, matp);
       return {
         line,
@@ -3080,7 +3081,11 @@
       const header = rows[0].map(cleanText);
       const ix = {};
       header.forEach((h, i) => { if (!(h in ix)) ix[h] = i; });
-      const need = ['Production Line','Production Month','Sequence','Material','Assembly Order','Operation Short Text','Posted Quantity'];
+      // Keyed by the SAP order number (stable), not line|month|seq: the ZPP0059
+      // Sequence is renumbered over time and stops matching the ZPP0022 order
+      // list, which silently dropped most postings. Order -> Production Order,
+      // Assembly Order -> the assembly lot.
+      const need = ['Production Line','Order','Assembly Order','Operation Short Text','Posted Quantity'];
       for (const name of need) { if (ix[name] === undefined) throw new Error('Missing column: ' + name); }
       const opField = { Insert: 'fp', Brazing: 'auto', Cutting: 'cutting' };
       const mat = {}; const lot = {};
@@ -3088,15 +3093,14 @@
         const row = rows[r];
         const line = cleanText(row[ix['Production Line']]);
         if (!line) continue;
-        const head = `${line}|${monthDisplay(row[ix['Production Month']])}|${seqKey(row[ix['Sequence']])}`;
         const op = cleanText(row[ix['Operation Short Text']]);
         const q = Number(row[ix['Posted Quantity']]);
         const qty = Number.isFinite(q) ? q : 0;
         if (op === 'H/P bender') {
-          const k = `${head}|${cleanText(row[ix['Assembly Order']])}`;
+          const k = cleanText(row[ix['Assembly Order']]);
           lot[k] = (lot[k] || 0) + qty;
         } else if (opField[op]) {
-          const k = `${head}|${cleanText(row[ix['Material']])}`;
+          const k = cleanText(row[ix['Order']]);
           if (!mat[k]) mat[k] = {};
           const f = opField[op];
           mat[k][f] = (mat[k][f] || 0) + qty;
@@ -3109,9 +3113,9 @@
     }
     function applyProgressToRows() {
       for (const row of currentRows) {
-        const head = `${row.line}|${row.month}|${seqKey(row.seq)}`;
-        const matp = (DATA.progressMat && DATA.progressMat[`${head}|${row.item}`]) || {};
-        const hpVal = DATA.progressLot ? DATA.progressLot[`${head}|${row.assyOrderNo}`] : undefined;
+        // Join progress by the SAP order number (stable), not line|month|seq.
+        const matp = (DATA.progressMat && DATA.progressMat[row.productionOrder]) || {};
+        const hpVal = DATA.progressLot ? DATA.progressLot[row.assyOrderNo] : undefined;
         const fin = finalQty(row.attribute, matp);
         row.hp = hpVal === undefined ? '' : hpVal;
         row.fp = matp.fp ?? '';
@@ -3254,8 +3258,7 @@
         row.unit = route.unit || '';
         row.ts = route.ts || '';
         row.operation = route.operation || '';
-        const head = `${row.line}|${row.month}|${seqKey(row.seq)}`;
-        const matp = (DATA.progressMat && DATA.progressMat[`${head}|${row.item}`]) || {};
+        const matp = (DATA.progressMat && DATA.progressMat[row.productionOrder]) || {};
         const fin = finalQty(row.attribute, matp);
         row.fg = fin; row.stockFg = fin; row.subcooler = fin;
       }
@@ -3890,8 +3893,8 @@
         ? Object.assign({}, actProd.N || {}, actProd.D || {})
         : (actProd[(shift === morning) ? 'D' : 'N'] || {});
       let rate = 0, n = 0, pcs = 0;
-      // Production is aggregated per material/seq, so each key counts once even
-      // though the same material appears in several order rows of the table.
+      // Production is aggregated per SAP production order, so each order counts
+      // once even if it shows up in several rows of the table.
       const seen = new Set();
       for (const row of filtered) {
         // Match the production population the rest of the dashboard uses:
@@ -3902,8 +3905,8 @@
         if (isHiddenByAssyStatus(row)) continue;
         const ts = valueOf(row, 'ts');
         if (ts === '' || ts === null || ts === undefined) continue;
-        const key = `${row.line}|${row.month}|${seqKey(row.seq)}|${row.item}`;
-        if (seen.has(key)) continue;
+        const key = row.productionOrder;
+        if (!key || seen.has(key)) continue;
         const prod = byKey[key];
         if (!prod) continue;
         const a = String(row.attribute || '').trim().toUpperCase();
