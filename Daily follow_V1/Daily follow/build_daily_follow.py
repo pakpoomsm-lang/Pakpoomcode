@@ -236,9 +236,13 @@ def clean_qty(value):
 def load_progress():
     """Aggregate real per-process progress from ZPP0059.
 
+    Keyed by the SAP order number (immutable), NOT line|month|seq: the Sequence
+    in ZPP0059 is renumbered over time and stops matching the ZPP0022 order list,
+    which silently dropped most postings. The order number always lines up.
+
     Returns (by_mat, by_lot):
-      by_mat["line|month|seq|material"] = {"fp": q, "auto": q, "cutting": q}
-      by_lot["line|month|seq|assyOrder"] = q   (H/P bender, summed per lot)
+      by_mat["Production Order"]  = {"fp": q, "auto": q, "cutting": q}
+      by_lot["Assembly Order"]    = q   (H/P bender, summed per assembly lot)
     """
     by_mat = defaultdict(lambda: defaultdict(float))
     by_lot = defaultdict(float)
@@ -250,10 +254,8 @@ def load_progress():
     headers = [text(v) for v in next(rows)]
     idx = {h: i for i, h in enumerate(headers)}
     c_line = idx["Production Line"]
-    c_month = idx["Production Month"]
-    c_seq = idx["Sequence"]
-    c_mat = idx["Material"]
-    c_ao = idx["Assembly Order"]
+    c_order = idx["Order"]            # component production order (= ZPP0022 "Production Order")
+    c_ao = idx["Assembly Order"]      # assembly order (= ZPP0022 "Assy Order")
     c_op = idx["Operation Short Text"]
     c_qty = idx["Posted Quantity"]
     # Optional in older exports — used to skip cancelled / deleted postings.
@@ -267,13 +269,12 @@ def load_progress():
             continue
         if c_cancel is not None and text(row[c_cancel]):
             continue
-        key_head = f"{line}|{month_display(row[c_month])}|{seq_key(row[c_seq])}"
         op = text(row[c_op])
         qty = row[c_qty] if isinstance(row[c_qty], (int, float)) else 0
         if op == HP_OP:
-            by_lot[f"{key_head}|{text(row[c_ao])}"] += qty
+            by_lot[text(row[c_ao])] += qty
         elif op in OP_TO_FIELD:
-            by_mat[f"{key_head}|{text(row[c_mat])}"][OP_TO_FIELD[op]] += qty
+            by_mat[text(row[c_order])][OP_TO_FIELD[op]] += qty
     wb.close()
     mat_out = {
         k: {f: clean_qty(q) for f, q in fields.items()}
@@ -478,9 +479,10 @@ def build_rows():
         model = text(row[col["assyMaterialDesc"]])
         month = month_display(row[col["month"]])
         assy_order_no = text(row[col["assyOrder"]])
-        head = f"{line}|{month}|{seq_key(row[col['seq']])}"
-        matp = prog_mat.get(f"{head}|{item}", {})
-        hp_val = prog_lot.get(f"{head}|{assy_order_no}", "")
+        prod_order = text(row[col["productionOrder"]])
+        # Join progress by the SAP order number (stable), not line|month|seq.
+        matp = prog_mat.get(prod_order, {})
+        hp_val = prog_lot.get(assy_order_no, "")
         fin = final_qty(route.get("attribute2"), matp)
         remark = " ".join(
             part
