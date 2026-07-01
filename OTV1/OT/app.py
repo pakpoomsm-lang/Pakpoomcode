@@ -1075,16 +1075,26 @@ def working_hours():
     cursor.execute('SELECT emp_id FROM hour_exclusions')
     excluded = {r[0] for r in cursor.fetchall()}
     cursor.execute('''
-        SELECT e.shift, a.emp_id, a.attendance_type
+        SELECT e.shift, a.emp_id, a.attendance_type,
+               e.first_name, e.last_name, e.workplace,
+               a.leave_period, a.leave_time
         FROM attendance_records a
         JOIN employees e ON e.emp_id = a.emp_id
-        WHERE a.work_date = ? AND a.attendance_type IN ('work', 'ot')
+        WHERE a.work_date = ? AND a.attendance_type IN ('work', 'ot', 'leave')
     ''', (work_date,))
     agg = {}
-    for shift, emp_id, atype in cursor.fetchall():
+    leaves = {}   # shift -> [รายชื่อคนลา]
+    for shift, emp_id, atype, fn, ln, wp, lp, lt in cursor.fetchall():
+        s = (shift or 'ไม่ระบุ')
+        if atype == 'leave':
+            name = f"{fn or ''} {ln or ''}".strip() or '-'
+            leaves.setdefault(s, []).append({
+                'emp_id': emp_id, 'emp_name': name, 'workplace': wp or '-',
+                'leave_period': lp or '-', 'leave_time': lt or '-',
+            })
+            continue
         if emp_id in excluded:
             continue
-        s = (shift or 'ไม่ระบุ')
         d = agg.setdefault(s, {'work': 0, 'ot': 0})
         d[atype] = d.get(atype, 0) + 1
     conn.close()
@@ -1094,21 +1104,29 @@ def working_hours():
 
     morning = 'A' if _shift_a_is_morning(work_date) else 'B'
     d_group = agg.get('D')
+    d_leaves = leaves.get('D', [])
 
     shifts = {}
     for s in ('A', 'B'):
         own = agg.get(s, {'work': 0, 'ot': 0})
         work, ot = own['work'], own['ot']
+        shift_leaves = list(leaves.get(s, []))
         shift_d = None
         includes_d = False
-        if d_group and s == morning:
-            shift_d = {'work': d_group['work'], 'ot': d_group['ot'],
-                       'hours': hours(d_group['work'], d_group['ot'])}
-            work += d_group['work']
-            ot += d_group['ot']
-            includes_d = True
+        if s == morning:
+            # Shift D เข้ากะเช้าของอาทิตย์นั้น — รวมทั้งชั่วโมงและคนลา
+            if d_group:
+                shift_d = {'work': d_group['work'], 'ot': d_group['ot'],
+                           'hours': hours(d_group['work'], d_group['ot'])}
+                work += d_group['work']
+                ot += d_group['ot']
+                includes_d = True
+            if d_leaves:
+                shift_leaves += d_leaves
+                includes_d = True
         shifts[s] = {
             'work': work, 'ot': ot, 'hours': hours(work, ot),
+            'leave': len(shift_leaves), 'leaves': shift_leaves,
             'includes_d': includes_d, 'shift_d': shift_d
         }
 
@@ -1121,54 +1139,6 @@ def working_hours():
     }
     _WH_CACHE[work_date] = (now, payload)
     return jsonify(payload)
-
-
-@app.route('/api/attendance/shift-summary')
-def attendance_shift_summary():
-    """คนมาทำงาน / คนลา แยกตาม Shift A/B สำหรับวันที่ (รวม Shift D เข้ากะเช้า
-    ของอาทิตย์นั้น เหมือน working-hours) พร้อมรายชื่อคนลาให้กดดูรายละเอียด."""
-    work_date = (request.args.get('work_date') or '').strip()
-    if not work_date:
-        return jsonify({'success': False, 'message': 'กรุณาระบุวันที่'}), 400
-
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT e.shift, a.attendance_type, a.emp_id,
-               e.first_name, e.last_name, e.workplace,
-               a.leave_period, a.leave_time
-        FROM attendance_records a
-        JOIN employees e ON e.emp_id = a.emp_id
-        WHERE a.work_date = ? AND a.attendance_type IN ('work', 'ot', 'leave')
-    ''', (work_date,))
-    rows = cursor.fetchall()
-    conn.close()
-
-    morning = 'A' if _shift_a_is_morning(work_date) else 'B'
-    # Shift D เข้ากะเช้าของอาทิตย์นั้น (เหมือน working-hours)
-    def norm(shift):
-        s = (shift or '').strip().upper()
-        return morning if s == 'D' else s
-
-    present = {'A': set(), 'B': set()}   # emp_id ที่มาทำงาน (นับหัวไม่ซ้ำ)
-    leaves  = {'A': [], 'B': []}
-    for shift, atype, emp_id, fn, ln, wp, lp, lt in rows:
-        s = norm(shift)
-        if s not in present:
-            continue
-        if atype in ('work', 'ot'):
-            present[s].add(emp_id)
-        elif atype == 'leave':
-            name = f"{fn or ''} {ln or ''}".strip() or '-'
-            leaves[s].append({
-                'emp_id': emp_id, 'emp_name': name, 'workplace': wp or '-',
-                'leave_period': lp or '-', 'leave_time': lt or '-',
-            })
-
-    shifts = {s: {'work': len(present[s]), 'leave': len(leaves[s]), 'leaves': leaves[s]}
-              for s in ('A', 'B')}
-    return jsonify({'success': True, 'work_date': work_date,
-                    'morning_shift': morning, 'shifts': shifts})
 
 
 @app.route('/api/attendance/incoming-substitutes')

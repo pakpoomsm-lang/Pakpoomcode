@@ -3911,18 +3911,6 @@
       localStorage.setItem('dailyFollowSimShift', activeSimShift);
       render();
     }
-    // คนมาทำงาน/คนลา ต่อ shift จากโปรแกรม OT (ผ่าน proxy ของ server).
-    async function loadAttendance(date) {
-      if (location.protocol === 'file:') return;   // ต้องใช้ server proxy
-      try {
-        const res = await fetch('api/ot-attendance?date=' + encodeURIComponent(date))
-          .then(r => r.json());
-        attendCache = (res && res.success) ? { date, shifts: res.shifts || {} } : null;
-      } catch (e) {
-        attendCache = null;
-      }
-      renderAttendance();
-    }
     // แสดงตัวเลขของ shift ที่กำลังเลือก; ซ่อนไปถ้ายังไม่มีข้อมูล
     function renderAttendance() {
       if (!els.attendBox) return;
@@ -3992,9 +3980,9 @@
         }
         const sh = res.shifts || {};
         otCache = { date, shifts: sh, morning_shift: res.morning_shift };
-        // คนมาทำงาน/คนลา ดึงคู่กันไป (ไม่บล็อกการแสดงชั่วโมง OT). กดปุ่ม OT เอง
-        // → รีเฟรชเสมอ; poll อัตโนมัติ → ดึงใหม่เฉพาะตอนเปลี่ยนวัน
-        if (!auto || !attendCache || attendCache.date !== date) loadAttendance(date);
+        // คนมาทำงาน/คนลา มากับ response เดียวกัน (แต่ละ shift มี work/leave/leaves)
+        attendCache = { date, shifts: sh };
+        renderAttendance();
         const inputFocused = (document.activeElement === els.workHour);
         for (const s of SIM_SHIFTS) {
           if (auto && simShifts[s].manual) continue;     // respect manual override
