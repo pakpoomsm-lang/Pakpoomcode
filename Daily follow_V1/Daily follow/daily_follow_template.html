@@ -1189,6 +1189,8 @@
       background: #eceef2 !important;
       cursor: not-allowed;
     }
+    /* -BZ jobs skip Cutting: show a plain "-" instead of a value, no grey block. */
+    td.cut-na { color: #94a3b8; text-align: center; }
     tbody tr.dlv-row td { background: #eef0f3 !important; }
     tbody tr.dlv-row:hover td { background: #e4e7ec !important; }
     tbody tr.dlv-row td.blocked { background: #e2e5ea !important; }
@@ -4212,9 +4214,9 @@
         else if (field === 'lead') { value = leadVal; td.dataset.field = 'lead'; }
         else if (field === 'scLead') { value = computeScLead(row); td.dataset.field = 'scLead'; }
         else value = valueOf(row, field);
-        // -BZ records end at Brazing, so the Cutting column is blocked (no value, not editable).
+        // -BZ records end at Brazing, so Cutting doesn't apply: auto-fill "-" (not editable).
         const cutBlocked = field === 'cutting' && attrEndsBz(row);
-        if (cutBlocked) { value = ''; td.classList.add('blocked'); }
+        if (cutBlocked) { value = '-'; td.classList.add('cut-na'); }
         if (field === 'checkSheet') {
           const cs = csStatus(row);
           if (cs && cs.state !== 'none') {
