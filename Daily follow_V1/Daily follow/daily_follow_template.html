@@ -1663,16 +1663,18 @@
       const month = String(row.month || '').trim();
       if (!line || !seq) return null;
       const procs = (checkSheets.byKey || {})[`${line}|${month}|${seq}`] || {};
+      // -BZ records end at Brazing, so Cutting is not part of their process.
+      const cols = attrEndsBz(row) ? CHECK_PROCS.filter(([key]) => key !== 'cutting') : CHECK_PROCS;
       let have = 0, ng = false;
       const missing = [];
       const detail = [];
-      for (const [key, label] of CHECK_PROCS) {
+      for (const [key, label] of cols) {
         const v = procs[key];
         if (v === 'OK') { have++; detail.push({ key, label, result: 'OK' }); }
         else if (v === 'NG') { ng = true; detail.push({ key, label, result: 'NG' }); }
         else { missing.push(label); detail.push({ key, label, result: null }); }
       }
-      const need = CHECK_PROCS.length;
+      const need = cols.length;
       if (have === 0 && !ng) return { state: 'none', detail };
       if (ng) return { state: 'ng', cls: 'ng', label: 'NG', title: 'มี process ผล NG', detail };
       if (have === need) return { state: 'full', cls: 'ok', label: 'ครบ', title: 'ครบทุก process', detail };
