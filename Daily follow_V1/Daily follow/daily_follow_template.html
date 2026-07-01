@@ -833,13 +833,14 @@
     /* คนมาทำงาน / คนลา ต่อ Shift (มุมขวาของหัว Plan) */
     .attend-box { display: flex; align-items: center; gap: 6px; margin-left: auto; }
     .attend-item {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
-      border: 1px solid transparent; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      width: 96px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      border: 1px solid transparent; line-height: 1; box-sizing: border-box;
     }
     .attend-item .attend-lbl { font-weight: 700; }
     .attend-item b { font-size: 13px; font-variant-numeric: tabular-nums; }
     .attend-work { background: #e7f5ee; color: #0a8043; border-color: #b7e4cd; }
+    .attend-ot { background: #fdf3e3; color: #b7791f; border-color: #f0d9a8; }
     .attend-leave {
       background: #fff3f3; color: #c0392b; border-color: #f2c2c2;
       cursor: pointer; font: inherit; font-weight: 700;
@@ -1497,6 +1498,7 @@
                 <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT">&#8635; OT</button>
                 <div id="attendBox" class="attend-box" hidden title="คน Shift นี้ (จากโปรแกรม OT)">
                   <span class="attend-item attend-work"><span class="attend-lbl">มาทำงาน</span><b id="attendWork">–</b></span>
+                  <span class="attend-item attend-ot"><span class="attend-lbl">ทำ OT</span><b id="attendOt">–</b></span>
                   <button id="attendLeaveBtn" type="button" class="attend-item attend-leave" title="คลิกดูรายชื่อคนลา"><span class="attend-lbl">ลา</span><b id="attendLeave">–</b></button>
                 </div>
               </div>
@@ -1942,6 +1944,7 @@
       actWorkBadge: document.getElementById('actWorkBadge'),
       actProdBadge: document.getElementById('actProdBadge'),
       attendBox: document.getElementById('attendBox'), attendWork: document.getElementById('attendWork'),
+      attendOt: document.getElementById('attendOt'),
       attendLeave: document.getElementById('attendLeave'), attendLeaveBtn: document.getElementById('attendLeaveBtn'),
       productivityViewBtn: document.getElementById('productivityViewBtn'),
       leadDashBtn: document.getElementById('leadDashBtn'),
@@ -3918,6 +3921,7 @@
       if (!s) { els.attendBox.hidden = true; return; }
       els.attendBox.hidden = false;
       els.attendWork.textContent = (s.work || 0).toLocaleString();
+      els.attendOt.textContent = (s.ot || 0).toLocaleString();
       els.attendLeave.textContent = (s.leave || 0).toLocaleString();
       els.attendLeaveBtn.disabled = !(s.leaves && s.leaves.length);
     }
