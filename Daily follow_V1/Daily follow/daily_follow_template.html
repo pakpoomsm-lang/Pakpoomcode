@@ -1399,6 +1399,9 @@
                 <label class="dm-item">Update Routing
                   <input id="importRouting" type="file" accept=".xlsx,.xlsm">
                 </label>
+                <label class="dm-item">Update CT
+                  <input id="importCt" type="file" accept=".xlsx,.xlsm">
+                </label>
                 <div class="dm-sep"></div>
                 <div class="dm-label">จำนวนเครื่องจักร (Machines)</div>
                 <div class="machine-counts" id="machineCounts" title="จำนวนเครื่องที่เดินขนานกันต่อ process · ใช้หาร Cycle Time ในตัววางแผน">
@@ -1882,6 +1885,7 @@
       wrap: document.querySelector('.table-wrap'),
       header: document.getElementById('headerRow'), importFile: document.getElementById('importFile'),
       importStock: document.getElementById('importStock'), importRouting: document.getElementById('importRouting'),
+      importCt: document.getElementById('importCt'),
       dataMgmtBtn: document.getElementById('dataMgmtBtn'), dataMgmtMenu: document.getElementById('dataMgmtMenu'),
       defaultDisplayBtn: document.getElementById('defaultDisplayBtn'),
       zpp0059Btn: document.getElementById('zpp0059Btn'),
@@ -2644,6 +2648,7 @@
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
       els.importRouting.addEventListener('change', importRoutingData);
+      els.importCt.addEventListener('change', importCtData);
       syncMachineInputs();
       if (els.changeoverMinInput) {
         els.changeoverMinInput.value = changeoverMin;
@@ -2910,6 +2915,19 @@
       const firstSheet = workbook.getElementsByTagName('sheet')[0];
       if (!firstSheet) throw new Error('Workbook has no sheets.');
       const relId = firstSheet.getAttribute('r:id');
+      const rels = parseXml(xmlText(files['xl/_rels/workbook.xml.rels']));
+      const rel = [...rels.getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === relId);
+      const target = rel ? rel.getAttribute('Target') : 'worksheets/sheet1.xml';
+      return 'xl/' + target.replace(/^\//, '').replace(/^xl\//, '');
+    }
+    // Path of a sheet by name (case-insensitive); falls back to the first sheet.
+    function namedWorksheetPath(files, name) {
+      const workbook = parseXml(xmlText(files['xl/workbook.xml']));
+      const want = String(name).trim().toLowerCase();
+      const sheet = [...workbook.getElementsByTagName('sheet')]
+        .find(s => (s.getAttribute('name') || '').trim().toLowerCase() === want);
+      if (!sheet) return firstWorksheetPath(files);
+      const relId = sheet.getAttribute('r:id');
       const rels = parseXml(xmlText(files['xl/_rels/workbook.xml.rels']));
       const rel = [...rels.getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === relId);
       const target = rel ? rel.getAttribute('Target') : 'worksheets/sheet1.xml';
@@ -3290,6 +3308,48 @@
       } catch (error) {
         console.error(error);
         els.importStatus.textContent = `Routing update failed: ${error.message}`;
+      } finally {
+        event.target.value = '';
+      }
+    }
+    // Parse CT.xlsx (sheet "Master") into {material: {finpress,hpbender,expander,
+    // autoBrazing,cutting}} — same shape and MAX-per-material rule as load_ct().
+    function parseCt(rows) {
+      const header = rows[0].map(cleanText);
+      const ix = {};
+      header.forEach((h, i) => { if (ix[h] === undefined) ix[h] = i; });
+      const need = ['Material','Finpress-CT','HPBender-CT','Expander-CT','Auto-Brazing-CT','Cutting-Sec'];
+      for (const name of need) { if (ix[name] === undefined) throw new Error('Missing column: ' + name); }
+      const ct = {};
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const material = cleanText(row[ix['Material']]);
+        if (!material) continue;
+        const rec = ct[material] || (ct[material] = { finpress: 0, hpbender: 0, expander: 0, autoBrazing: 0, cutting: 0 });
+        rec.finpress    = Math.max(rec.finpress,    cleanNumber(row[ix['Finpress-CT']])     || 0);
+        rec.hpbender    = Math.max(rec.hpbender,    cleanNumber(row[ix['HPBender-CT']])     || 0);
+        rec.expander    = Math.max(rec.expander,    cleanNumber(row[ix['Expander-CT']])     || 0);
+        rec.autoBrazing = Math.max(rec.autoBrazing, cleanNumber(row[ix['Auto-Brazing-CT']]) || 0);
+        rec.cutting     = Math.max(rec.cutting,     cleanNumber(row[ix['Cutting-Sec']])     || 0);
+      }
+      return ct;
+    }
+    async function importCtData(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      els.importStatus.textContent = `Updating CT: ${file.name}`;
+      try {
+        const files = await unzipXlsx(await file.arrayBuffer());
+        const shared = readSharedStrings(files);
+        const rows = worksheetRows(files, namedWorksheetPath(files, 'Master'), shared);
+        if (!rows.length) throw new Error('No rows found in file.');
+        const ct = parseCt(rows);
+        DATA.ct = ct;
+        recompute(true);
+        els.importStatus.textContent = `CT updated: ${file.name} (${Object.keys(ct).length.toLocaleString()} materials)`;
+      } catch (error) {
+        console.error(error);
+        els.importStatus.textContent = `CT update failed: ${error.message}`;
       } finally {
         event.target.value = '';
       }
