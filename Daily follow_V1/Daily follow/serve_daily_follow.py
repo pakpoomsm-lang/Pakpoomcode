@@ -1535,6 +1535,27 @@ class Handler(BaseHTTPRequestHandler):
                              f"ตรวจสอบว่าโปรแกรม OT เปิดอยู่. [{exc}]"
                 }))
             return
+        if path == "api/ot-attendance":
+            # Proxy the OT app's per-shift attendance (คนมาทำงาน / คนลา).
+            import urllib.request
+            from urllib.error import URLError, HTTPError
+            req_date = (query.get("date", [""])[0] or "").strip()
+            if not req_date:
+                return self._send(400, json.dumps(
+                    {"success": False, "error": "missing date"}))
+            url = f"{OT_APP_URL}/api/attendance/shift-summary?work_date={req_date}"
+            try:
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                with opener.open(url, timeout=5) as resp:
+                    body = resp.read()
+                self._send(200, body)
+            except (URLError, HTTPError, OSError) as exc:
+                self._send(200, json.dumps({
+                    "success": False,
+                    "error": f"เชื่อมต่อโปรแกรม OT ไม่ได้ ({OT_APP_URL}). "
+                             f"ตรวจสอบว่าโปรแกรม OT เปิดอยู่. [{exc}]"
+                }))
+            return
         target = (ROOT / path).resolve()
         if ROOT.resolve() not in target.parents and target != ROOT.resolve():
             return self._send(403, "forbidden", "text/plain")

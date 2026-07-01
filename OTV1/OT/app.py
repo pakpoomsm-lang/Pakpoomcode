@@ -1123,6 +1123,54 @@ def working_hours():
     return jsonify(payload)
 
 
+@app.route('/api/attendance/shift-summary')
+def attendance_shift_summary():
+    """คนมาทำงาน / คนลา แยกตาม Shift A/B สำหรับวันที่ (รวม Shift D เข้ากะเช้า
+    ของอาทิตย์นั้น เหมือน working-hours) พร้อมรายชื่อคนลาให้กดดูรายละเอียด."""
+    work_date = (request.args.get('work_date') or '').strip()
+    if not work_date:
+        return jsonify({'success': False, 'message': 'กรุณาระบุวันที่'}), 400
+
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT e.shift, a.attendance_type, a.emp_id,
+               e.first_name, e.last_name, e.workplace,
+               a.leave_period, a.leave_time
+        FROM attendance_records a
+        JOIN employees e ON e.emp_id = a.emp_id
+        WHERE a.work_date = ? AND a.attendance_type IN ('work', 'ot', 'leave')
+    ''', (work_date,))
+    rows = cursor.fetchall()
+    conn.close()
+
+    morning = 'A' if _shift_a_is_morning(work_date) else 'B'
+    # Shift D เข้ากะเช้าของอาทิตย์นั้น (เหมือน working-hours)
+    def norm(shift):
+        s = (shift or '').strip().upper()
+        return morning if s == 'D' else s
+
+    present = {'A': set(), 'B': set()}   # emp_id ที่มาทำงาน (นับหัวไม่ซ้ำ)
+    leaves  = {'A': [], 'B': []}
+    for shift, atype, emp_id, fn, ln, wp, lp, lt in rows:
+        s = norm(shift)
+        if s not in present:
+            continue
+        if atype in ('work', 'ot'):
+            present[s].add(emp_id)
+        elif atype == 'leave':
+            name = f"{fn or ''} {ln or ''}".strip() or '-'
+            leaves[s].append({
+                'emp_id': emp_id, 'emp_name': name, 'workplace': wp or '-',
+                'leave_period': lp or '-', 'leave_time': lt or '-',
+            })
+
+    shifts = {s: {'work': len(present[s]), 'leave': len(leaves[s]), 'leaves': leaves[s]}
+              for s in ('A', 'B')}
+    return jsonify({'success': True, 'work_date': work_date,
+                    'morning_shift': morning, 'shifts': shifts})
+
+
 @app.route('/api/attendance/incoming-substitutes')
 def get_incoming_substitutes():
     """พนักงานจากทีมอื่นที่มาทำ OT แทนให้กับทีมของ GL นี้"""
