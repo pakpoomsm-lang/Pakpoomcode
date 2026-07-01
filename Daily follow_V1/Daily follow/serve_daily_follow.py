@@ -10,6 +10,7 @@ Run on the Windows machine that has SAP GUI open and logged in.
 Double-click Start_Daily_Follow.bat or: python serve_daily_follow.py
 """
 
+import contextlib
 import hashlib
 import json
 import os
@@ -621,6 +622,11 @@ EXPORT_EXTS = {".xlsx", ".xlsm", ".xls"}
 def _get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_FILE), check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # WAL lets a reader (the web server computing the badge) and a writer (the
+    # standalone ZPP0059 updater) work on the same file at once; busy_timeout
+    # makes the rare writer-vs-writer overlap wait instead of erroring out.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 
@@ -1197,57 +1203,100 @@ def _friendly_sap_error(raw: str) -> str:
     return f"SAP script error: {raw[:300] or 'unknown'}"
 
 
+# SAP GUI Scripting drives one shared SAP window, so only one automation may run
+# at a time — the green button, the ZPP0022 button, and the standalone updater all
+# funnel through _drive_sap_export. A file lock (not a threading.Lock) serialises
+# them even across separate processes.
+SAP_LOCK_FILE = ROOT / "_sap_automation.lock"
+SAP_LOCK_STALE_SEC = RUN_TIMEOUT + 60   # a lock held longer than this = crashed run, steal it
+
+
+class SapBusy(RuntimeError):
+    """Another SAP automation is already running (couldn't get the lock in time)."""
+
+
+@contextlib.contextmanager
+def sap_lock(wait_sec: float = RUN_TIMEOUT + 15):
+    """Cross-process mutex around SAP automation. Waits up to wait_sec for a
+    running export to finish; raises SapBusy if it never frees up."""
+    deadline = time.time() + wait_sec
+    fd = None
+    while fd is None:
+        try:
+            fd = os.open(str(SAP_LOCK_FILE), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, f"{os.getpid()} {time.time():.0f}".encode())
+        except FileExistsError:
+            # Steal the lock if whoever held it crashed and left it behind.
+            try:
+                age = time.time() - float(SAP_LOCK_FILE.read_text().split()[1])
+            except Exception:
+                age = None
+            if age is not None and age > SAP_LOCK_STALE_SEC:
+                SAP_LOCK_FILE.unlink(missing_ok=True)
+                continue
+            if time.time() >= deadline:
+                raise SapBusy("SAP automation is busy — another export is running.")
+            time.sleep(0.5)
+    try:
+        yield
+    finally:
+        os.close(fd)
+        SAP_LOCK_FILE.unlink(missing_ok=True)
+
+
 def _drive_sap_export(script_text: str = SAP_SCRIPT_0059,
                      transaction: str = START_TRANSACTION,
                      roll_dates: bool = DYNAMIC_DATES,
                      export_dir_win: str = SAP_EXPORT_DIR,
                      tmp_name: str = "_zpp0059_run.vbs") -> Path:
     """Drive SAP once and return the file it just exported.
-    Raises RuntimeError on a (often transient) failure; TimeoutExpired on timeout."""
+    Raises RuntimeError on a (often transient) failure; TimeoutExpired on timeout;
+    SapBusy if another SAP automation is already running."""
     cscript = shutil.which("cscript")
     script = _prepare_script(script_text, transaction, roll_dates, export_dir_win, tmp_name)
-    # Start background handler BEFORE cscript so it's ready to catch the popup.
-    sec_handler = _start_security_handler()
-    started = time.time()
-    try:
-        proc = subprocess.run(
-            [cscript, "//nologo", str(script)],
-            capture_output=True, text=True, timeout=RUN_TIMEOUT,
-        )
-    finally:
-        if sec_handler:
+    with sap_lock():
+        # Start background handler BEFORE cscript so it's ready to catch the popup.
+        sec_handler = _start_security_handler()
+        started = time.time()
+        try:
+            proc = subprocess.run(
+                [cscript, "//nologo", str(script)],
+                capture_output=True, text=True, timeout=RUN_TIMEOUT,
+            )
+        finally:
+            if sec_handler:
+                try:
+                    sec_handler.terminate()
+                except Exception:
+                    pass
             try:
-                sec_handler.terminate()
+                (ROOT / "_sec_handler.ps1").unlink(missing_ok=True)
             except Exception:
                 pass
-        try:
-            (ROOT / "_sec_handler.ps1").unlink(missing_ok=True)
-        except Exception:
-            pass
-    if proc.returncode != 0:
-        msg = (proc.stderr or proc.stdout or "").strip()
-        raise RuntimeError(_friendly_sap_error(msg))
+        if proc.returncode != 0:
+            msg = (proc.stderr or proc.stdout or "").strip()
+            raise RuntimeError(_friendly_sap_error(msg))
 
-    # Prefer the folder SAP was told to save into, so we never pick up a newer
-    # file produced by a different transaction (e.g. a ZPP0059 stock export
-    # landing in its own folder while we're running ZPP0022). Only fall back to
-    # scanning every EXPORT_DIRS if nothing showed up there (SAP may have used a
-    # default save location like C:\TEMP when the network drive was unwritable).
-    target_dir = Path(export_dir_win)
-    export = None
-    for _ in range(20):
-        if target_dir.is_dir():
-            export = _newest_export(started, dirs=[target_dir])
+        # Prefer the folder SAP was told to save into, so we never pick up a newer
+        # file produced by a different transaction (e.g. a ZPP0059 stock export
+        # landing in its own folder while we're running ZPP0022). Only fall back to
+        # scanning every EXPORT_DIRS if nothing showed up there (SAP may have used a
+        # default save location like C:\TEMP when the network drive was unwritable).
+        target_dir = Path(export_dir_win)
+        export = None
+        for _ in range(20):
+            if target_dir.is_dir():
+                export = _newest_export(started, dirs=[target_dir])
+            if not export:
+                export = _newest_export(started)
+            if export:
+                break
+            time.sleep(0.5)
         if not export:
-            export = _newest_export(started)
-        if export:
-            break
-        time.sleep(0.5)
-    if not export:
-        raise RuntimeError(
-            "Ran the script but found no exported file. "
-            "Add your SAP export folder to EXPORT_DIRS in serve_daily_follow.py.")
-    return export
+            raise RuntimeError(
+                "Ran the script but found no exported file. "
+                "Add your SAP export folder to EXPORT_DIRS in serve_daily_follow.py.")
+        return export
 
 
 def run_zpp0059(date_from: str = "", date_to: str = "") -> tuple[dict, dict, str, dict]:
@@ -1401,6 +1450,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(409, json.dumps(
                     {"ok": False, "error": str(exc), "code": "SAP_NOT_READY"}
                 ))
+            except SapBusy as exc:
+                self._send(409, json.dumps(
+                    {"ok": False, "error": str(exc), "code": "SAP_BUSY"}
+                ))
             except subprocess.TimeoutExpired:
                 self._send(504, json.dumps({"ok": False, "error": "SAP timed out."}))
             except Exception as exc:
@@ -1424,6 +1477,10 @@ class Handler(BaseHTTPRequestHandler):
             except SapNotReady as exc:
                 self._send(409, json.dumps(
                     {"ok": False, "error": str(exc), "code": "SAP_NOT_READY"}
+                ))
+            except SapBusy as exc:
+                self._send(409, json.dumps(
+                    {"ok": False, "error": str(exc), "code": "SAP_BUSY"}
                 ))
             except subprocess.TimeoutExpired:
                 self._send(504, json.dumps({"ok": False, "error": "SAP timed out."}))
