@@ -830,6 +830,28 @@
       line-height: 1.3;
     }
     .sim-ot-info.err { color: var(--late); }
+    /* คนมาทำงาน / คนลา ต่อ Shift (มุมขวาของหัว Plan) */
+    .attend-box { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .attend-item {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      border: 1px solid transparent; line-height: 1;
+    }
+    .attend-item .attend-lbl { font-weight: 700; }
+    .attend-item b { font-size: 13px; font-variant-numeric: tabular-nums; }
+    .attend-work { background: #e7f5ee; color: #0a8043; border-color: #b7e4cd; }
+    .attend-leave {
+      background: #fff3f3; color: #c0392b; border-color: #f2c2c2;
+      cursor: pointer; font: inherit; font-weight: 700;
+    }
+    .attend-leave:hover { background: #ffe6e6; }
+    .attend-leave[disabled] { opacity: .55; cursor: default; }
+    .leave-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 8px 4px; border-bottom: 1px solid var(--grid, #e5e9f0); }
+    .leave-row:last-child { border-bottom: 0; }
+    .leave-name { font-weight: 700; color: var(--ink); }
+    .leave-meta { font-size: 12px; color: var(--muted); }
+    .leave-period { font-size: 12px; font-weight: 700; color: #c0392b; text-align: right; }
+    .leave-empty { padding: 20px; text-align: center; color: var(--muted); }
     .sim {
       display: inline-flex;
       align-items: stretch;
@@ -1473,6 +1495,10 @@
               <div class="prod-col-head">
                 <span class="prod-tag tag-plan">Plan</span>
                 <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT">&#8635; OT</button>
+                <div id="attendBox" class="attend-box" hidden title="คน Shift นี้ (จากโปรแกรม OT)">
+                  <span class="attend-item attend-work"><span class="attend-lbl">มาทำงาน</span><b id="attendWork">–</b></span>
+                  <button id="attendLeaveBtn" type="button" class="attend-item attend-leave" title="คลิกดูรายชื่อคนลา"><span class="attend-lbl">ลา</span><b id="attendLeave">–</b></button>
+                </div>
               </div>
               <div class="sim" id="simBox" title="ติ๊กแถวด้านซ้ายเพื่อวางแผน · Unit Rate = ผลรวม (TS x Assy Order) ของแถวที่ติ๊ก">
                 <div class="sim-cell">
@@ -1575,6 +1601,15 @@
         <button id="incClose" class="dash-close" type="button">&#10005;</button>
       </div>
       <div id="incList" class="cs-list"></div>
+    </div>
+  </div>
+  <div id="leaveOverlay" class="dash-overlay" hidden>
+    <div class="dash-panel cs-panel">
+      <div class="dash-head">
+        <div id="leaveTitle" class="dash-title">คนลา</div>
+        <button id="leaveClose" class="dash-close" type="button">&#10005;</button>
+      </div>
+      <div id="leaveList" class="cs-list"></div>
     </div>
   </div>
   <div id="dbOverlay" class="dash-overlay" hidden>
@@ -1906,6 +1941,8 @@
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
       actProdBadge: document.getElementById('actProdBadge'),
+      attendBox: document.getElementById('attendBox'), attendWork: document.getElementById('attendWork'),
+      attendLeave: document.getElementById('attendLeave'), attendLeaveBtn: document.getElementById('attendLeaveBtn'),
       productivityViewBtn: document.getElementById('productivityViewBtn'),
       leadDashBtn: document.getElementById('leadDashBtn'),
       productivityView: document.getElementById('productivityView'),
@@ -2027,6 +2064,7 @@
     let lastActualDate = '';   // date of the last actual-production fetch (D: skip if unchanged)
     let lastActualLoad = 0;    // timestamp of the last actual fetch (B: throttle the today-poll)
     let otCache = null;        // { date, shifts, morning_shift } from the last OT pull (C: dedup)
+    let attendCache = null;    // { date, shifts } คนมาทำงาน/คนลา ต่อ shift จากโปรแกรม OT
     let byId = new Map();
     let fillSource = null;
     let fillDragging = false;
@@ -2759,6 +2797,11 @@
       const incClose = document.getElementById('incClose');
       if (incClose) incClose.addEventListener('click', () => { incOverlay.hidden = true; });
       if (incOverlay) incOverlay.addEventListener('click', (e) => { if (e.target === incOverlay) incOverlay.hidden = true; });
+      const leaveOverlay = document.getElementById('leaveOverlay');
+      const leaveClose = document.getElementById('leaveClose');
+      if (els.attendLeaveBtn) els.attendLeaveBtn.addEventListener('click', openLeaveDetail);
+      if (leaveClose) leaveClose.addEventListener('click', () => { leaveOverlay.hidden = true; });
+      if (leaveOverlay) leaveOverlay.addEventListener('click', (e) => { if (e.target === leaveOverlay) leaveOverlay.hidden = true; });
     }
     function searchText(row) {
       return [row.line,row.seq,row.month,row.code,row.model,row.item,row.description,row.attribute,row.productionOrder,row.assyOrderNo,row.status,row.remark,row.leadRemark].join(' ').toLowerCase();
@@ -3864,8 +3907,63 @@
           b.classList.toggle('active', b.dataset.shift === shift));
       }
       updateSimShiftLabel();
+      renderAttendance();   // ตัวเลขคนมาทำงาน/คนลา เปลี่ยนตาม shift
       localStorage.setItem('dailyFollowSimShift', activeSimShift);
       render();
+    }
+    // คนมาทำงาน/คนลา ต่อ shift จากโปรแกรม OT (ผ่าน proxy ของ server).
+    async function loadAttendance(date) {
+      if (location.protocol === 'file:') return;   // ต้องใช้ server proxy
+      try {
+        const res = await fetch('api/ot-attendance?date=' + encodeURIComponent(date))
+          .then(r => r.json());
+        attendCache = (res && res.success) ? { date, shifts: res.shifts || {} } : null;
+      } catch (e) {
+        attendCache = null;
+      }
+      renderAttendance();
+    }
+    // แสดงตัวเลขของ shift ที่กำลังเลือก; ซ่อนไปถ้ายังไม่มีข้อมูล
+    function renderAttendance() {
+      if (!els.attendBox) return;
+      const s = attendCache && attendCache.shifts[activeSimShift];
+      if (!s) { els.attendBox.hidden = true; return; }
+      els.attendBox.hidden = false;
+      els.attendWork.textContent = (s.work || 0).toLocaleString();
+      els.attendLeave.textContent = (s.leave || 0).toLocaleString();
+      els.attendLeaveBtn.disabled = !(s.leaves && s.leaves.length);
+    }
+    function openLeaveDetail() {
+      const ovl = document.getElementById('leaveOverlay');
+      const title = document.getElementById('leaveTitle');
+      const list = document.getElementById('leaveList');
+      if (!ovl) return;
+      const s = attendCache && attendCache.shifts[activeSimShift];
+      const recs = (s && s.leaves) || [];
+      title.textContent = `คนลา — Shift ${activeSimShift} (${recs.length} คน)`;
+      list.replaceChildren();
+      if (!recs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'leave-empty';
+        empty.textContent = 'ไม่มีคนลาใน shift นี้';
+        list.appendChild(empty);
+      }
+      for (const r of recs) {
+        const row = document.createElement('div');
+        row.className = 'leave-row';
+        const name = document.createElement('div');
+        name.className = 'leave-name';
+        name.textContent = `${r.emp_name} (${r.emp_id})`;
+        const period = document.createElement('div');
+        period.className = 'leave-period';
+        period.textContent = [r.leave_period, r.leave_time].filter(v => v && v !== '-').join(' ') || '-';
+        const meta = document.createElement('div');
+        meta.className = 'leave-meta';
+        meta.textContent = r.workplace && r.workplace !== '-' ? r.workplace : '';
+        row.append(name, period, meta);
+        list.appendChild(row);
+      }
+      ovl.hidden = false;
     }
     // Pull per-shift working hours from the OT program (via local server proxy).
     // Pull per-shift working hours from the OT program.
@@ -3894,6 +3992,9 @@
         }
         const sh = res.shifts || {};
         otCache = { date, shifts: sh, morning_shift: res.morning_shift };
+        // คนมาทำงาน/คนลา ดึงคู่กันไป (ไม่บล็อกการแสดงชั่วโมง OT). กดปุ่ม OT เอง
+        // → รีเฟรชเสมอ; poll อัตโนมัติ → ดึงใหม่เฉพาะตอนเปลี่ยนวัน
+        if (!auto || !attendCache || attendCache.date !== date) loadAttendance(date);
         const inputFocused = (document.activeElement === els.workHour);
         for (const s of SIM_SHIFTS) {
           if (auto && simShifts[s].manual) continue;     // respect manual override
