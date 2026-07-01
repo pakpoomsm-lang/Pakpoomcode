@@ -9,7 +9,7 @@ import os
 import re
 import sqlite3
 from datetime import datetime
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 import uvicorn
@@ -440,14 +440,16 @@ def incoming_query(line=None, search=None, date_from=None, date_to=None, limit=5
          "WHERE 1=1")
     p = []
     if line and line != "all":
-        q += " AND line_num=?"; p.append(line)
+        q += " AND i.line_num=?"; p.append(line)
     if search:
-        q += " AND (part_no LIKE ? OR item_code LIKE ? OR do_num LIKE ? OR employee LIKE ?)"
-        p.extend([f"%{search}%"]*4)
+        # i.* ถูก JOIN กับ item_descriptions ที่มี item_code เหมือนกัน — ต้องระบุ alias i. กันชื่อชนกัน
+        q += (" AND (i.part_no LIKE ? OR i.item_code LIKE ? OR i.do_num LIKE ? "
+              "OR i.seq LIKE ? OR i.location LIKE ? OR i.employee LIKE ?)")
+        p.extend([f"%{search}%"]*6)
     if date_from:
-        q += " AND receive_date>=?"; p.append(date_from)
+        q += " AND i.receive_date>=?"; p.append(date_from)
     if date_to:
-        q += " AND receive_date<=?"; p.append(date_to)
+        q += " AND i.receive_date<=?"; p.append(date_to)
     q += " ORDER BY timestamp DESC LIMIT ?"; p.append(limit)
     rows = conn.execute(q, p).fetchall()
     conn.close()
@@ -488,6 +490,89 @@ async def api_incoming_create(request: Request):
         body["timestamp"]   = now.isoformat()
         incoming_insert(body)
         return JSONResponse({"ok": True, "id": rec_id, "record": body})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+# หัวตาราง Excel (normalize แล้ว) → ชื่อ field ภายใน — รองรับทั้งไทยและอังกฤษ
+# normalize = ตัวพิมพ์เล็ก + ตัดช่องว่าง/ขีด/ขีดล่าง/สแลชออก ให้ "Part No" = "part_no" = "partno"
+_EXCEL_HEADER_MAP = {
+    "partno": "partNo", "part": "partNo", "partnumber": "partNo",
+    "itemcode": "itemCode", "item": "itemCode", "vendorcode": "itemCode", "vendor": "itemCode",
+    "จำนวน": "qty", "qty": "qty", "quantity": "qty", "amount": "qty",
+    "unit": "unit", "หน่วย": "unit",
+    "line": "lineNum", "linenum": "lineNum", "ไลน์": "lineNum",
+    "seq": "seq", "sequence": "seq",
+    "location": "location", "loc": "location", "ตำแหน่ง": "location",
+    "duedate": "dueDate", "duetime": "dueTime",
+    "donumber": "doNum", "do": "doNum", "donum": "doNum", "dono": "doNum",
+    "promonth": "proMonth",
+    "พนักงาน": "employee", "employee": "employee", "emp": "employee", "staff": "employee",
+    "วันที่รับ": "receiveDate", "receivedate": "receiveDate", "date": "receiveDate",
+    "เวลา": "receiveTime", "receivetime": "receiveTime", "time": "receiveTime",
+    "rawqr": "rawQr", "qr": "rawQr",
+    "recordid": "id", "id": "id",
+}
+
+def _norm_header(h):
+    s = str(h or "").strip().lower()
+    for ch in (" ", "_", "-", "/", ".", "#"):
+        s = s.replace(ch, "")
+    return s
+
+@app.post("/api/incoming/import")
+async def api_incoming_import(file: UploadFile = File(...)):
+    """นำเข้าข้อมูล incoming จากไฟล์ Excel (.xlsx) — แมปคอลัมน์จากหัวตาราง รองรับรูปแบบเดียวกับ Export CSV"""
+    try:
+        import openpyxl, io, uuid
+        data = await file.read()
+        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+        ws = wb.active
+        rows = ws.iter_rows(values_only=True)
+
+        header = next(rows, None)
+        if not header:
+            return JSONResponse({"ok": False, "error": "ไฟล์ว่างเปล่า"}, status_code=400)
+        # คอลัมน์ index → field
+        col_map = {}
+        for idx, h in enumerate(header):
+            field = _EXCEL_HEADER_MAP.get(_norm_header(h))
+            if field:
+                col_map[idx] = field
+        if "partNo" not in col_map.values() and "itemCode" not in col_map.values():
+            return JSONResponse(
+                {"ok": False, "error": "ไม่พบคอลัมน์ Part No หรือ Item Code ในไฟล์"},
+                status_code=400)
+
+        now = datetime.now()
+        imported = skipped = 0
+        for r in rows:
+            rec = {}
+            for idx, field in col_map.items():
+                if idx < len(r):
+                    rec[field] = r[idx]
+            part = str(rec.get("partNo") or rec.get("itemCode") or "").strip()
+            if not part:                       # ข้ามแถวว่าง
+                skipped += 1
+                continue
+            # qty → int (รองรับค่าทศนิยม/มี comma)
+            try:
+                rec["qty"] = int(float(str(rec.get("qty") or 0).replace(",", "")))
+            except (ValueError, TypeError):
+                rec["qty"] = 0
+            # ทำความสะอาดค่า: แปลงทุกอย่างเป็น str ตัดช่องว่าง
+            for k in list(rec.keys()):
+                if k != "qty" and rec[k] is not None:
+                    rec[k] = str(rec[k]).strip()
+            rec.setdefault("unit", "PC")
+            if not rec.get("id"):
+                rec["id"] = f"INC-{now.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+            rec.setdefault("receiveDate", now.strftime("%d/%m/%Y"))
+            rec.setdefault("receiveTime", now.strftime("%H:%M:%S"))
+            rec["timestamp"] = now.isoformat()
+            incoming_insert(rec)
+            imported += 1
+        wb.close()
+        return JSONResponse({"ok": True, "imported": imported, "skipped": skipped})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
@@ -911,6 +996,36 @@ async def api_incoming_stock(line: str = Query(None)):
 
         result.sort(key=lambda x: x["net_qty"], reverse=True)
         return JSONResponse({"ok": True, "stock": result})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+@app.post("/api/incoming/stock/adjust")
+async def api_incoming_stock_adjust(request: Request):
+    """ปรับยอด stock คงเหลือของ part หนึ่ง — บันทึกส่วนต่างลงตาราง deductions
+       delta > 0 = เพิ่ม stock, delta < 0 = ลด stock
+       (net = รับเข้า − จ่ายออก − SUM(deductions) จึงใส่ deduction = -delta)"""
+    try:
+        import uuid
+        body = await request.json()
+        part_no = str(body.get("part_no", "")).strip()
+        delta   = int(body.get("delta"))
+        reason  = str(body.get("reason", "") or "ปรับด้วยตนเอง").strip()
+        if not part_no:
+            return JSONResponse({"ok": False, "error": "ต้องระบุ part_no"}, status_code=400)
+        if delta == 0:
+            return JSONResponse({"ok": False, "error": "ส่วนต่างต้องไม่เป็น 0"}, status_code=400)
+        now = datetime.now()
+        conn = sqlite3.connect(INCOMING_DB)
+        conn.execute(
+            "INSERT INTO deductions (id, part_no, qty, reason, ref_order_id, date, timestamp) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (str(uuid.uuid4()), part_no, -delta, reason,
+             "manual_adjust", now.strftime("%d/%m/%Y"), now.isoformat())
+        )
+        conn.commit(); conn.close()
+        return JSONResponse({"ok": True, "part_no": part_no, "delta": delta})
+    except (TypeError, ValueError):
+        return JSONResponse({"ok": False, "error": "delta ต้องเป็นตัวเลข"}, status_code=400)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 

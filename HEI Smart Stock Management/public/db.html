@@ -252,6 +252,31 @@ tr.selected{background:#fff5f5 !important;}
 .modal-title{font-size:16px;font-weight:700;margin-bottom:8px;color:var(--text);}
 .modal-desc{font-size:13px;color:var(--mid);margin-bottom:22px;}
 .modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* COLUMN FILTER (แบบ Excel) */
+.colf{display:inline-block;margin-left:3px;cursor:pointer;color:var(--dim);font-size:11px;
+  padding:0 3px;border-radius:3px;user-select:none;transition:all .15s;}
+.colf:hover{background:var(--border);color:var(--text);}
+.colf.on{color:#fff;background:var(--green);}
+.colf-pop{display:none;position:fixed;z-index:950;width:236px;background:#fff;
+  border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 28px rgba(0,0,0,.18);
+  padding:8px;font-family:'Sarabun',sans-serif;}
+.colf-search{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;
+  font-size:12px;font-family:'Sarabun',sans-serif;outline:none;margin-bottom:6px;}
+.colf-list{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:3px;}
+.colf-item{display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:4px;
+  font-size:12px;color:var(--text);cursor:pointer;}
+.colf-item:hover{background:var(--bg);}
+.colf-item input{width:14px;height:14px;accent-color:var(--green);flex-shrink:0;}
+.colf-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.colf-all{font-weight:700;border-bottom:1px solid var(--border);border-radius:0;margin-bottom:3px;}
+.colf-btns{display:flex;gap:7px;margin-top:8px;}
+.colf-btns button{flex:1;padding:6px;border-radius:6px;font-size:12px;font-weight:700;
+  font-family:'Sarabun',sans-serif;cursor:pointer;border:1px solid var(--border);}
+.colf-clear{background:#fff;color:var(--mid);}
+.colf-clear:hover{background:var(--bg);}
+.colf-apply{background:var(--green);color:#fff;border-color:var(--green);}
+.colf-apply:hover{background:#15643b;}
 </style>
 </head>
 <body>
@@ -370,6 +395,8 @@ tr.selected{background:#fff5f5 !important;}
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-reload" onclick="refreshAll()">🔄 รีเฟรช</button>
+        <button class="btn-csv" id="btnImport" style="display:none;background:var(--blue)" onclick="document.getElementById('importFile').click()">📥 Import Excel</button>
+        <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
         <button class="btn-csv" onclick="exportCSV()">⬇️ Export CSV</button>
       </div>
     </div>
@@ -410,6 +437,9 @@ tr.selected{background:#fff5f5 !important;}
 </div><!-- /main -->
 
 <div class="toast" id="toast"></div>
+
+<!-- Column Filter popup (แบบ Excel) -->
+<div id="colFilterPop" class="colf-pop"></div>
 
 <!-- Confirm Modal (generic) -->
 <div class="modal-overlay" id="modal">
@@ -478,6 +508,8 @@ let ws = null, reconnectCount = 0;
 function switchDB(db) {
   currentDB = db;
   selectedIds.clear();
+  incColFilters = {};          // รีเซ็ตตัวกรองคอลัมน์
+  closeColFilter();
 
   const isMecp = db === 'mecp';
   const accent  = isMecp ? '#d93025' : '#1a7f4b';
@@ -518,6 +550,9 @@ function switchDB(db) {
 
   // selection bar
   document.getElementById('selBar').classList.remove('show');
+
+  // import (incoming เท่านั้น)
+  document.getElementById('btnImport').style.display = isMecp ? 'none' : '';
 
   refreshAll();
 }
@@ -780,11 +815,14 @@ function setIF(key, val, btn) {
 }
 
 function renderIncoming() {
-  const total = allRows.length;
+  incView = applyIncColFilters(allRows);   // กรองตาม column filter (แบบ Excel)
+  const total = incView.length;
   const start = (page-1)*PER;
-  const slice = allRows.slice(start, start+PER);
+  const slice = incView.slice(start, start+PER);
+  const nActive = Object.keys(incColFilters).length;
   document.getElementById('tcount').textContent =
-    `แสดง ${Math.min(start+PER,total)} จาก ${total} รายการ (incoming.db)`;
+    `แสดง ${Math.min(start+PER,total)} จาก ${total} รายการ (incoming.db)` +
+    (nActive ? ` · กรอง ${nActive} คอลัมน์` : '');
   if (!total) {
     document.getElementById('tbody').innerHTML = '<div class="empty">🔍 ไม่พบข้อมูล</div>';
     document.getElementById('pager').style.display = 'none';
@@ -814,20 +852,128 @@ function renderIncoming() {
       <td>${doShort}</td>
       <td class="c-mono">${o.pro_month||'—'}</td>
       <td style="font-size:11px">${o.employee||'—'}</td>
-      <td><button class="btn-del-row" onclick="confirmDeleteIncOne('${o.id}')">🗑️</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn-del-row" style="border-color:var(--blue-bd);color:var(--blue)" onclick="editIncQty('${o.id}',${o.qty||0})">✏️</button>
+        <button class="btn-del-row" onclick="confirmDeleteIncOne('${o.id}')">🗑️</button>
+      </td>
     </tr>`;
   }).join('');
+  // หัวคอลัมน์ที่กรองได้แบบ Excel — th(label, field)
+  const th = (label, field) => field
+    ? `<th>${label} <span class="colf ${incColFilters[field]?'on':''}" onclick="openColFilter(event,'${field}')">▾</span></th>`
+    : `<th>${label}</th>`;
   document.getElementById('tbody').innerHTML = `<table>
     <thead><tr>
       <th class="cb-cell"><input type="checkbox" ${allPageChecked?'checked':''} onchange="togglePageAll(this)"></th>
-      <th>#</th><th>Record ID</th><th>วันที่รับ</th><th>เวลา</th>
-      <th>Part No</th><th>Item Code</th><th>จำนวน</th>
-      <th>LINE / SEQ</th><th>Location</th><th>Due Date</th>
-      <th>DO Number</th><th>PRO MONTH</th><th>พนักงาน</th><th></th>
+      <th>#</th>${th('Record ID')}${th('วันที่รับ','receive_date')}${th('เวลา')}
+      ${th('Part No','part_no')}${th('Item Code','item_code')}${th('จำนวน')}
+      ${th('LINE','line_num')}${th('Location','location')}${th('Due Date','due_date')}
+      ${th('DO Number','do_num')}${th('PRO MONTH','pro_month')}${th('พนักงาน','employee')}<th></th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
   renderPager(total);
+}
+
+// ══════════════════════════════════════════
+// COLUMN FILTER (แบบ Excel) — incoming เท่านั้น
+// ══════════════════════════════════════════
+let incColFilters = {};   // field -> Set(ค่าที่อนุญาต)  (ไม่มี key = ไม่กรอง)
+let incView       = [];   // แถวหลังกรอง column (ใช้กับ pager/selection)
+
+function incVal(r, field) {
+  const v = r[field];
+  return (v === null || v === undefined) ? '' : String(v);
+}
+// กรองแถวด้วย column filter ทั้งหมด (ข้าม field ที่ส่งใน except เพื่อหา distinct แบบ Excel)
+function applyIncColFilters(rows, except) {
+  return rows.filter(r => {
+    for (const f in incColFilters) {
+      if (f === except) continue;
+      if (!incColFilters[f].has(incVal(r, f))) return false;
+    }
+    return true;
+  });
+}
+function incDistinct(field) {
+  const set = new Set();
+  applyIncColFilters(allRows, field).forEach(r => set.add(incVal(r, field)));
+  return [...set].sort((a, b) => a.localeCompare(b, 'th', { numeric: true }));
+}
+function openColFilter(e, field) {
+  e.stopPropagation();
+  const pop = document.getElementById('colFilterPop');
+  const cur = incColFilters[field];   // Set หรือ undefined (=ทั้งหมด)
+  const items = incDistinct(field).map(v => {
+    const checked = !cur || cur.has(v) ? 'checked' : '';
+    const label = v === '' ? '(ว่าง)' : v;
+    return `<label class="colf-item"><input type="checkbox" value="${encodeURIComponent(v)}" ${checked}><span>${label}</span></label>`;
+  }).join('') || '<div style="padding:8px;color:var(--dim);font-size:12px">ไม่มีข้อมูล</div>';
+  pop.innerHTML = `
+    <input type="text" class="colf-search" placeholder="🔍 ค้นหาค่า..." oninput="colfSearch(this.value)">
+    <label class="colf-item colf-all"><input type="checkbox" checked onchange="colfToggleAll(this.checked)"><span>(เลือกทั้งหมด)</span></label>
+    <div class="colf-list" id="colfList">${items}</div>
+    <div class="colf-btns">
+      <button class="colf-clear" onclick="colfClear('${field}')">ล้าง</button>
+      <button class="colf-apply" onclick="colfApply('${field}')">ตกลง</button>
+    </div>`;
+  pop.style.display = 'block';
+  const r = e.target.getBoundingClientRect();
+  pop.style.left = Math.min(r.left, window.innerWidth - 250) + 'px';
+  pop.style.top  = (r.bottom + 4) + 'px';
+}
+function colfSearch(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#colfList .colf-item').forEach(el => {
+    el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+function colfToggleAll(checked) {
+  document.querySelectorAll('#colfList .colf-item input').forEach(cb => {
+    if (cb.closest('.colf-item').style.display !== 'none') cb.checked = checked;
+  });
+}
+function colfApply(field) {
+  const boxes = [...document.querySelectorAll('#colfList .colf-item input')];
+  const picked = boxes.filter(cb => cb.checked).map(cb => decodeURIComponent(cb.value));
+  if (!picked.length) { showToast('⚠️ เลือกอย่างน้อย 1 ค่า'); return; }
+  if (picked.length === boxes.length) delete incColFilters[field];  // เลือกครบ = ไม่กรอง
+  else incColFilters[field] = new Set(picked);
+  closeColFilter();
+  page = 1;
+  renderIncoming();
+}
+function colfClear(field) {
+  delete incColFilters[field];
+  closeColFilter();
+  page = 1;
+  renderIncoming();
+}
+function closeColFilter() {
+  document.getElementById('colFilterPop').style.display = 'none';
+}
+// ปิด popup เมื่อคลิกที่อื่น
+document.addEventListener('click', e => {
+  const pop = document.getElementById('colFilterPop');
+  if (pop.style.display === 'block' && !pop.contains(e.target) && !e.target.classList.contains('colf'))
+    closeColFilter();
+});
+
+// ── EDIT: incoming.db (แก้จำนวน) ──
+async function editIncQty(id, current) {
+  const v = prompt('แก้ไขจำนวน (ชิ้น):', current);
+  if (v === null) return;
+  const qty = parseInt(v, 10);
+  if (isNaN(qty) || qty < 0) { showToast('⚠️ จำนวนไม่ถูกต้อง'); return; }
+  try {
+    const res = await fetch(`/api/incoming/${encodeURIComponent(id)}/qty`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ qty })
+    });
+    const j = await res.json();
+    if (res.ok && j.ok !== false) { showToast(`✏️ แก้ไขจำนวนเป็น ${qty}`); fetchIncStats(); fetchIncoming(); }
+    else showToast('❌ ' + (j.error||'แก้ไขไม่สำเร็จ'));
+  } catch(e) { showToast('❌ ' + e.message); }
 }
 
 // ── DELETE: incoming.db ──
@@ -885,6 +1031,26 @@ function exportIncCSV() {
   showToast('✅ Export CSV สำเร็จ!');
 }
 
+// ── IMPORT EXCEL: incoming.db ──
+async function importExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';  // reset เพื่อให้เลือกไฟล์เดิมซ้ำได้
+  showToast('⏳ กำลังนำเข้า...');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/incoming/import', { method:'POST', body: fd });
+    const j = await res.json();
+    if (j.ok) {
+      showToast(`✅ นำเข้า ${j.imported} รายการ${j.skipped?` · ข้าม ${j.skipped}`:''}`);
+      fetchIncStats(); fetchIncoming();
+    } else {
+      showToast('❌ ' + (j.error||'นำเข้าไม่สำเร็จ'));
+    }
+  } catch(e) { showToast('❌ ' + e.message); }
+}
+
 // ══════════════════════════════════════════
 // SHARED: exportCSV dispatcher
 // ══════════════════════════════════════════
@@ -914,7 +1080,7 @@ function renderPager(total) {
   document.getElementById('pbtns').innerHTML = b;
 }
 function goP(p) {
-  const total = allRows.length;
+  const total = (currentDB==='incoming') ? incView.length : allRows.length;
   if (p<1||p>Math.ceil(total/PER)) return;
   page = p;
   if (currentDB==='mecp') renderMecp(); else renderIncoming();
@@ -938,7 +1104,8 @@ function toggleRow(id,cb) {
 }
 function togglePageAll(cb) {
   const start=(page-1)*PER;
-  const slice=allRows.slice(start, start+PER);
+  const src = (currentDB==='incoming') ? incView : allRows;
+  const slice=src.slice(start, start+PER);
   slice.forEach(o => { if (cb.checked) selectedIds.add(o.id); else selectedIds.delete(o.id); });
   if (currentDB==='mecp') renderMecp(); else renderIncoming();
   updateSelBar();

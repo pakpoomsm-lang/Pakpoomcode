@@ -604,9 +604,11 @@ SAP_EXPORT_DIR = str(Path(SAP_EXPORT_BASE) / "ZPP0059")
 UNIQUE_KEY_COLS = ["Order", "Activity", "Short Time Stamp", "Tag ID"]
 
 # Columns used to aggregate progress (must match bdf.load_progress logic).
+# "Order" = component production order, "Assembly Order" = assembly lot — these
+# are the stable join keys to the ZPP0022 order list (not the volatile Sequence).
 PROGRESS_COLS = [
-    "Production Line", "Production Month", "Sequence",
-    "Material", "Assembly Order", "Operation Short Text", "Posted Quantity",
+    "Production Line", "Order", "Assembly Order",
+    "Operation Short Text", "Posted Quantity",
 ]
 
 # File extensions accepted when scanning EXPORT_DIRS for SAP's export file.
@@ -748,24 +750,26 @@ def db_aggregate(conn: sqlite3.Connection) -> tuple[dict, dict]:
         cc = c(name)
         if cc in col_map:
             where.append(f'IFNULL("{cc}", "") = ""')
-    sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", '
-           f'"{c("Sequence")}", "{c("Material")}", "{c("Assembly Order")}", '
+    # Keyed by the SAP order number (stable), not line|month|seq: the ZPP0059
+    # Sequence gets renumbered over time and stops matching the ZPP0022 order
+    # list, which silently dropped most postings.
+    sql = (f'SELECT "{c("Production Line")}", "{c("Order")}", '
+           f'"{c("Assembly Order")}", '
            f'"{c("Operation Short Text")}", "{c("Posted Quantity")}" '
            f'FROM zpp0059_raw WHERE ' + " AND ".join(where))
 
     for row in conn.execute(sql):
-        line, month_raw, seq_raw, mat, ao, op, qty_raw = row
+        line, order, ao, op, qty_raw = row
         if not line:
             continue
         try:
             qty = float(qty_raw) if qty_raw else 0.0
         except ValueError:
             qty = 0.0
-        head = f"{line}|{bdf.month_display(month_raw)}|{bdf.seq_key(seq_raw)}"
         if op == hp_op:
-            by_lot[f"{head}|{ao}"] += qty
+            by_lot[ao] += qty
         elif op in op_field:
-            by_mat[f"{head}|{mat}"][op_field[op]] += qty
+            by_mat[order][op_field[op]] += qty
 
     def rnd(v):
         return int(v) if float(v).is_integer() else round(v, 3)
@@ -798,11 +802,11 @@ def actual_production_by_date(date_iso):
 
     A working day runs 07:40 today → 07:40 tomorrow, so the night shift's
     after-midnight output (00:00–07:40) is counted on the day the shift started.
-    Keyed by line|month|seq|material."""
+    Keyed by the SAP production order (stable; matches row.productionOrder)."""
     conn = _get_db()
     col_map = {r[1]: r[1] for r in conn.execute("PRAGMA table_info(zpp0059_raw)")}
     c = _col_name
-    needed = ["Production Line", "Production Month", "Sequence", "Material",
+    needed = ["Production Line", "Order",
               "Operation Short Text", "Posted Quantity", "Short Time Stamp"]
     if any(c(x) not in col_map for x in needed):
         conn.close(); return {"D": {}, "N": {}}
@@ -819,12 +823,12 @@ def actual_production_by_date(date_iso):
         cc = c(name)
         if cc in col_map:
             where.append(f'IFNULL("{cc}", "") = ""')
-    sql = (f'SELECT "{c("Production Line")}", "{c("Production Month")}", "{c("Sequence")}", '
-           f'"{c("Material")}", "{c("Operation Short Text")}", "{c("Posted Quantity")}", '
+    sql = (f'SELECT "{c("Production Line")}", "{c("Order")}", '
+           f'"{c("Operation Short Text")}", "{c("Posted Quantity")}", '
            f'"{ts_col}" FROM zpp0059_raw WHERE ' + " AND ".join(where))
     op_field = {"Brazing": "auto", "Cutting": "cutting"}
     out = {"D": {}, "N": {}}
-    for line, month_raw, seq_raw, mat, op, qty_raw, ts in conn.execute(sql, params):
+    for line, order, op, qty_raw, ts in conn.execute(sql, params):
         if not line:
             continue
         field = op_field.get((op or "").strip())
@@ -837,8 +841,8 @@ def actual_production_by_date(date_iso):
             qty = float(qty_raw) if qty_raw else 0.0
         except ValueError:
             qty = 0.0
-        key = f"{line}|{bdf.month_display(month_raw)}|{bdf.seq_key(seq_raw)}|{mat}"
-        bucket = out[dn].setdefault(key, {"auto": 0.0, "cutting": 0.0})
+        # Keyed by the SAP production order (stable), matched to row.productionOrder.
+        bucket = out[dn].setdefault(order, {"auto": 0.0, "cutting": 0.0})
         bucket[field] += qty
     conn.close()
     def rnd(v):

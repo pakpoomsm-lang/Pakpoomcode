@@ -830,6 +830,29 @@
       line-height: 1.3;
     }
     .sim-ot-info.err { color: var(--late); }
+    /* คนมาทำงาน / คนลา ต่อ Shift (มุมขวาของหัว Plan) */
+    .attend-box { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .attend-item {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      width: 96px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700;
+      border: 1px solid transparent; line-height: 1; box-sizing: border-box;
+    }
+    .attend-item .attend-lbl { font-weight: 700; }
+    .attend-item b { font-size: 13px; font-variant-numeric: tabular-nums; }
+    .attend-work { background: #e7f5ee; color: #0a8043; border-color: #b7e4cd; }
+    .attend-ot { background: #fdf3e3; color: #b7791f; border-color: #f0d9a8; }
+    .attend-leave {
+      background: #fff3f3; color: #c0392b; border-color: #f2c2c2;
+      cursor: pointer; font: inherit; font-weight: 700;
+    }
+    .attend-leave:hover { background: #ffe6e6; }
+    .attend-leave[disabled] { opacity: .55; cursor: default; }
+    .leave-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 8px 4px; border-bottom: 1px solid var(--grid, #e5e9f0); }
+    .leave-row:last-child { border-bottom: 0; }
+    .leave-name { font-weight: 700; color: var(--ink); }
+    .leave-meta { font-size: 12px; color: var(--muted); }
+    .leave-period { font-size: 12px; font-weight: 700; color: #c0392b; text-align: right; }
+    .leave-empty { padding: 20px; text-align: center; color: var(--muted); }
     .sim {
       display: inline-flex;
       align-items: stretch;
@@ -1127,6 +1150,9 @@
     th:hover { filter: brightness(1.08); }
     th.freeze-col { z-index: 6; }
     td.freeze-col { position: sticky; z-index: 2; background: #fff; }
+    /* Frozen (sticky) cells must carry the seq band, not a flat white. */
+    tbody tr.seq-band-a td.freeze-col { background: #ffffff; }
+    tbody tr.seq-band-b td.freeze-col { background: #dbe7fb; }
     td.editable.freeze-col { background: var(--edit-tint); }
     .freeze-edge { box-shadow: 5px 0 8px -6px rgba(15,23,42,.55); }
     th .th-hide {
@@ -1170,8 +1196,10 @@
     
 
     tbody td { color: var(--ink); background: var(--surface); }
-    tbody tr:nth-child(odd) td { background: var(--surface-2); }
-    
+    /* Alternate the background per seq (blue / white bands), not per row. */
+    tbody tr.seq-band-a td { background: #ffffff; }
+    tbody tr.seq-band-b td { background: #dbe7fb; }
+
     tbody tr:hover td { background: #eaf1ff; }
 
     
@@ -1184,6 +1212,8 @@
       background: #eceef2 !important;
       cursor: not-allowed;
     }
+    /* -BZ jobs skip Cutting: show a plain "-" instead of a value, no grey block. */
+    td.cut-na { color: #94a3b8; text-align: center; }
     tbody tr.dlv-row td { background: #eef0f3 !important; }
     tbody tr.dlv-row:hover td { background: #e4e7ec !important; }
     tbody tr.dlv-row td.blocked { background: #e2e5ea !important; }
@@ -1392,6 +1422,9 @@
                 <label class="dm-item">Update Routing
                   <input id="importRouting" type="file" accept=".xlsx,.xlsm">
                 </label>
+                <label class="dm-item">Update CT
+                  <input id="importCt" type="file" accept=".xlsx,.xlsm">
+                </label>
                 <div class="dm-sep"></div>
                 <div class="dm-label">จำนวนเครื่องจักร (Machines)</div>
                 <div class="machine-counts" id="machineCounts" title="จำนวนเครื่องที่เดินขนานกันต่อ process · ใช้หาร Cycle Time ในตัววางแผน">
@@ -1463,6 +1496,11 @@
               <div class="prod-col-head">
                 <span class="prod-tag tag-plan">Plan</span>
                 <button id="simPullOt" class="sim-pull" type="button" title="ดึงชั่วโมงการทำงานจากโปรแกรม OT">&#8635; OT</button>
+                <div id="attendBox" class="attend-box" hidden title="คน Shift นี้ (จากโปรแกรม OT)">
+                  <span class="attend-item attend-work"><span class="attend-lbl">มาทำงาน</span><b id="attendWork">–</b></span>
+                  <span class="attend-item attend-ot"><span class="attend-lbl">ทำ OT</span><b id="attendOt">–</b></span>
+                  <button id="attendLeaveBtn" type="button" class="attend-item attend-leave" title="คลิกดูรายชื่อคนลา"><span class="attend-lbl">ลา</span><b id="attendLeave">–</b></button>
+                </div>
               </div>
               <div class="sim" id="simBox" title="ติ๊กแถวด้านซ้ายเพื่อวางแผน · Unit Rate = ผลรวม (TS x Assy Order) ของแถวที่ติ๊ก">
                 <div class="sim-cell">
@@ -1567,6 +1605,15 @@
       <div id="incList" class="cs-list"></div>
     </div>
   </div>
+  <div id="leaveOverlay" class="dash-overlay" hidden>
+    <div class="dash-panel cs-panel">
+      <div class="dash-head">
+        <div id="leaveTitle" class="dash-title">คนลา</div>
+        <button id="leaveClose" class="dash-close" type="button">&#10005;</button>
+      </div>
+      <div id="leaveList" class="cs-list"></div>
+    </div>
+  </div>
   <div id="dbOverlay" class="dash-overlay" hidden>
     <div class="dash-panel db-panel">
       <div class="dash-head">
@@ -1658,16 +1705,18 @@
       const month = String(row.month || '').trim();
       if (!line || !seq) return null;
       const procs = (checkSheets.byKey || {})[`${line}|${month}|${seq}`] || {};
+      // -BZ records end at Brazing, so Cutting is not part of their process.
+      const cols = attrEndsBz(row) ? CHECK_PROCS.filter(([key]) => key !== 'cutting') : CHECK_PROCS;
       let have = 0, ng = false;
       const missing = [];
       const detail = [];
-      for (const [key, label] of CHECK_PROCS) {
+      for (const [key, label] of cols) {
         const v = procs[key];
         if (v === 'OK') { have++; detail.push({ key, label, result: 'OK' }); }
         else if (v === 'NG') { ng = true; detail.push({ key, label, result: 'NG' }); }
         else { missing.push(label); detail.push({ key, label, result: null }); }
       }
-      const need = CHECK_PROCS.length;
+      const need = cols.length;
       if (have === 0 && !ng) return { state: 'none', detail };
       if (ng) return { state: 'ng', cls: 'ng', label: 'NG', title: 'มี process ผล NG', detail };
       if (have === need) return { state: 'full', cls: 'ok', label: 'ครบ', title: 'ครบทุก process', detail };
@@ -1873,6 +1922,7 @@
       wrap: document.querySelector('.table-wrap'),
       header: document.getElementById('headerRow'), importFile: document.getElementById('importFile'),
       importStock: document.getElementById('importStock'), importRouting: document.getElementById('importRouting'),
+      importCt: document.getElementById('importCt'),
       dataMgmtBtn: document.getElementById('dataMgmtBtn'), dataMgmtMenu: document.getElementById('dataMgmtMenu'),
       defaultDisplayBtn: document.getElementById('defaultDisplayBtn'),
       zpp0059Btn: document.getElementById('zpp0059Btn'),
@@ -1893,6 +1943,9 @@
       actRateSub: document.getElementById('actRateSub'),
       actWorkBadge: document.getElementById('actWorkBadge'),
       actProdBadge: document.getElementById('actProdBadge'),
+      attendBox: document.getElementById('attendBox'), attendWork: document.getElementById('attendWork'),
+      attendOt: document.getElementById('attendOt'),
+      attendLeave: document.getElementById('attendLeave'), attendLeaveBtn: document.getElementById('attendLeaveBtn'),
       productivityViewBtn: document.getElementById('productivityViewBtn'),
       leadDashBtn: document.getElementById('leadDashBtn'),
       productivityView: document.getElementById('productivityView'),
@@ -2014,6 +2067,7 @@
     let lastActualDate = '';   // date of the last actual-production fetch (D: skip if unchanged)
     let lastActualLoad = 0;    // timestamp of the last actual fetch (B: throttle the today-poll)
     let otCache = null;        // { date, shifts, morning_shift } from the last OT pull (C: dedup)
+    let attendCache = null;    // { date, shifts } คนมาทำงาน/คนลา ต่อ shift จากโปรแกรม OT
     let byId = new Map();
     let fillSource = null;
     let fillDragging = false;
@@ -2635,6 +2689,7 @@
       els.importFile.addEventListener('change', importRawData);
       els.importStock.addEventListener('change', importStockData);
       els.importRouting.addEventListener('change', importRoutingData);
+      els.importCt.addEventListener('change', importCtData);
       syncMachineInputs();
       if (els.changeoverMinInput) {
         els.changeoverMinInput.value = changeoverMin;
@@ -2745,6 +2800,11 @@
       const incClose = document.getElementById('incClose');
       if (incClose) incClose.addEventListener('click', () => { incOverlay.hidden = true; });
       if (incOverlay) incOverlay.addEventListener('click', (e) => { if (e.target === incOverlay) incOverlay.hidden = true; });
+      const leaveOverlay = document.getElementById('leaveOverlay');
+      const leaveClose = document.getElementById('leaveClose');
+      if (els.attendLeaveBtn) els.attendLeaveBtn.addEventListener('click', openLeaveDetail);
+      if (leaveClose) leaveClose.addEventListener('click', () => { leaveOverlay.hidden = true; });
+      if (leaveOverlay) leaveOverlay.addEventListener('click', (e) => { if (e.target === leaveOverlay) leaveOverlay.hidden = true; });
     }
     function searchText(row) {
       return [row.line,row.seq,row.month,row.code,row.model,row.item,row.description,row.attribute,row.productionOrder,row.assyOrderNo,row.status,row.remark,row.leadRemark].join(' ').toLowerCase();
@@ -2906,6 +2966,19 @@
       const target = rel ? rel.getAttribute('Target') : 'worksheets/sheet1.xml';
       return 'xl/' + target.replace(/^\//, '').replace(/^xl\//, '');
     }
+    // Path of a sheet by name (case-insensitive); falls back to the first sheet.
+    function namedWorksheetPath(files, name) {
+      const workbook = parseXml(xmlText(files['xl/workbook.xml']));
+      const want = String(name).trim().toLowerCase();
+      const sheet = [...workbook.getElementsByTagName('sheet')]
+        .find(s => (s.getAttribute('name') || '').trim().toLowerCase() === want);
+      if (!sheet) return firstWorksheetPath(files);
+      const relId = sheet.getAttribute('r:id');
+      const rels = parseXml(xmlText(files['xl/_rels/workbook.xml.rels']));
+      const rel = [...rels.getElementsByTagName('Relationship')].find(r => r.getAttribute('Id') === relId);
+      const target = rel ? rel.getAttribute('Target') : 'worksheets/sheet1.xml';
+      return 'xl/' + target.replace(/^\//, '').replace(/^xl\//, '');
+    }
     function colIndex(cellRef) {
       const letters = String(cellRef || '').match(/[A-Z]+/i)?.[0] || 'A';
       let n = 0;
@@ -2993,9 +3066,10 @@
       const speed = DATA.speedByModel[`${line}|${code}|${model}`] ?? DATA.speedByLine[line] ?? '';
       const month = monthDisplay(at('month'));
       const assyOrderNo = cleanText(at('assyOrder'));
-      const head = `${line}|${month}|${cleanNumber(at('seq'))}`;
-      const matp = (DATA.progressMat && DATA.progressMat[`${head}|${item}`]) || {};
-      const hpVal = DATA.progressLot ? DATA.progressLot[`${head}|${assyOrderNo}`] : undefined;
+      const prodOrder = cleanText(at('productionOrder'));
+      // Join progress by the SAP order number (stable), not line|month|seq.
+      const matp = (DATA.progressMat && DATA.progressMat[prodOrder]) || {};
+      const hpVal = DATA.progressLot ? DATA.progressLot[assyOrderNo] : undefined;
       const fin = finalQty(route.attribute2, matp);
       return {
         line,
@@ -3080,7 +3154,11 @@
       const header = rows[0].map(cleanText);
       const ix = {};
       header.forEach((h, i) => { if (!(h in ix)) ix[h] = i; });
-      const need = ['Production Line','Production Month','Sequence','Material','Assembly Order','Operation Short Text','Posted Quantity'];
+      // Keyed by the SAP order number (stable), not line|month|seq: the ZPP0059
+      // Sequence is renumbered over time and stops matching the ZPP0022 order
+      // list, which silently dropped most postings. Order -> Production Order,
+      // Assembly Order -> the assembly lot.
+      const need = ['Production Line','Order','Assembly Order','Operation Short Text','Posted Quantity'];
       for (const name of need) { if (ix[name] === undefined) throw new Error('Missing column: ' + name); }
       const opField = { Insert: 'fp', Brazing: 'auto', Cutting: 'cutting' };
       const mat = {}; const lot = {};
@@ -3088,15 +3166,14 @@
         const row = rows[r];
         const line = cleanText(row[ix['Production Line']]);
         if (!line) continue;
-        const head = `${line}|${monthDisplay(row[ix['Production Month']])}|${seqKey(row[ix['Sequence']])}`;
         const op = cleanText(row[ix['Operation Short Text']]);
         const q = Number(row[ix['Posted Quantity']]);
         const qty = Number.isFinite(q) ? q : 0;
         if (op === 'H/P bender') {
-          const k = `${head}|${cleanText(row[ix['Assembly Order']])}`;
+          const k = cleanText(row[ix['Assembly Order']]);
           lot[k] = (lot[k] || 0) + qty;
         } else if (opField[op]) {
-          const k = `${head}|${cleanText(row[ix['Material']])}`;
+          const k = cleanText(row[ix['Order']]);
           if (!mat[k]) mat[k] = {};
           const f = opField[op];
           mat[k][f] = (mat[k][f] || 0) + qty;
@@ -3109,9 +3186,9 @@
     }
     function applyProgressToRows() {
       for (const row of currentRows) {
-        const head = `${row.line}|${row.month}|${seqKey(row.seq)}`;
-        const matp = (DATA.progressMat && DATA.progressMat[`${head}|${row.item}`]) || {};
-        const hpVal = DATA.progressLot ? DATA.progressLot[`${head}|${row.assyOrderNo}`] : undefined;
+        // Join progress by the SAP order number (stable), not line|month|seq.
+        const matp = (DATA.progressMat && DATA.progressMat[row.productionOrder]) || {};
+        const hpVal = DATA.progressLot ? DATA.progressLot[row.assyOrderNo] : undefined;
         const fin = finalQty(row.attribute, matp);
         row.hp = hpVal === undefined ? '' : hpVal;
         row.fp = matp.fp ?? '';
@@ -3254,8 +3331,7 @@
         row.unit = route.unit || '';
         row.ts = route.ts || '';
         row.operation = route.operation || '';
-        const head = `${row.line}|${row.month}|${seqKey(row.seq)}`;
-        const matp = (DATA.progressMat && DATA.progressMat[`${head}|${row.item}`]) || {};
+        const matp = (DATA.progressMat && DATA.progressMat[row.productionOrder]) || {};
         const fin = finalQty(row.attribute, matp);
         row.fg = fin; row.stockFg = fin; row.subcooler = fin;
       }
@@ -3278,6 +3354,48 @@
       } catch (error) {
         console.error(error);
         els.importStatus.textContent = `Routing update failed: ${error.message}`;
+      } finally {
+        event.target.value = '';
+      }
+    }
+    // Parse CT.xlsx (sheet "Master") into {material: {finpress,hpbender,expander,
+    // autoBrazing,cutting}} — same shape and MAX-per-material rule as load_ct().
+    function parseCt(rows) {
+      const header = rows[0].map(cleanText);
+      const ix = {};
+      header.forEach((h, i) => { if (ix[h] === undefined) ix[h] = i; });
+      const need = ['Material','Finpress-CT','HPBender-CT','Expander-CT','Auto-Brazing-CT','Cutting-Sec'];
+      for (const name of need) { if (ix[name] === undefined) throw new Error('Missing column: ' + name); }
+      const ct = {};
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const material = cleanText(row[ix['Material']]);
+        if (!material) continue;
+        const rec = ct[material] || (ct[material] = { finpress: 0, hpbender: 0, expander: 0, autoBrazing: 0, cutting: 0 });
+        rec.finpress    = Math.max(rec.finpress,    cleanNumber(row[ix['Finpress-CT']])     || 0);
+        rec.hpbender    = Math.max(rec.hpbender,    cleanNumber(row[ix['HPBender-CT']])     || 0);
+        rec.expander    = Math.max(rec.expander,    cleanNumber(row[ix['Expander-CT']])     || 0);
+        rec.autoBrazing = Math.max(rec.autoBrazing, cleanNumber(row[ix['Auto-Brazing-CT']]) || 0);
+        rec.cutting     = Math.max(rec.cutting,     cleanNumber(row[ix['Cutting-Sec']])     || 0);
+      }
+      return ct;
+    }
+    async function importCtData(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      els.importStatus.textContent = `Updating CT: ${file.name}`;
+      try {
+        const files = await unzipXlsx(await file.arrayBuffer());
+        const shared = readSharedStrings(files);
+        const rows = worksheetRows(files, namedWorksheetPath(files, 'Master'), shared);
+        if (!rows.length) throw new Error('No rows found in file.');
+        const ct = parseCt(rows);
+        DATA.ct = ct;
+        recompute(true);
+        els.importStatus.textContent = `CT updated: ${file.name} (${Object.keys(ct).length.toLocaleString()} materials)`;
+      } catch (error) {
+        console.error(error);
+        els.importStatus.textContent = `CT update failed: ${error.message}`;
       } finally {
         event.target.value = '';
       }
@@ -3582,12 +3700,26 @@
       });
       th.appendChild(grip);
     }
+    // Alternate the row background per seq (blue / white bands) so each
+    // production seq reads as one block. Every row of the same line|month|seq
+    // shares a band; the band flips color when the seq changes.
+    function assignSeqBands(rows) {
+      let band = 0;
+      let prevKey = null;
+      for (const r of rows) {
+        const key = `${r.line}|${r.month}|${r.seq}`;
+        if (prevKey !== null && key !== prevKey) band ^= 1;
+        r._band = band;
+        prevKey = key;
+      }
+    }
     function recompute(resetScroll) {
       if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
       const q = els.search.value.trim().toLowerCase();
       const filtering = q || els.line.value !== 'ALL' || els.month.value !== 'ALL'
         || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideCncl || hideAssySkip || autoHideOldDlv || hiddenDlvRecords.size > 0;
       filtered = filtering ? sortedAll.filter(r => passes(r, q)) : sortedAll;
+      assignSeqBands(filtered);
       if (resetScroll && els.wrap) els.wrap.scrollTop = 0;
       render();
     }
@@ -3778,8 +3910,52 @@
           b.classList.toggle('active', b.dataset.shift === shift));
       }
       updateSimShiftLabel();
+      renderAttendance();   // ตัวเลขคนมาทำงาน/คนลา เปลี่ยนตาม shift
       localStorage.setItem('dailyFollowSimShift', activeSimShift);
       render();
+    }
+    // แสดงตัวเลขของ shift ที่กำลังเลือก; ซ่อนไปถ้ายังไม่มีข้อมูล
+    function renderAttendance() {
+      if (!els.attendBox) return;
+      const s = attendCache && attendCache.shifts[activeSimShift];
+      if (!s) { els.attendBox.hidden = true; return; }
+      els.attendBox.hidden = false;
+      els.attendWork.textContent = (s.work || 0).toLocaleString();
+      els.attendOt.textContent = (s.ot || 0).toLocaleString();
+      els.attendLeave.textContent = (s.leave || 0).toLocaleString();
+      els.attendLeaveBtn.disabled = !(s.leaves && s.leaves.length);
+    }
+    function openLeaveDetail() {
+      const ovl = document.getElementById('leaveOverlay');
+      const title = document.getElementById('leaveTitle');
+      const list = document.getElementById('leaveList');
+      if (!ovl) return;
+      const s = attendCache && attendCache.shifts[activeSimShift];
+      const recs = (s && s.leaves) || [];
+      title.textContent = `คนลา — Shift ${activeSimShift} (${recs.length} คน)`;
+      list.replaceChildren();
+      if (!recs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'leave-empty';
+        empty.textContent = 'ไม่มีคนลาใน shift นี้';
+        list.appendChild(empty);
+      }
+      for (const r of recs) {
+        const row = document.createElement('div');
+        row.className = 'leave-row';
+        const name = document.createElement('div');
+        name.className = 'leave-name';
+        name.textContent = `${r.emp_name} (${r.emp_id})`;
+        const period = document.createElement('div');
+        period.className = 'leave-period';
+        period.textContent = [r.leave_period, r.leave_time].filter(v => v && v !== '-').join(' ') || '-';
+        const meta = document.createElement('div');
+        meta.className = 'leave-meta';
+        meta.textContent = r.workplace && r.workplace !== '-' ? r.workplace : '';
+        row.append(name, period, meta);
+        list.appendChild(row);
+      }
+      ovl.hidden = false;
     }
     // Pull per-shift working hours from the OT program (via local server proxy).
     // Pull per-shift working hours from the OT program.
@@ -3808,6 +3984,9 @@
         }
         const sh = res.shifts || {};
         otCache = { date, shifts: sh, morning_shift: res.morning_shift };
+        // คนมาทำงาน/คนลา มากับ response เดียวกัน (แต่ละ shift มี work/leave/leaves)
+        attendCache = { date, shifts: sh };
+        renderAttendance();
         const inputFocused = (document.activeElement === els.workHour);
         for (const s of SIM_SHIFTS) {
           if (auto && simShifts[s].manual) continue;     // respect manual override
@@ -3890,8 +4069,8 @@
         ? Object.assign({}, actProd.N || {}, actProd.D || {})
         : (actProd[(shift === morning) ? 'D' : 'N'] || {});
       let rate = 0, n = 0, pcs = 0;
-      // Production is aggregated per material/seq, so each key counts once even
-      // though the same material appears in several order rows of the table.
+      // Production is aggregated per SAP production order, so each order counts
+      // once even if it shows up in several rows of the table.
       const seen = new Set();
       for (const row of filtered) {
         // Match the production population the rest of the dashboard uses:
@@ -3902,8 +4081,8 @@
         if (isHiddenByAssyStatus(row)) continue;
         const ts = valueOf(row, 'ts');
         if (ts === '' || ts === null || ts === undefined) continue;
-        const key = `${row.line}|${row.month}|${seqKey(row.seq)}|${row.item}`;
-        if (seen.has(key)) continue;
+        const key = row.productionOrder;
+        if (!key || seen.has(key)) continue;
         const prod = byKey[key];
         if (!prod) continue;
         const a = String(row.attribute || '').trim().toUpperCase();
@@ -4162,6 +4341,7 @@
       const locked = isHairPin(row);
       const leadVal = computeLead(row);
       tr.className = locked ? 'row-locked' : (leadVal === '' ? 'row-missing' : 'row-ready');
+      tr.classList.add(row._band ? 'seq-band-b' : 'seq-band-a');
       if (isDlv(row)) tr.classList.add('dlv-row');
       let ci = -1;
       for (const [field, title, klass] of activeCols) {
@@ -4187,9 +4367,9 @@
         else if (field === 'lead') { value = leadVal; td.dataset.field = 'lead'; }
         else if (field === 'scLead') { value = computeScLead(row); td.dataset.field = 'scLead'; }
         else value = valueOf(row, field);
-        // -BZ records end at Brazing, so the Cutting column is blocked (no value, not editable).
+        // -BZ records end at Brazing, so Cutting doesn't apply: auto-fill "-" (not editable).
         const cutBlocked = field === 'cutting' && attrEndsBz(row);
-        if (cutBlocked) { value = ''; td.classList.add('blocked'); }
+        if (cutBlocked) { value = '-'; td.classList.add('cut-na'); }
         if (field === 'checkSheet') {
           const cs = csStatus(row);
           if (cs && cs.state !== 'none') {

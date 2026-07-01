@@ -3822,6 +3822,10 @@ function rvRenderStock() {
       </td>
       <td style="padding:11px 14px;font-size:11px;color:#94a3b8;text-align:center;">${r.lot_count || 0} ครั้ง</td>
       <td style="padding:11px 14px;font-size:11px;color:#94a3b8;font-family:monospace;">${r.last_receive || '—'}</td>
+      <td style="padding:11px 14px;text-align:center;">
+        <button onclick="rvAdjustStock('${(r.part_no||'').replace(/'/g,"\\'")}', ${net})"
+          style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️ ปรับ</button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -3836,8 +3840,10 @@ function rvRenderStock() {
         ${th('คงเหลือ')}
         ${th('รับกี่ครั้ง','center')}
         ${th('รับล่าสุด')}
+        ${th('ปรับ','center')}
       </tr></thead>
       <tbody>${rows}</tbody>
+      <!-- footer สรุปยอด -->
       <tfoot>
         <tr style="background:#f0f9ff;border-top:2px solid #bfdbfe;">
           <td colspan="3" style="padding:12px 14px;font-size:12px;font-weight:700;color:#1e293b;">รวมทั้งหมด ${data.length} รายการ</td>
@@ -3852,10 +3858,35 @@ function rvRenderStock() {
               ${grandNet<0?'⚠️ ':''}${grandNet.toLocaleString()} ชิ้น
             </span>
           </td>
-          <td colspan="2"></td>
+          <td colspan="3"></td>
         </tr>
       </tfoot>
     </table>`;
+}
+
+// ปรับยอด stock คงเหลือของ item (บันทึกส่วนต่างลง deductions ฝั่ง server)
+async function rvAdjustStock(partNo, currentNet) {
+  if (!partNo) return;
+  const v = prompt(`ปรับยอดคงเหลือ — ${partNo}\nคงเหลือปัจจุบัน: ${Number(currentNet).toLocaleString()} ชิ้น\n\nกรอกยอดคงเหลือใหม่:`, currentNet);
+  if (v === null) return;
+  const target = parseInt(String(v).replace(/,/g, ''), 10);
+  if (isNaN(target)) { toast('⚠️ กรุณากรอกตัวเลข', 'toast-err'); return; }
+  const delta = target - currentNet;
+  if (delta === 0) { toast('ยอดไม่เปลี่ยนแปลง'); return; }
+  const reason = prompt('เหตุผลในการปรับ (ไม่บังคับ):', 'ปรับด้วยตนเอง') || 'ปรับด้วยตนเอง';
+  try {
+    const res = await fetch('/api/incoming/stock/adjust', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ part_no: partNo, delta, reason })
+    });
+    const j = await res.json();
+    if (j.ok) {
+      toast(`✅ ปรับ ${partNo} เป็น ${target.toLocaleString()} (${delta>0?'+':''}${delta.toLocaleString()})`);
+      rvLoadStock();
+    } else {
+      toast('❌ ' + (j.error || 'ปรับไม่สำเร็จ'), 'toast-err');
+    }
+  } catch (e) { toast('❌ ' + e.message, 'toast-err'); }
 }
 
 let toastTimer;
