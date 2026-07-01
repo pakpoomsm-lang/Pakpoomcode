@@ -1127,6 +1127,9 @@
     th:hover { filter: brightness(1.08); }
     th.freeze-col { z-index: 6; }
     td.freeze-col { position: sticky; z-index: 2; background: #fff; }
+    /* Frozen (sticky) cells must carry the seq band, not a flat white. */
+    tbody tr.seq-band-a td.freeze-col { background: #ffffff; }
+    tbody tr.seq-band-b td.freeze-col { background: #dbe7fb; }
     td.editable.freeze-col { background: var(--edit-tint); }
     .freeze-edge { box-shadow: 5px 0 8px -6px rgba(15,23,42,.55); }
     th .th-hide {
@@ -1170,8 +1173,10 @@
     
 
     tbody td { color: var(--ink); background: var(--surface); }
-    tbody tr:nth-child(odd) td { background: var(--surface-2); }
-    
+    /* Alternate the background per seq (blue / white bands), not per row. */
+    tbody tr.seq-band-a td { background: #ffffff; }
+    tbody tr.seq-band-b td { background: #dbe7fb; }
+
     tbody tr:hover td { background: #eaf1ff; }
 
     
@@ -3585,12 +3590,26 @@
       });
       th.appendChild(grip);
     }
+    // Alternate the row background per seq (blue / white bands) so each
+    // production seq reads as one block. Every row of the same line|month|seq
+    // shares a band; the band flips color when the seq changes.
+    function assignSeqBands(rows) {
+      let band = 0;
+      let prevKey = null;
+      for (const r of rows) {
+        const key = `${r.line}|${r.month}|${r.seq}`;
+        if (prevKey !== null && key !== prevKey) band ^= 1;
+        r._band = band;
+        prevKey = key;
+      }
+    }
     function recompute(resetScroll) {
       if (needSort) { sortedAll = sortRows(currentRows.slice()); needSort = false; }
       const q = els.search.value.trim().toLowerCase();
       const filtering = q || els.line.value !== 'ALL' || els.month.value !== 'ALL'
         || els.status.value !== 'ALL' || hideSkip || hideHairPin || hideCncl || hideAssySkip || autoHideOldDlv || hiddenDlvRecords.size > 0;
       filtered = filtering ? sortedAll.filter(r => passes(r, q)) : sortedAll;
+      assignSeqBands(filtered);
       if (resetScroll && els.wrap) els.wrap.scrollTop = 0;
       render();
     }
@@ -4165,6 +4184,7 @@
       const locked = isHairPin(row);
       const leadVal = computeLead(row);
       tr.className = locked ? 'row-locked' : (leadVal === '' ? 'row-missing' : 'row-ready');
+      tr.classList.add(row._band ? 'seq-band-b' : 'seq-band-a');
       if (isDlv(row)) tr.classList.add('dlv-row');
       let ci = -1;
       for (const [field, title, klass] of activeCols) {
