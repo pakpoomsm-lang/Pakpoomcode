@@ -144,6 +144,11 @@ DB_FILE = ROOT / "zpp0059.db"
 # a browser refresh. Written by POST /api/save-state, read by GET /api/state.
 STATE_FILE = ROOT / "daily_follow_state.json"
 
+# Shared production plan (ticked rows + working hours per day/shift) so every
+# machine pointing at this server sees the same plan. Last save wins.
+# Written by POST /api/save-plan, read by GET /api/plan.
+PLAN_FILE = ROOT / "daily_follow_plan.json"
+
 # How long to wait for SAP to finish exporting (seconds).
 RUN_TIMEOUT = 180
 
@@ -1415,6 +1420,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, json.dumps({"ok": True}))
             except Exception as exc:
                 self._send(500, json.dumps({"ok": False, "error": str(exc)}))
+        elif route == "/api/save-plan":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                raw = self.rfile.read(length) if length else b"{}"
+                json.loads(raw.decode("utf-8"))   # reject non-JSON
+                PLAN_FILE.write_bytes(raw)
+                self._send(200, json.dumps({"ok": True}))
+            except Exception as exc:
+                self._send(500, json.dumps({"ok": False, "error": str(exc)}))
         elif route == "/api/run-zpp0022":
             try:
                 fname, stats = run_zpp0022()
@@ -1445,6 +1459,15 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 if STATE_FILE.is_file():
                     self._send(200, STATE_FILE.read_bytes())
+                else:
+                    self._send(200, json.dumps({}))
+            except Exception as exc:
+                self._send(500, json.dumps({"error": str(exc)}))
+            return
+        if path == "api/plan":
+            try:
+                if PLAN_FILE.is_file():
+                    self._send(200, PLAN_FILE.read_bytes())
                 else:
                     self._send(200, json.dumps({}))
             except Exception as exc:
