@@ -1188,6 +1188,9 @@
     }
     body.col-resizing { cursor: col-resize; user-select: none; }
     body.col-resizing * { cursor: col-resize !important; }
+    th[draggable="true"] { cursor: grab; }
+    th.col-dragging { opacity: .5; }
+    th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--primary, #2563eb); }
 
     
 
@@ -1546,7 +1549,8 @@
               </div>
             </div>
           </div>
-          <div class="cycle-card" id="cycleCard">
+          <!-- Cycle time / capacity card: ซ่อนอยู่ตลอดตามที่ผู้ใช้ขอ -->
+          <div class="cycle-card" id="cycleCard" hidden>
             <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
               <thead>
                 <tr><th></th><th>Fin Press</th><th>HP Bender</th><th>Expander</th><th>Auto-Brazing</th><th>Cutting</th></tr>
@@ -1903,6 +1907,7 @@
       ['cutting','Cutting','num edit',64], ['fg','FG.','num edit',52], ['unit','UNIT','num',58],
       ['stockFg','Assy','num edit',74], ['subcooler','Subcooler','num edit',84], ['lead','Assy LT (Hrs.)','num lead',96], ['scLead','SC LT (Hrs.)','num lead',90],
       ['leadRemark','Remark','',130], ['ts','TS','num',58], ['unitRate','Unit Rate','num',100],
+      ['simUnitRate','SIM Unit Rate','num',110],
       ['actualTs','Actual TS','num',70], ['actualUnitRate','Actual UR','num',100]
     ];
     const headerClass = {
@@ -1910,6 +1915,7 @@
       speed: 'c-pink', status: 'c-purple', hp: 'c-blue', fp: 'c-blue', exp: 'c-blue',
       auto: 'c-blue', cutting: 'c-blue', fg: 'c-blue', unit: 'c-blue', stockFg: 'c-blue',
       lead: 'c-blue', leadRemark: 'c-green', ts: 'c-green', unitRate: 'c-green',
+      simUnitRate: 'c-purple',
       actualTs: 'c-orange', actualUnitRate: 'c-orange',
       subcooler: 'c-blue', scLead: 'c-blue'
     };
@@ -2037,6 +2043,36 @@
     let colWidths = {};
     try { colWidths = JSON.parse(localStorage.getItem('dailyFollowColWidths') || '{}') || {}; } catch (e) { colWidths = {}; }
     function saveColWidths() { localStorage.setItem('dailyFollowColWidths', JSON.stringify(colWidths)); }
+    // ลำดับ column ที่ผู้ใช้ลากจัดเอง (เก็บเป็น list ของชื่อ field). column ที่เพิ่มใหม่
+    // ในโค้ดแต่ยังไม่มีในลำดับที่บันทึกไว้ จะต่อท้ายตามลำดับเดิมใน `columns`.
+    let colOrder = [];
+    try { colOrder = JSON.parse(localStorage.getItem('dailyFollowColOrder') || '[]') || []; } catch (e) { colOrder = []; }
+    function orderedColumns() {
+      const byField = new Map(columns.map(c => [c[0], c]));
+      const result = [];
+      const seen = new Set();
+      for (const f of colOrder) {
+        const c = byField.get(f);
+        if (c && !seen.has(f)) { result.push(c); seen.add(f); }
+      }
+      for (const c of columns) {
+        if (!seen.has(c[0])) { result.push(c); seen.add(c[0]); }
+      }
+      return result;
+    }
+    function moveColumn(dragField, targetField) {
+      if (dragField === targetField) return;
+      const order = orderedColumns().map(c => c[0]);
+      const from = order.indexOf(dragField);
+      const to = order.indexOf(targetField);
+      if (from < 0 || to < 0) return;
+      order.splice(from, 1);
+      const insertAt = order.indexOf(targetField) + (from < to ? 1 : 0);
+      order.splice(insertAt, 0, dragField);
+      colOrder = order;
+      localStorage.setItem('dailyFollowColOrder', JSON.stringify(order));
+      render();
+    }
     let freezeField = localStorage.getItem('dailyFollowFreezeField') || '';
     const columnTitle = Object.fromEntries(columns.map(([field, title]) => [field, title]));
     let sortKey = 'prodSort';
@@ -2167,6 +2203,18 @@
       if (ts === '' || ts === null || ts === undefined) return '';
       if (stock === '' || stock === null || stock === undefined) return '';
       const v = (num(ts) / TS_HOURS_PER_UNIT) * num(stock);
+      if (!v) return '';
+      return Math.round(v * 10) / 10;
+    }
+    // SIM unit rate = จำลองว่าถ้าผลิตจบทั้ง order แล้ว unit rate จะเท่าไหร่
+    // (ใช้ Assy Order เต็มจำนวน แทน Assy stock ปัจจุบันที่ Unit Rate ใช้)
+    function computeSimUnitRate(row) {
+      if (isHairPin(row) || assyOk(row)) return '';
+      const ts = valueOf(row, 'ts');
+      if (ts === '' || ts === null || ts === undefined) return '';
+      const order = valueOf(row, 'assyOrder');
+      if (order === '' || order === null || order === undefined) return '';
+      const v = (num(ts) / TS_HOURS_PER_UNIT) * num(order);
       if (!v) return '';
       return Math.round(v * 10) / 10;
     }
@@ -2733,6 +2781,8 @@
       if (els.defaultDisplayBtn) els.defaultDisplayBtn.addEventListener('click', () => {
         colWidths = {};
         saveColWidths();
+        colOrder = [];
+        localStorage.setItem('dailyFollowColOrder', '[]');
         if (els.wrap) els.wrap.scrollLeft = 0;
         render();
       });
@@ -2831,7 +2881,7 @@
       return true;
     }
     function sortRows(rows) {
-      const computed = { prodSort: r => r.prodSort, lead: computeLead, unitRate: computeUnitRate, actualTs: computeActualTs, actualUnitRate: computeActualUnitRate };
+      const computed = { prodSort: r => r.prodSort, lead: computeLead, unitRate: computeUnitRate, simUnitRate: computeSimUnitRate, actualTs: computeActualTs, actualUnitRate: computeActualUnitRate };
       const getv = computed[sortKey];
       return rows.sort((a,b) => {
         let av = getv ? getv(a) : valueOf(a, sortKey);
@@ -3553,8 +3603,9 @@
       recompute(true);
     }
     function visibleColumns() {
-      const visible = columns.filter(([field]) => !hidden.has(field));
-      return visible.length ? visible : columns;
+      const ordered = orderedColumns();
+      const visible = ordered.filter(([field]) => !hidden.has(field));
+      return visible.length ? visible : ordered;
     }
     function renderFreezeOptions() {
       if (!els.freezeColumnSelect) return;
@@ -3633,6 +3684,7 @@
             updateSimReadout();
           });
           els.selAll = chk;
+          wireColDrag(th, field);
           addColResizer(th, field);
           th.appendChild(chk);
           els.header.appendChild(th);
@@ -3640,15 +3692,44 @@
         }
         th.appendChild(document.createTextNode(title));
         if (headerClass[field]) th.classList.add(headerClass[field]);
-        th.title = '\u00D7 to hide';
+        th.title = 'Drag to reorder \u00B7 \u00D7 to hide';
         const hide = document.createElement('span');
         hide.className = 'th-hide';
         hide.textContent = '\u00D7';
         hide.title = 'Hide this column';
         hide.addEventListener('click', (e) => { e.stopPropagation(); hideColumn(field); });
         th.appendChild(hide);
+        wireColDrag(th, field);
         addColResizer(th, field);
         els.header.appendChild(th);
+      });
+    }
+    // \u0E25\u0E32\u0E01 header \u0E40\u0E1E\u0E37\u0E48\u0E2D\u0E22\u0E49\u0E32\u0E22\u0E15\u0E33\u0E41\u0E2B\u0E19\u0E48\u0E07 column (HTML5 drag-and-drop). \u0E01\u0E32\u0E23\u0E25\u0E32\u0E01\u0E40\u0E23\u0E34\u0E48\u0E21\u0E08\u0E32\u0E01
+    // \u0E15\u0E31\u0E27 th; grip \u0E1B\u0E23\u0E31\u0E1A\u0E02\u0E19\u0E32\u0E14\u0E01\u0E31\u0E19 drag \u0E14\u0E49\u0E27\u0E22 preventDefault \u0E43\u0E19 mousedown \u0E02\u0E2D\u0E07\u0E21\u0E31\u0E19\u0E40\u0E2D\u0E07.
+    let dragCol = null;
+    function wireColDrag(th, field) {
+      th.draggable = true;
+      th.addEventListener('dragstart', (e) => {
+        dragCol = field;
+        e.dataTransfer.effectAllowed = 'move';
+        th.classList.add('col-dragging');
+      });
+      th.addEventListener('dragend', () => {
+        dragCol = null;
+        th.classList.remove('col-dragging');
+        els.header.querySelectorAll('.col-drop-target').forEach(h => h.classList.remove('col-drop-target'));
+      });
+      th.addEventListener('dragover', (e) => {
+        if (dragCol === null || dragCol === field) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        th.classList.add('col-drop-target');
+      });
+      th.addEventListener('dragleave', () => th.classList.remove('col-drop-target'));
+      th.addEventListener('drop', (e) => {
+        e.preventDefault();
+        th.classList.remove('col-drop-target');
+        if (dragCol !== null) moveColumn(dragCol, field);
       });
     }
     function closeDataMenu() {
@@ -4362,6 +4443,7 @@
         }
         let value;
         if (field === 'unitRate') { value = computeUnitRate(row); td.dataset.field = 'unitRate'; }
+        else if (field === 'simUnitRate') { value = computeSimUnitRate(row); td.dataset.field = 'simUnitRate'; }
         else if (field === 'actualTs') { value = computeActualTs(row); td.dataset.field = 'actualTs'; }
         else if (field === 'actualUnitRate') { value = computeActualUnitRate(row); td.dataset.field = 'actualUnitRate'; }
         else if (field === 'lead') { value = leadVal; td.dataset.field = 'lead'; }
