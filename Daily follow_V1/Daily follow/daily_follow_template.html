@@ -649,7 +649,17 @@
       display: flex; flex-direction: column; gap: 12px;
     }
     .productivity-layout .prod-body { order: 1; }
+    .productivity-layout .cycle-toggle { order: 2; }
     .productivity-layout .cycle-card { order: 2; }
+    .cycle-toggle {
+      align-self: flex-start;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border: 1px solid #d8e1ef; border-radius: 8px;
+      background: #fff; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .cycle-toggle:hover { border-color: #93a9d4; color: #1d4ed8; }
+    .cycle-toggle .caret { transition: transform .15s; }
+    .cycle-toggle.open .caret { transform: rotate(180deg); }
     .lead-inline-body {
       padding: 2px 0 0; overflow: visible;
     }
@@ -1124,8 +1134,8 @@
       background: transparent !important;
     }
     th, td {
-      border-right: 1px solid var(--grid);
-      border-bottom: 1px solid var(--grid);
+      border-right: 1px solid #334155;
+      border-bottom: 1px solid #334155;
       padding: 4px 9px;
       height: 26px;
       white-space: nowrap;
@@ -1549,7 +1559,8 @@
               </div>
             </div>
           </div>
-          <!-- Cycle time / capacity card: ซ่อนอยู่ตลอดตามที่ผู้ใช้ขอ -->
+          <!-- Cycle time / capacity card: ซ่อนเป็นค่าเริ่มต้น กดปุ่มเพื่อเปิดดูได้ -->
+          <button id="cycleCardToggle" class="cycle-toggle" type="button" aria-expanded="false" title="แสดง/ซ่อน Cycle time & Capacity"><span class="caret">&#9662;</span> Cycle time / Capacity</button>
           <div class="cycle-card" id="cycleCard" hidden>
             <table class="ct-matrix" id="ctItemTable" hidden title="Cycle Time + เวลาเปลี่ยนรุ่น (15 นาที/ครั้ง/process) แยกตาม process · ไม่รวม Hair Pin">
               <thead>
@@ -1962,7 +1973,7 @@
       prodPanel: document.getElementById('prodPanel'),
       summaryCollapseBtn: document.getElementById('summaryCollapseBtn'),
       cycleCard: document.getElementById('cycleCard'),
-      cycleCardCollapse: document.getElementById('cycleCardCollapse'),
+      cycleCardToggle: document.getElementById('cycleCardToggle'),
       editTargetBtn: document.getElementById('editTargetBtn'),
       targetOverlay: document.getElementById('targetOverlay'), targetClose: document.getElementById('targetClose'),
       targetBody: document.getElementById('targetBody'), targetReset: document.getElementById('targetReset'),
@@ -2801,6 +2812,22 @@
       els.clearData.addEventListener('click', clearData);
       els.clearProgress.addEventListener('click', clearProgress);
     }
+    // Card cycle time/capacity ซ่อนเป็นค่าเริ่มต้น ปุ่มเปิด/ปิดได้ และจำสถานะไว้
+    function wireCycleCardToggle() {
+      const btn = els.cycleCardToggle, card = els.cycleCard;
+      if (!btn || !card) return;
+      const apply = show => {
+        card.hidden = !show;
+        btn.classList.toggle('open', show);
+        btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+      };
+      apply(localStorage.getItem('dailyCycleCardOpen') === '1');
+      btn.addEventListener('click', () => {
+        const show = card.hidden;   // ตอนนี้ซ่อนอยู่ -> เปิด
+        localStorage.setItem('dailyCycleCardOpen', show ? '1' : '0');
+        apply(show);
+      });
+    }
     function wireCardCollapse(card, button, storageKey, label) {
       if (!card || !button) return;
       const setCollapsed = collapsed => {
@@ -2829,7 +2856,7 @@
           els.summaryCollapseBtn.setAttribute('aria-expanded', 'false');
         }
       }
-      wireCardCollapse(els.cycleCard, els.cycleCardCollapse, 'dailyCycleTimeCollapsed', 'Cycle Time');
+      wireCycleCardToggle();
       if (els.dbViewBtn) els.dbViewBtn.addEventListener('click', openDatabase);
       if (els.dbClose) els.dbClose.addEventListener('click', () => { els.dbOverlay.hidden = true; });
       if (els.dbOverlay) els.dbOverlay.addEventListener('click', (e) => { if (e.target === els.dbOverlay) els.dbOverlay.hidden = true; });
