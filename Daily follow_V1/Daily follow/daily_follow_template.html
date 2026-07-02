@@ -1134,14 +1134,20 @@
       background: transparent !important;
     }
     th, td {
-      border-right: 1px solid #334155;
-      border-bottom: 1px solid #334155;
+      border-right: 1px solid var(--grid);
+      border-bottom: 1px solid var(--grid);
       padding: 4px 9px;
       height: 26px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 260px;
+    }
+    /* ตารางแผนการผลิต: เส้นตารางเข้ม + ตัวอักษรอยู่ตรงกลางทุก column */
+    #planTable th, #planTable td {
+      border-right: 1px solid #334155;
+      border-bottom: 1px solid #334155;
+      text-align: center;
     }
     th {
       position: sticky;
