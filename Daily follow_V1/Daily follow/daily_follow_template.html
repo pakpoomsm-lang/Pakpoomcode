@@ -2112,6 +2112,11 @@
     let selected = simShifts[activeSimShift].sel;
     let bootSelected = simShifts[activeSimShift].boot;   // ids ที่มาจาก Boot productivity (ติ๊กสีเหลือง)
     let simPlanDate = todayISO();
+    // แผนการผลิตทั้งหมด (ทุกวัน/ทุก shift) เก็บใน memory เป็นแหล่งความจริงหลัก
+    // sync ขึ้น server ให้ทุกเครื่องเห็นแผนเดียวกัน (localStorage เป็น cache สำรอง)
+    let simPlanStore = (() => {
+      try { return JSON.parse(localStorage.getItem('dailyFollowSimPlan') || '{}'); } catch (e) { return {}; }
+    })();
     let actProdDate = todayISO();
     let actProd = { D: {}, N: {} };   // production by shift for actProdDate (from server)
     let actOt = null;                 // { shifts:{A,B}, morning_shift } for actProdDate
@@ -2408,6 +2413,7 @@
       simPlanDate = todayISO();
       if (els.simPlanDate) els.simPlanDate.value = simPlanDate;
       actProdDate = todayISO();
+      await refreshServerPlan();   // ดึงแผนที่แชร์จาก server ก่อนแสดง
       restoreSelected();
       refreshFilters();
       // Reflect the saved active shift on the tabs + Working label.
@@ -2533,9 +2539,10 @@
         const btn = e.target.closest('.sim-tab');
         if (btn && btn.dataset.shift) setActiveSimShift(btn.dataset.shift);
       });
-      if (els.simPlanDate) els.simPlanDate.addEventListener('change', () => {
+      if (els.simPlanDate) els.simPlanDate.addEventListener('change', async () => {
         const date = els.simPlanDate.value || todayISO();
         actProdDate = date;
+        await refreshServerPlan();   // เห็นแผนล่าสุดจากเครื่องอื่นเมื่อเปลี่ยนวัน
         loadSimPlanForDate(date);
         // tabs/label unchanged; refresh table + readout for the new day's plan
         render();
@@ -3963,18 +3970,48 @@
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
     function loadSimPlanStore() {
-      try { return JSON.parse(localStorage.getItem('dailyFollowSimPlan') || '{}'); } catch (e) { return {}; }
+      return simPlanStore;
+    }
+    // ดึงแผนล่าสุดจาก server มาแทน (last save wins). คืน true ถ้าดึงได้
+    async function refreshServerPlan() {
+      if (!serverStateAvailable()) return false;
+      try {
+        const resp = await fetch('api/plan?t=' + Date.now());
+        if (!resp.ok) return false;
+        const store = await resp.json();
+        if (store && typeof store === 'object' && Object.keys(store).length) {
+          simPlanStore = store;
+          localStorage.setItem('dailyFollowSimPlan', JSON.stringify(store));
+          return true;
+        }
+        // server ยังไม่มีแผน: ถ้าเครื่องนี้มีแผนเก่าใน localStorage ให้ push ขึ้นไปตั้งต้น
+        if (Object.keys(simPlanStore).length) saveServerPlan();
+      } catch (e) { /* offline: ใช้ค่าที่มีใน memory ต่อไป */ }
+      return false;
+    }
+    // ส่งแผนทั้งหมดขึ้น server (debounce กันยิงถี่ตอนติ๊กรัว ๆ)
+    let planSaveTimer = 0;
+    function saveServerPlan() {
+      if (!serverStateAvailable()) return;
+      clearTimeout(planSaveTimer);
+      planSaveTimer = setTimeout(() => {
+        fetch('api/save-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(simPlanStore),
+        }).catch(e => console.warn('Could not save plan to server', e));
+      }, 400);
     }
     // Persist the whole per-day plan (both shifts: ticked rows + working hours).
     function saveSelected() {
       simShifts[activeSimShift].wh = els.workHour.value;
-      const store = loadSimPlanStore();
-      store[simPlanDate] = {
+      simPlanStore[simPlanDate] = {
         A: { sel: [...simShifts.A.sel], boot: [...simShifts.A.boot], wh: simShifts.A.wh },
         B: { sel: [...simShifts.B.sel], boot: [...simShifts.B.boot], wh: simShifts.B.wh }
       };
-      localStorage.setItem('dailyFollowSimPlan', JSON.stringify(store));
+      localStorage.setItem('dailyFollowSimPlan', JSON.stringify(simPlanStore));
       localStorage.setItem('dailyFollowSimShift', activeSimShift);
+      saveServerPlan();
     }
     function restoreSelected() {
       loadSimPlanForDate(simPlanDate);
